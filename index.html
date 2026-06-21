@@ -1,0 +1,2187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CommerceHub — Retail Media Platform</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a4fd6'/%3E%3Ctext x='16' y='22' font-size='18' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E" />
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+<script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-2: #f7f9fc;
+  --border: #e6e9ef;
+  --border-strong: #d4d9e2;
+  --text: #1f2430;
+  --text-2: #5b6577;
+  --text-3: #8a94a6;
+  --brand: #1a4fd6;
+  --brand-2: #1a73e8;
+  --brand-soft: #eaf1ff;
+  --navy: #11203f;
+  --green: #1aa260;
+  --green-soft: #e6f6ee;
+  --red: #d93838;
+  --red-soft: #fdecec;
+  --amber: #d98a00;
+  --amber-soft: #fdf3e0;
+  --purple: #6b3fd6;
+  --purple-soft: #efeaff;
+  --shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+  --shadow-lg: 0 8px 28px rgba(16,24,40,.12);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --header-h: 56px;
+  --sidebar-w: 232px;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cfd5e0; border-radius: 6px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- App shell ---------- */
+.app { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--navy);
+  color: #c8d2e4;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; bottom: 0; left: 0;
+  z-index: 30;
+}
+.sidebar-brand {
+  height: var(--header-h);
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 18px;
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.brand-logo {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--brand-2), var(--brand));
+  display: grid; place-items: center;
+  font-weight: 800; color: #fff; font-size: 15px;
+  flex: 0 0 auto;
+}
+.brand-name { font-weight: 700; font-size: 15px; letter-spacing: -.2px; }
+.brand-name span { color: #7fa6ff; }
+
+.module-switch { padding: 14px 12px 6px; }
+.module-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #6b7a96; padding: 0 8px 6px; }
+.module-pill {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px; border-radius: var(--radius-sm);
+  color: #aeb9cf; font-weight: 600; font-size: 12.5px;
+  cursor: pointer; margin-bottom: 2px;
+}
+.module-pill:hover { background: rgba(255,255,255,.05); color: #fff; }
+.module-pill.active { background: var(--brand); color: #fff; }
+.module-pill .ico { width: 17px; height: 17px; flex: 0 0 auto; }
+
+.nav-section { padding: 8px 12px; overflow-y: auto; flex: 1; }
+.nav-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #6b7a96; padding: 12px 10px 6px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  color: #b6c0d6; font-size: 12.5px; cursor: pointer; margin-bottom: 1px;
+}
+.nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+.nav-item.active { background: rgba(127,166,255,.16); color: #fff; font-weight: 600; }
+.nav-item .ico { width: 16px; height: 16px; flex: 0 0 auto; opacity: .9; }
+.nav-badge { margin-left: auto; font-size: 10px; background: rgba(255,255,255,.12); padding: 1px 6px; border-radius: 10px; }
+
+.sidebar-foot { padding: 12px; border-top: 1px solid rgba(255,255,255,.08); display: flex; align-items: center; gap: 10px; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; background: #3a5a9e; color:#fff; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.sidebar-foot .who { font-size: 12px; color: #e6ecf7; font-weight: 600; }
+.sidebar-foot .who small { display: block; color: #8595b3; font-weight: 500; font-size: 10.5px; }
+
+/* Main */
+.main { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-width: 0; }
+.topbar {
+  height: var(--header-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 22px; position: sticky; top: 0; z-index: 20;
+}
+.crumb { display:flex; align-items:center; gap: 8px; color: var(--text-3); font-size: 12.5px; }
+.crumb b { color: var(--text); font-weight: 700; font-size: 14px; }
+.crumb .sep { color: var(--border-strong); }
+.topbar-spacer { flex: 1; }
+.topbar-ctrl {
+  display:flex; align-items:center; gap: 7px; height: 32px; padding: 0 11px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-2); font-size: 12px; font-weight: 500;
+}
+.topbar-ctrl:hover { border-color: var(--border-strong); color: var(--text); }
+.topbar-ctrl .ico { width: 15px; height: 15px; }
+.topbar-ctrl .badge { background: var(--brand); color: #fff; border-radius: 9px; font-size: 10px; padding: 0 5px; font-weight:700;}
+
+.content { padding: 20px 22px 60px; flex: 1; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; gap: 16px; flex-wrap: wrap; }
+.page-title { font-size: 19px; font-weight: 750; letter-spacing: -.3px; }
+.page-sub { color: var(--text-2); margin-top: 2px; font-size: 12.5px; }
+.page-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Buttons */
+.btn { display:inline-flex; align-items:center; gap:7px; height: 32px; padding: 0 13px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-size: 12.5px; font-weight: 600; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn.primary:hover { background: #1644bd; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--text-2); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn .ico { width: 15px; height: 15px; }
+.btn.sm { height: 27px; padding: 0 10px; font-size: 11.5px; }
+
+/* Tabs (view selector) */
+.viewtabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-bottom: 16px; overflow-x: auto; }
+.viewtab { padding: 7px 13px; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.viewtab:hover { background: var(--surface-2); color: var(--text); }
+.viewtab.active { background: var(--brand-soft); color: var(--brand); }
+
+/* KPI cards */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.kpi {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 13px 15px; box-shadow: var(--shadow); position: relative;
+}
+.kpi .k-label { color: var(--text-2); font-size: 11.5px; font-weight: 600; display:flex; align-items:center; gap:6px;}
+.kpi .k-val { font-size: 22px; font-weight: 750; letter-spacing: -.5px; margin-top: 5px; }
+.kpi .k-delta { font-size: 11px; font-weight: 700; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px; }
+.k-delta.up { color: var(--green); }
+.k-delta.down { color: var(--red); }
+.kpi .k-spark { position:absolute; right:12px; bottom:10px; opacity:.85; }
+
+/* Card / panel */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card-head { display:flex; align-items:center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.card-head h3 { margin: 0; font-size: 14px; font-weight: 700; }
+.card-head .sub { color: var(--text-2); font-size: 12px; font-weight: 500; }
+.card-body { padding: 16px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+@media (max-width: 1100px){ .grid-2,.grid-3 { grid-template-columns: 1fr; } }
+
+/* Toolbar above tables */
+.toolbar { display:flex; align-items:center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.search {
+  display:flex; align-items:center; gap: 8px; height: 34px; padding: 0 12px; flex: 1; min-width: 220px; max-width: 380px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-3);
+}
+.search input { border: none; outline: none; background: transparent; font-size: 12.5px; color: var(--text); width: 100%; }
+.chip { display:inline-flex; align-items:center; gap:6px; height: 28px; padding: 0 10px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); color: var(--text-2); font-size: 11.5px; font-weight: 600;}
+.chip.on { background: var(--brand-soft); border-color: #cdddff; color: var(--brand); }
+.bulkbar { display:flex; align-items:center; gap: 10px; background: var(--navy); color:#fff; border-radius: var(--radius-sm); padding: 8px 14px; margin-bottom: 12px; }
+.bulkbar .sel { font-weight: 700; }
+.bulkbar .btn { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.18); color:#fff; }
+.bulkbar .btn:hover { background: rgba(255,255,255,.2); }
+
+/* Table */
+.tablewrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+table.dt { border-collapse: collapse; width: 100%; font-size: 12.5px; min-width: 100%; }
+table.dt th, table.dt td { padding: 10px 12px; text-align: left; white-space: nowrap; }
+table.dt thead th {
+  background: var(--surface-2); color: var(--text-2); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .03em;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 2;
+}
+table.dt th.num, table.dt td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.dt tbody tr { border-bottom: 1px solid var(--border); }
+table.dt tbody tr:hover { background: var(--surface-2); }
+table.dt tbody tr:last-child { border-bottom: none; }
+.cellname { font-weight: 600; color: var(--text); max-width: 360px; white-space: normal; }
+.cellname small { display:block; color: var(--text-3); font-weight: 500; }
+.sticky-l { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+table.dt tbody tr:hover .sticky-l { background: var(--surface-2); }
+thead .sticky-l { z-index: 3; background: var(--surface-2); }
+
+/* Status pills */
+.pill { display:inline-flex; align-items:center; gap:6px; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.pill .dot { width:7px; height:7px; border-radius:50%; }
+.pill.green { background: var(--green-soft); color: #0f7a47; }
+.pill.green .dot { background: var(--green); }
+.pill.red { background: var(--red-soft); color: var(--red); }
+.pill.red .dot { background: var(--red); }
+.pill.amber { background: var(--amber-soft); color: #9a6300; }
+.pill.amber .dot { background: var(--amber); }
+.pill.gray { background: #eef1f6; color: var(--text-2); }
+.pill.gray .dot { background: var(--text-3); }
+.pill.blue { background: var(--brand-soft); color: var(--brand); }
+.pill.blue .dot { background: var(--brand); }
+.pill.purple { background: var(--purple-soft); color: var(--purple); }
+.pill.purple .dot { background: var(--purple); }
+
+.tag { display:inline-block; padding: 1px 7px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); font-size: 11px; font-weight: 600; }
+
+/* Toggle */
+.toggle { width: 34px; height: 19px; border-radius: 20px; background: #c9d0dc; position: relative; transition: .15s; border:none; padding:0; flex:0 0 auto;}
+.toggle.on { background: var(--green); }
+.toggle::after { content:''; position:absolute; top:2px; left:2px; width: 15px; height:15px; border-radius:50%; background:#fff; transition:.15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);}
+.toggle.on::after { left: 17px; }
+
+.bidcell { display:flex; align-items:center; gap:6px; }
+.bidcell .ed { color: var(--brand); font-weight:700; }
+.miniprog { width: 70px; height: 6px; background: #eef1f6; border-radius: 4px; overflow: hidden; }
+.miniprog > span { display:block; height: 100%; background: var(--brand); }
+
+/* Checkboxes */
+.cb { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border-strong); display:inline-grid; place-items:center; cursor:pointer; background:#fff;}
+.cb.on { background: var(--brand); border-color: var(--brand); color:#fff; }
+
+/* Misc */
+.muted { color: var(--text-2); }
+.flex { display:flex; }
+.between { justify-content: space-between; }
+.items-center { align-items: center; }
+.gap-8 { gap: 8px; } .gap-12 { gap: 12px; } .gap-16 { gap: 16px; }
+.mt-8{margin-top:8px;} .mt-16{margin-top:16px;} .mb-12{margin-bottom:12px;}
+.right { text-align: right; }
+.legend { display:flex; gap: 14px; flex-wrap: wrap; }
+.legend span { display:inline-flex; align-items:center; gap:6px; font-size:12px; color: var(--text-2); }
+.legend i { width:10px;height:10px;border-radius:3px;display:inline-block;}
+.section-title { font-size: 13px; font-weight: 750; margin: 4px 0 12px; color: var(--text); }
+.hint { background: var(--brand-soft); border: 1px solid #d4e3ff; color: #234; border-radius: var(--radius-sm); padding: 10px 13px; font-size: 12px; display:flex; gap:10px; align-items:flex-start; }
+.hint .ico { color: var(--brand); flex:0 0 auto; margin-top:1px;}
+
+/* Rule / list rows */
+.lrow { display:flex; align-items:center; gap: 14px; padding: 13px 16px; border-bottom: 1px solid var(--border); }
+.lrow:last-child { border-bottom:none; }
+.lrow:hover { background: var(--surface-2); }
+.lrow .icobox { width:36px;height:36px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;}
+.lrow .grow { flex:1; min-width:0; }
+.lrow .title { font-weight: 650; }
+.lrow .desc { color: var(--text-2); font-size: 11.5px; margin-top:2px; }
+
+/* Dayparting heatmap */
+.heat { display:grid; grid-template-columns: 42px repeat(24, 1fr); gap: 3px; }
+.heat .hh { font-size: 9.5px; color: var(--text-3); text-align:center; }
+.heat .rl { font-size: 11px; color: var(--text-2); display:flex; align-items:center; font-weight:600;}
+.heat .cell { height: 22px; border-radius: 4px; display:grid; place-items:center; font-size:9px; color: rgba(255,255,255,.95); cursor:pointer;}
+
+/* Progress bars in budget */
+.pace { height: 9px; border-radius: 6px; background: #eef1f6; overflow: hidden; position: relative; }
+.pace > span { display:block; height:100%; border-radius:6px; }
+.pacelabel { display:flex; justify-content: space-between; font-size: 11px; color: var(--text-2); margin-top:5px; }
+
+/* small donut */
+.metric-inline { display:flex; align-items:center; gap: 8px; }
+
+.footnote { color: var(--text-3); font-size: 11px; margin-top: 10px; }
+.empty { padding: 40px; text-align:center; color: var(--text-3); }
+
+#boot { position:fixed; inset:0; display:grid; place-items:center; font-family:sans-serif; color:#5b6577; }
+</style>
+</head>
+<body>
+<div id="root"><div id="boot">Loading CommerceHub…</div></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useMemo, useEffect, useContext, useRef, createContext, Fragment } = React;
+const { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } = Recharts;
+
+const RouterCtx = createContext({ path: '/', navigate: () => {} });
+function RouterProvider({ children }) {
+  const [path, setPath] = useState(window.location.hash.slice(1) || '/');
+  useEffect(() => {
+    const h = () => setPath(window.location.hash.slice(1) || '/');
+    window.addEventListener('hashchange', h);
+    return () => window.removeEventListener('hashchange', h);
+  }, []);
+  const navigate = (to) => { window.location.hash = to; };
+  return <RouterCtx.Provider value={{ path, navigate }}>{children}</RouterCtx.Provider>;
+}
+const useLocation = () => ({ pathname: useContext(RouterCtx).path });
+function Link({ to, children, className, style, ...rest }) {
+  const cn = typeof className === 'function' ? className({ isActive: false }) : className;
+  return <a href={'#' + to} className={cn} style={style} onClick={(e) => { e.preventDefault(); window.location.hash = to; }} {...rest}>{children}</a>;
+}
+function NavLink({ to, end, children, className, style }) {
+  const { path } = useContext(RouterCtx);
+  const isActive = end ? path === to : (path === to || path.startsWith(to + '/'));
+  const cn = typeof className === 'function' ? className({ isActive }) : (className || '');
+  return <a href={'#' + to} className={cn} style={style} onClick={(e) => { e.preventDefault(); window.location.hash = to; }}>{children}</a>;
+}
+function Routes({ children }) {
+  const { path } = useContext(RouterCtx);
+  let match = null, fallback = null;
+  React.Children.forEach(children, (ch) => {
+    if (!ch) return;
+    const p = ch.props.path;
+    if (p === '*') { fallback = ch.props.element; return; }
+    if (p === path) match = ch.props.element;
+  });
+  return match || fallback;
+}
+function Route() { return null; }
+
+
+/* ===================== src/lib/format.js ===================== */
+// Number / currency / percent formatting helpers
+
+const cur = (n, symbol = '$', dec = 0) => {
+  if (n == null || isNaN(n)) return '—'
+  const neg = n < 0
+  const v = Math.abs(n)
+  const s = v.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec })
+  return `${neg ? '-' : ''}${symbol}${s}`
+}
+
+const compact = (n, symbol = '') => {
+  if (n == null || isNaN(n)) return '—'
+  const abs = Math.abs(n)
+  let out
+  if (abs >= 1e9) out = (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B'
+  else if (abs >= 1e6) out = (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
+  else if (abs >= 1e3) out = (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K'
+  else out = Math.round(n).toLocaleString('en-US')
+  return symbol + out
+}
+
+const money = (n, symbol = '$') => {
+  if (n == null || isNaN(n)) return '—'
+  const abs = Math.abs(n)
+  if (abs >= 1e6) return `${symbol}${(n / 1e6).toFixed(2)}M`
+  if (abs >= 1e4) return `${symbol}${(n / 1e3).toFixed(1)}K`
+  return `${symbol}${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+}
+
+const pct = (n, dec = 1) => (n == null || isNaN(n) ? '—' : `${n.toFixed(dec)}%`)
+const dec2 = (n) => (n == null || isNaN(n) ? '—' : n.toFixed(2))
+const int = (n) => (n == null || isNaN(n) ? '—' : Math.round(n).toLocaleString('en-US'))
+
+
+/* ===================== src/data/mock.js ===================== */
+// ---------------------------------------------------------------------------
+// CommerceHub mock data layer
+// A self-contained, deterministic dataset that emulates the kind of entities a
+// retail-media platform (Pacvue-style) manages for an Amazon Sponsored Ads /
+// DSP / Commerce account. All data is fictional.
+// ---------------------------------------------------------------------------
+
+// Seeded pseudo-random generator so the dataset is stable across reloads.
+let _seed = 1337
+function rnd() {
+  _seed = (_seed * 1664525 + 1013904223) % 4294967296
+  return _seed / 4294967296
+}
+const pick = (arr) => arr[Math.floor(rnd() * arr.length)]
+const range = (min, max) => min + rnd() * (max - min)
+const irange = (min, max) => Math.floor(range(min, max + 1))
+
+// ---------------------------------------------------------------------------
+// Profiles (accounts / marketplaces)
+// ---------------------------------------------------------------------------
+const profiles = [
+  { id: 'us', name: 'Brightleaf — Amazon.com', market: 'Amazon USA', cc: 'US', currency: '$', type: '1P' },
+  { id: 'ca', name: 'Brightleaf — Amazon.ca', market: 'Amazon Canada', cc: 'CA', currency: 'C$', type: '1P' },
+  { id: 'uk', name: 'Brightleaf — Amazon.co.uk', market: 'Amazon UK', cc: 'UK', currency: '£', type: '3P' },
+]
+const profileById = Object.fromEntries(profiles.map((p) => [p.id, p]))
+
+// ---------------------------------------------------------------------------
+// Product catalog (used by Commerce / Digital Shelf + ad targeting)
+// ---------------------------------------------------------------------------
+const PRODUCTS = [
+  ['B0CFREEZE1', 'Brightleaf Freeze-Dried Salmon Treats — 12.5oz', 'Brightleaf', 'Pet Treats'],
+  ['B0CFREEZE2', 'Brightleaf Freeze-Dried Beef Bites — 4.7oz', 'Brightleaf', 'Pet Treats'],
+  ['B0CSTICK01', 'Brightleaf Protein Sticks Variety Pack — 12ct', 'Brightleaf', 'Snacks'],
+  ['B0CSWEET01', 'Brightleaf Sweet Potato Chews — 28oz', 'Brightleaf', 'Pet Treats'],
+  ['B0CGRAIN01', 'Brightleaf Grain-Free Kibble — 24lb', 'Brightleaf', 'Pet Food'],
+  ['B0COMEGA01', 'Brightleaf Omega-3 Fish Oil — 16oz', 'Brightleaf', 'Supplements'],
+  ['B0CDENT001', 'Brightleaf Dental Chews — 36ct', 'Brightleaf', 'Pet Treats'],
+  ['B0CPUMP001', 'Brightleaf Pumpkin Digestive Aid — 15oz', 'Brightleaf', 'Supplements'],
+  ['B0CCALM001', 'Brightleaf Calming Soft Chews — 90ct', 'Brightleaf', 'Supplements'],
+  ['B0CJERKY01', 'Brightleaf Chicken Jerky Strips — 16oz', 'Brightleaf', 'Pet Treats'],
+  ['B0CPUPPY01', 'Brightleaf Puppy Starter Kibble — 12lb', 'Brightleaf', 'Pet Food'],
+  ['B0CSALMON1', 'Brightleaf Wild Salmon Recipe — 24lb', 'Brightleaf', 'Pet Food'],
+]
+
+// ---------------------------------------------------------------------------
+// Campaigns
+// ---------------------------------------------------------------------------
+const CAMP_TYPES = ['SP-Auto', 'SP-Manual', 'SB', 'SBV', 'SD-Product', 'SD-Audience']
+const TARGETING = {
+  'SP-Auto': 'Auto',
+  'SP-Manual': 'Manual',
+  SB: 'Keyword',
+  SBV: 'Keyword',
+  'SD-Product': 'Product',
+  'SD-Audience': 'Audience',
+}
+const STATES = ['Enabled', 'Paused']
+function deriveStatus(state, spend, budget) {
+  if (state === 'Paused') return 'Paused'
+  if (spend > budget * 0.92) return 'Out of Budget'
+  return 'Enabled'
+}
+
+function metricBlock(scale) {
+  const impr = irange(8000, 950000) * scale
+  const ctr = range(0.08, 2.6)
+  const clk = Math.max(20, Math.round((impr * ctr) / 100))
+  const cpc = range(2.2, 5.8)
+  const spend = clk * cpc
+  const cvr = range(28, 70)
+  const orders = Math.max(1, Math.round((clk * cvr) / 100))
+  const asp = range(11, 24)
+  const aov = asp * range(1.0, 1.5)
+  const sales = orders * aov
+  const units = Math.round(orders * range(1.0, 1.4))
+  const ntb = Math.round(orders * range(0, 0.35))
+  const atc = Math.round(clk * range(0.02, 0.12))
+  return {
+    impr: Math.round(impr), clk, ctr, cpc, spend, cvr, orders, asp, aov,
+    sales, units, ntb, atc,
+    acos: (spend / sales) * 100,
+    roas: sales / spend,
+    cpa: spend / orders,
+  }
+}
+
+const MATCH = ['Broad', 'Phrase', 'Exact']
+const TGROUP = ['KW-Brand', 'KW-Category', 'KW-Competitor', 'PAT-Product', 'PAT-Category']
+
+const campaigns = []
+let cid = 1
+for (const p of profiles) {
+  const nCamp = p.id === 'uk' ? 8 : 16
+  for (let i = 0; i < nCamp; i++) {
+    const prod = pick(PRODUCTS)
+    const type = pick(CAMP_TYPES)
+    const scale = p.id === 'uk' ? 0.4 : 1
+    const m = metricBlock(scale)
+    const state = rnd() > 0.42 ? 'Enabled' : 'Paused'
+    const dailyBudget = Math.round(range(5, 180) * 10) / 10
+    const status = deriveStatus(state, m.spend / 30, dailyBudget)
+    let suffix = TARGETING[type]
+    if (type === 'SP-Manual') suffix = `Manual-${pick(TGROUP)}-${pick(MATCH)}`
+    if (type === 'SP-Auto') suffix = 'Auto'
+    const name = `${prod[1].split('—')[0].trim()}-${prod[0]}-${type}-${suffix}`
+    campaigns.push({
+      id: 'C' + String(cid++).padStart(4, '0'),
+      name,
+      asin: prod[0],
+      product: prod[1],
+      profileId: p.id,
+      state,
+      status,
+      campaignType: type,
+      targetingType: TARGETING[type],
+      adGroups: { active: irange(1, 3), total: irange(1, 4) },
+      dailyBudget,
+      actlBid: Math.round(range(6, 18) * 10) / 10,
+      avlBid: Math.round(range(20, 25) * 10) / 10,
+      portfolio: pick(['Always-On', 'New Launch', 'Brand Defense', 'Competitor Conquest', 'Seasonal']),
+      bidStrategy: pick(['Dynamic - down only', 'Dynamic - up & down', 'Fixed bids']),
+      ...m,
+    })
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Keywords / Targets
+// ---------------------------------------------------------------------------
+const SEED_KW = [
+  'freeze dried dog treats', 'salmon dog treats', 'grain free dog food', 'puppy food',
+  'dental chews for dogs', 'omega 3 for dogs', 'calming chews', 'pumpkin for dogs',
+  'protein sticks', 'healthy dog snacks', 'training treats', 'natural dog treats',
+  'beef dog treats', 'sweet potato dog chews', 'fish oil for dogs', 'jerky dog treats',
+  'large breed dog food', 'sensitive stomach dog food', 'high protein dog food', 'limited ingredient treats',
+]
+const keywords = []
+let kid = 1
+for (const c of campaigns.filter((c) => c.targetingType !== 'Auto').slice(0, 26)) {
+  const n = irange(4, 9)
+  for (let i = 0; i < n; i++) {
+    const m = metricBlock(0.08)
+    keywords.push({
+      id: 'K' + String(kid++).padStart(4, '0'),
+      keyword: pick(SEED_KW),
+      campaignId: c.id,
+      campaign: c.name,
+      profileId: c.profileId,
+      matchType: pick(MATCH),
+      state: rnd() > 0.2 ? 'Enabled' : 'Paused',
+      bid: Math.round(range(0.45, 2.4) * 100) / 100,
+      sugBid: Math.round(range(0.6, 2.8) * 100) / 100,
+      topOfSearchIS: range(6, 64),
+      ...m,
+    })
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Search-term report (with harvesting candidates)
+// ---------------------------------------------------------------------------
+const searchTerms = []
+let stid = 1
+for (let i = 0; i < 40; i++) {
+  const m = metricBlock(0.05)
+  const c = pick(campaigns.filter((x) => x.campaignType.startsWith('SP')))
+  searchTerms.push({
+    id: 'S' + String(stid++).padStart(4, '0'),
+    term: pick(SEED_KW) + pick(['', ' organic', ' bulk', ' best', ' for puppies', ' subscription', '']),
+    campaign: c.name,
+    profileId: c.profileId,
+    matchedTarget: c.targetingType === 'Auto' ? 'close-match' : pick(SEED_KW),
+    ...m,
+    harvested: false,
+    recommend: m.acos < 30 && m.orders > 6 ? 'harvest' : m.acos > 80 ? 'negate' : 'monitor',
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Share of Voice
+// ---------------------------------------------------------------------------
+const COMPETITORS = ['Pawthentic', 'NorthernPack', 'TrueNature', 'AlphaPet', 'WildHarvest']
+const shareOfVoice = SEED_KW.slice(0, 14).map((kw, i) => {
+  const paid = range(4, 38)
+  const organic = range(2, 30)
+  return {
+    id: 'SOV' + i,
+    keyword: kw,
+    searchVolume: irange(1800, 64000),
+    paidShare: paid,
+    organicShare: organic,
+    totalShare: paid + organic,
+    yourRank: irange(1, 18),
+    topCompetitor: pick(COMPETITORS),
+    competitorShare: range(8, 42),
+    trend: range(-6, 9),
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Dayparting — 7 days x 24 hours bid multipliers
+// ---------------------------------------------------------------------------
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const dayparting = DAYS.map((d, di) =>
+  Array.from({ length: 24 }, (_, h) => {
+    // realistic curve: low overnight, peak midday + evening, weekend bump
+    let base = 0.6
+    if (h >= 8 && h <= 11) base = 1.05
+    if (h >= 12 && h <= 14) base = 1.2
+    if (h >= 18 && h <= 22) base = 1.35
+    if (h >= 0 && h <= 5) base = 0.4
+    if (di >= 5) base *= 1.08
+    return Math.round((base + range(-0.08, 0.08)) * 100) / 100
+  }),
+)
+
+// ---------------------------------------------------------------------------
+// Automation rules
+// ---------------------------------------------------------------------------
+const rules = [
+  { id: 'R1', name: 'Defend Target ACoS ≤ 28%', type: 'Bid', scope: 'All SP campaigns', status: 'Active', trigger: 'ACoS > 28% over 14d', action: 'Decrease bid by 12%', runs: 'Every 6 hours', lastRun: '2h ago', affected: 142 },
+  { id: 'R2', name: 'Scale Winners (ROAS ≥ 4)', type: 'Bid', scope: 'Always-On portfolio', status: 'Active', trigger: 'ROAS ≥ 4 and Orders ≥ 10 (7d)', action: 'Increase bid by 8% (max $2.40)', runs: 'Every 6 hours', lastRun: '2h ago', affected: 58 },
+  { id: 'R3', name: 'Keyword Harvesting — Auto → Manual', type: 'Harvest', scope: 'All SP-Auto', status: 'Active', trigger: 'Search term: Orders ≥ 6, ACoS ≤ 30%', action: 'Add as Exact to manual campaign', runs: 'Daily 2:00 AM', lastRun: '9h ago', affected: 23 },
+  { id: 'R4', name: 'Negate Wasted Spend', type: 'Negative', scope: 'All SP campaigns', status: 'Active', trigger: 'Clicks ≥ 15, Orders = 0 (30d)', action: 'Add as Negative Exact', runs: 'Daily 3:00 AM', lastRun: '8h ago', affected: 31 },
+  { id: 'R5', name: 'Out-of-Stock Auto-Pause', type: 'Retail', scope: 'All campaigns', status: 'Active', trigger: 'ASIN out of stock or Buy Box < 50%', action: 'Pause ads for ASIN', runs: 'Every 1 hour', lastRun: '24m ago', affected: 4 },
+  { id: 'R6', name: 'Prime Day Dayparting Boost', type: 'Dayparting', scope: 'Seasonal portfolio', status: 'Paused', trigger: 'Event window active', action: 'Apply +35% multiplier 12pm–11pm', runs: 'Hourly', lastRun: '—', affected: 0 },
+  { id: 'R7', name: 'Budget Pacing Guard', type: 'Budget', scope: 'All profiles', status: 'Active', trigger: 'Daily pace > 115% of target', action: 'Throttle bids 10% until midnight', runs: 'Every 2 hours', lastRun: '1h ago', affected: 76 },
+]
+
+// ---------------------------------------------------------------------------
+// Budgets
+// ---------------------------------------------------------------------------
+const budgets = profiles.map((p, i) => {
+  const monthly = [185000, 92000, 38000][i]
+  const spent = monthly * range(0.46, 0.82)
+  const dayOfMonth = 20
+  const daysInMonth = 30
+  const targetPace = monthly * (dayOfMonth / daysInMonth)
+  return {
+    profileId: p.id,
+    profile: p.market,
+    currency: p.currency,
+    monthlyCap: monthly,
+    spent,
+    forecast: spent * (daysInMonth / dayOfMonth),
+    targetPace,
+    pacePct: (spent / targetPace) * 100,
+    remaining: monthly - spent,
+    status: spent > targetPace * 1.05 ? 'Over pace' : spent < targetPace * 0.9 ? 'Under pace' : 'On pace',
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Alerts / notifications
+// ---------------------------------------------------------------------------
+const alerts = [
+  { id: 'A1', sev: 'high', icon: 'box', title: 'ASIN out of stock', body: 'B0CGRAIN01 Grain-Free Kibble (US) is out of stock — Rule R5 paused 3 campaigns.', time: '24m ago', read: false },
+  { id: 'A2', sev: 'high', icon: 'trend-down', title: 'Buy Box lost', body: 'B0CSWEET01 Buy Box dropped to 41% on Amazon.com. Ad efficiency at risk.', time: '1h ago', read: false },
+  { id: 'A3', sev: 'med', icon: 'budget', title: 'Budget pacing alert', body: 'Amazon USA is 112% of target pace. Pacing guard (R7) throttled 76 campaigns.', time: '1h ago', read: false },
+  { id: 'A4', sev: 'med', icon: 'spark', title: 'Harvest opportunity', body: '23 search terms qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%).', time: '3h ago', read: true },
+  { id: 'A5', sev: 'low', icon: 'star', title: 'Rating drop', body: 'B0COMEGA01 average rating fell to 4.1★ after 6 new reviews.', time: '6h ago', read: true },
+  { id: 'A6', sev: 'low', icon: 'doc', title: 'Scheduled report sent', body: '"Weekly Exec Summary" delivered to 4 recipients.', time: '9h ago', read: true },
+]
+
+// ---------------------------------------------------------------------------
+// Reports (saved + scheduled)
+// ---------------------------------------------------------------------------
+const reports = [
+  { id: 'RP1', name: 'Weekly Exec Summary', type: 'Dashboard', cadence: 'Weekly · Mon 7:00 AM', recipients: 4, format: 'PDF + XLSX', owner: 'You', updated: '2d ago' },
+  { id: 'RP2', name: 'Campaign Performance — All Profiles', type: 'Campaign', cadence: 'Daily · 6:00 AM', recipients: 2, format: 'XLSX', owner: 'You', updated: '5h ago' },
+  { id: 'RP3', name: 'Search Term Harvest Candidates', type: 'Search Term', cadence: 'Daily · 8:00 AM', recipients: 1, format: 'CSV', owner: 'A. Rivera', updated: '1d ago' },
+  { id: 'RP4', name: 'Share of Voice — Priority Keywords', type: 'Share of Voice', cadence: 'Weekly · Fri 9:00 AM', recipients: 3, format: 'PDF', owner: 'You', updated: '3d ago' },
+  { id: 'RP5', name: 'Digital Shelf Health', type: 'Commerce', cadence: 'Weekly · Mon 7:30 AM', recipients: 5, format: 'PDF', owner: 'M. Chen', updated: '4d ago' },
+  { id: 'RP6', name: 'DSP Full-Funnel Attribution', type: 'DSP', cadence: 'Monthly · 1st 8:00 AM', recipients: 3, format: 'XLSX', owner: 'You', updated: '1w ago' },
+]
+const reportTemplates = [
+  'Campaign', 'Ad Group', 'Keyword', 'Search Term', 'Product (ASIN)', 'Placement',
+  'Share of Voice', 'Hourly / Dayparting', 'Budget', 'DSP Line Item', 'Digital Shelf', 'Custom widget',
+]
+
+// ---------------------------------------------------------------------------
+// Commerce / Digital Shelf — per ASIN
+// ---------------------------------------------------------------------------
+const digitalShelf = PRODUCTS.flatMap((prod, idx) =>
+  profiles.slice(0, 2).map((p) => {
+    const inStock = rnd() > 0.12
+    const buyBox = inStock ? range(46, 99) : range(0, 40)
+    const listingScore = irange(58, 99)
+    return {
+      id: `${prod[0]}-${p.id}`,
+      asin: prod[0],
+      title: prod[1],
+      brand: prod[2],
+      category: prod[3],
+      profileId: p.id,
+      profile: p.market,
+      currency: p.currency,
+      price: Math.round(range(11, 49) * 100) / 100,
+      mapViolation: rnd() > 0.85,
+      inStock,
+      buyBox,
+      listingScore,
+      contentIssues: listingScore < 75 ? irange(1, 4) : 0,
+      rating: Math.round(range(3.8, 4.9) * 10) / 10,
+      reviews: irange(40, 5200),
+      glanceViews: irange(2000, 220000),
+      conversion: range(3, 22),
+      orderedRevenue: range(8000, 240000),
+      repOos: inStock ? 0 : irange(1, 9),
+      images: irange(4, 9),
+      aplus: rnd() > 0.35,
+      video: rnd() > 0.55,
+    }
+  }),
+)
+
+// ---------------------------------------------------------------------------
+// DSP — orders & line items
+// ---------------------------------------------------------------------------
+const dspOrders = [
+  { id: 'D1', name: 'Brightleaf — Always-On Retargeting', tactic: 'Remarketing', status: 'Active', budget: 42000, spend: 28640, impr: 14200000, clicks: 38400, dpvr: 2.4, purchases: 4120, sales: 198400, roas: 6.9, ntbPct: 38 },
+  { id: 'D2', name: 'Brightleaf — Category Conquest', tactic: 'In-market audiences', status: 'Active', budget: 36000, spend: 24180, impr: 19800000, clicks: 41200, dpvr: 1.8, purchases: 2860, sales: 121300, roas: 5.0, ntbPct: 61 },
+  { id: 'D3', name: 'Brightleaf — New-to-Brand Prospecting', tactic: 'Lifestyle audiences', status: 'Active', budget: 30000, spend: 21750, impr: 26400000, clicks: 33100, dpvr: 1.1, purchases: 1740, sales: 73800, roas: 3.4, ntbPct: 82 },
+  { id: 'D4', name: 'Brightleaf — Performance+ Auto', tactic: 'Amazon Performance+', status: 'Active', budget: 28000, spend: 19980, impr: 17600000, clicks: 29800, dpvr: 2.0, purchases: 2980, sales: 134200, roas: 6.7, ntbPct: 44 },
+  { id: 'D5', name: 'Brightleaf — Brand+ Awareness', tactic: 'Amazon Brand+', status: 'Paused', budget: 22000, spend: 8400, impr: 31200000, clicks: 18200, dpvr: 0.7, purchases: 640, sales: 27600, roas: 3.3, ntbPct: 88 },
+  { id: 'D6', name: 'Brightleaf — Cart Abandoners 30d', tactic: 'Remarketing', status: 'Active', budget: 16000, spend: 11240, impr: 5400000, clicks: 22600, dpvr: 3.6, purchases: 3180, sales: 142900, roas: 12.7, ntbPct: 12 },
+]
+
+const audiences = [
+  { id: 'AU1', name: 'Viewed product, no purchase (30d)', type: 'Remarketing', source: 'Pixel / ASIN', size: 412000, status: 'Active', usedIn: 3 },
+  { id: 'AU2', name: 'Repeat purchasers — replenishment', type: 'Remarketing', source: 'Purchase history', size: 86400, status: 'Active', usedIn: 2 },
+  { id: 'AU3', name: 'In-market: Pet Supplies', type: 'In-market', source: 'Amazon audiences', size: 2840000, status: 'Active', usedIn: 4 },
+  { id: 'AU4', name: 'Competitor ASIN viewers (Deep Intelligence)', type: 'Conquest', source: 'AMC + ASIN seeds', size: 654000, status: 'Active', usedIn: 2 },
+  { id: 'AU5', name: 'Lifestyle: Health & Wellness', type: 'Lifestyle', source: 'Amazon audiences', size: 5100000, status: 'Draft', usedIn: 0 },
+  { id: 'AU6', name: 'High-LTV lookalike (AMC modeled)', type: 'Modeled', source: 'AMC', size: 1280000, status: 'Active', usedIn: 1 },
+  { id: 'AU7', name: 'Cart abandoners 7d', type: 'Remarketing', source: 'Pixel', size: 38200, status: 'Active', usedIn: 1 },
+]
+
+const amcAudiences = audiences.filter((a) => /AMC/.test(a.source))
+const amcQueries = [
+  { id: 'Q1', name: 'Path to conversion — ad-exposed vs organic', template: 'Customer Journey', schedule: 'Weekly', lastRun: '1d ago', rows: 18420, status: 'Ready' },
+  { id: 'Q2', name: 'New-to-brand by media mix', template: 'NTB Analysis', schedule: 'Monthly', lastRun: '6d ago', rows: 9240, status: 'Ready' },
+  { id: 'Q3', name: 'Overlap: SP + DSP exposed audiences', template: 'Audience Overlap', schedule: 'Ad hoc', lastRun: '2d ago', rows: 5120, status: 'Ready' },
+  { id: 'Q4', name: 'Optimal frequency for conversion lift', template: 'Frequency Analysis', schedule: 'Weekly', lastRun: '1d ago', rows: 7610, status: 'Running' },
+  { id: 'Q5', name: 'Time-to-conversion / dayparting signal', template: 'Custom SQL', schedule: 'Daily', lastRun: '4h ago', rows: 24180, status: 'Ready' },
+]
+
+// ---------------------------------------------------------------------------
+// Time-series for charts (last 30 days)
+// ---------------------------------------------------------------------------
+const timeseries = (() => {
+  const out = []
+  const today = new Date('2026-06-19')
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const dow = d.getDay()
+    const weekend = dow === 0 || dow === 6 ? 1.18 : 1
+    const base = 120000 + Math.sin(i / 3) * 22000 + (29 - i) * 2400
+    const impr = Math.round(base * weekend * (1 + range(-0.08, 0.08)))
+    const clicks = Math.round(impr * range(0.0026, 0.0038))
+    const spend = Math.round(clicks * range(3.1, 4.2))
+    const orders = Math.round(clicks * range(0.42, 0.6))
+    const sales = Math.round(orders * range(15, 22))
+    out.push({
+      date: `${d.getMonth() + 1}/${d.getDate()}`,
+      impr, clicks, spend, orders, sales,
+      acos: +((spend / sales) * 100).toFixed(1),
+      roas: +(sales / spend).toFixed(2),
+    })
+  }
+  return out
+})()
+
+// ---------------------------------------------------------------------------
+// Aggregations / KPI helpers
+// ---------------------------------------------------------------------------
+function aggregate(rows) {
+  const sum = (k) => rows.reduce((a, b) => a + (b[k] || 0), 0)
+  const impr = sum('impr'), clk = sum('clk'), spend = sum('spend'),
+    sales = sum('sales'), orders = sum('orders'), units = sum('units')
+  return {
+    impr, clk, spend, sales, orders, units,
+    ctr: (clk / impr) * 100,
+    cpc: spend / clk,
+    acos: (spend / sales) * 100,
+    roas: sales / spend,
+    cvr: (orders / clk) * 100,
+    cpa: spend / orders,
+    aov: sales / orders,
+  }
+}
+
+function campaignsFor(profileId) {
+  return profileId === 'all' ? campaigns : campaigns.filter((c) => c.profileId === profileId)
+}
+
+
+/* ===================== src/components/Icon.jsx ===================== */
+// Compact inline SVG icon set (Feather-style, 24x24 stroke).
+const P = {
+  dashboard: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
+  ads: 'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 11-5.8-1.6',
+  target: 'M12 12m-9 0a9 9 0 1018 0a9 9 0 10-18 0M12 12m-5 0a5 5 0 1010 0a5 5 0 10-10 0M12 12m-1 0a1 1 0 102 0a1 1 0 10-2 0',
+  layers: 'M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5',
+  tag: 'M20.6 13.4L13.4 20.6a2 2 0 01-2.8 0l-7.2-7.2A2 2 0 012.8 12V4.8A2 2 0 014.8 2.8H12a2 2 0 011.4.6l7.2 7.2a2 2 0 010 2.8zM7.5 7.5h.01',
+  search: 'M11 11m-7 0a7 7 0 1014 0a7 7 0 10-14 0M21 21l-4.3-4.3',
+  bars: 'M12 20V10M18 20V4M6 20v-4',
+  clock: 'M12 12m-9 0a9 9 0 1018 0a9 9 0 10-18 0M12 7v5l3 2',
+  sliders: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
+  wallet: 'M21 12V7H5a2 2 0 010-4h14v4M3 5v14a2 2 0 002 2h16v-5M18 12a2 2 0 000 4h4v-4z',
+  bell: 'M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0',
+  file: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M9 13h6M9 17h6',
+  store: 'M3 9l1.5-5h15L21 9M4 9v11h16V9M9 22V14h6v8',
+  box: 'M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8',
+  users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8M23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8',
+  database: 'M12 5c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6',
+  calendar: 'M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zM16 2v4M8 2v4M3 10h18',
+  filter: 'M22 3H2l8 9.5V19l4 2v-8.5z',
+  plus: 'M12 5v14M5 12h14',
+  chevDown: 'M6 9l6 6 6-6',
+  chevRight: 'M9 18l6-6-6-6',
+  arrowUp: 'M12 19V5M5 12l7-7 7 7',
+  arrowDown: 'M12 5v14M19 12l-7 7-7-7',
+  gear: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z',
+  bulb: 'M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0012 2z',
+  trendUp: 'M23 6l-9.5 9.5-5-5L1 18M17 6h6v6',
+  trendDown: 'M23 18l-9.5-9.5-5 5L1 6M17 18h6v-6',
+  star: 'M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z',
+  check: 'M20 6L9 17l-5-5',
+  x: 'M18 6L6 18M6 6l12 12',
+  dots: 'M12 13a1 1 0 100-2 1 1 0 000 2zM19 13a1 1 0 100-2 1 1 0 000 2zM5 13a1 1 0 100-2 1 1 0 000 2z',
+  download: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  play: 'M5 3l14 9-14 9z',
+  pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
+  edit: 'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z',
+  spark: 'M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2zM5 3v4M3 5h4M19 17v4M17 19h4',
+  refresh: 'M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0114.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0020.5 15',
+  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  globe: 'M12 22a10 10 0 100-20 10 10 0 000 20zM2 12h20M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z',
+  flame: 'M12 2c1 4 5 5 5 9a5 5 0 01-10 0c0-1 .5-2 1-2.5C8 11 9 9 8 7c2 1 3 3 3 5 1-1 1-3 1-5z',
+  link: 'M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1.5 1.5M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1.5-1.5',
+  eye: 'M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12zM12 15a3 3 0 100-6 3 3 0 000 6z',
+}
+function Icon({ name, size = 16, className = '', style, strokeWidth = 2 }) {
+  const d = P[name] || P.dots
+  return (
+    <svg className={`ico ${className}`} width={size} height={size} viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round"
+      strokeLinejoin="round" style={style} aria-hidden="true">
+      {d.split('M').filter(Boolean).map((seg, i) => <path key={i} d={'M' + seg} />)}
+    </svg>
+  )
+}
+
+
+/* ===================== src/components/ui.jsx ===================== */
+
+/* ---------------- KPI cards ---------------- */
+function Kpi({ label, value, delta, deltaGood, hint }) {
+  const up = delta != null && delta >= 0
+  const good = deltaGood === undefined ? up : deltaGood
+  return (
+    <div className="kpi">
+      <div className="k-label">{label}{hint && <span title={hint} style={{ color: 'var(--text-3)' }}>·</span>}</div>
+      <div className="k-val">{value}</div>
+      {delta != null && (
+        <div className={`k-delta ${good ? 'up' : 'down'}`}>
+          <Icon name={up ? 'arrowUp' : 'arrowDown'} size={12} />{Math.abs(delta).toFixed(1)}%
+        </div>
+      )}
+    </div>
+  )
+}
+function KpiGrid({ children }) { return <div className="kpi-grid">{children}</div> }
+
+/* ---------------- Status pill ---------------- */
+const STATUS_MAP = {
+  Enabled: 'green', Active: 'green', Ready: 'green', 'On pace': 'green', 'In Stock': 'green',
+  Paused: 'gray', Draft: 'gray', Ended: 'gray', monitor: 'gray',
+  'Out of Budget': 'amber', 'Under pace': 'amber', Running: 'blue', 'Out of Stock': 'red',
+  'Over pace': 'red', negate: 'red', harvest: 'green',
+}
+function Pill({ children, tone }) {
+  const t = tone || STATUS_MAP[children] || 'gray'
+  return <span className={`pill ${t}`}><span className="dot" />{children}</span>
+}
+
+/* ---------------- Toggle ---------------- */
+function Toggle({ on, onClick }) {
+  return <button className={`toggle ${on ? 'on' : ''}`} onClick={onClick} aria-pressed={on} />
+}
+
+/* ---------------- Card ---------------- */
+function Card({ title, sub, actions, children, pad = true }) {
+  return (
+    <div className="card">
+      {(title || actions) && (
+        <div className="card-head">
+          <div><h3>{title}</h3>{sub && <div className="sub">{sub}</div>}</div>
+          {actions}
+        </div>
+      )}
+      <div style={pad ? { padding: 16 } : {}}>{children}</div>
+    </div>
+  )
+}
+
+/* ---------------- Checkbox ---------------- */
+function Check({ on, onClick }) {
+  return <span className={`cb ${on ? 'on' : ''}`} onClick={onClick}>{on && <Icon name="check" size={11} strokeWidth={3} />}</span>
+}
+
+/* ---------------- DataTable ----------------
+   columns: [{ key, label, num?, sticky?, render?(row), width? }]
+*/
+function DataTable({ columns, rows, selectable, selected, onToggle, onToggleAll, rowKey = 'id', empty = 'No data' }) {
+  const allOn = selectable && rows.length > 0 && rows.every((r) => selected?.has(r[rowKey]))
+  return (
+    <div className="tablewrap">
+      <table className="dt">
+        <thead>
+          <tr>
+            {selectable && (
+              <th className="sticky-l" style={{ width: 36 }}>
+                <Check on={allOn} onClick={onToggleAll} />
+              </th>
+            )}
+            {columns.map((c) => (
+              <th key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l' : ''}`} style={c.width ? { minWidth: c.width } : undefined}>{c.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && <tr><td colSpan={columns.length + (selectable ? 1 : 0)} className="empty">{empty}</td></tr>}
+          {rows.map((r) => (
+            <tr key={r[rowKey]}>
+              {selectable && (
+                <td className="sticky-l"><Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} /></td>
+              )}
+              {columns.map((c) => (
+                <td key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l cellname' : ''}`}>
+                  {c.render ? c.render(r) : r[c.key]}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/* sorting hook for tables */
+function useSort(rows, initial) {
+  const [sort, setSort] = useState(initial || { key: null, dir: 'desc' })
+  const sorted = useMemo(() => {
+    if (!sort.key) return rows
+    const r = [...rows].sort((a, b) => {
+      const x = a[sort.key], y = b[sort.key]
+      if (typeof x === 'number') return sort.dir === 'asc' ? x - y : y - x
+      return sort.dir === 'asc' ? String(x).localeCompare(String(y)) : String(y).localeCompare(String(x))
+    })
+    return r
+  }, [rows, sort])
+  const toggle = (key) => setSort((s) => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }))
+  return { sorted, sort, toggle }
+}
+
+/* ---------------- Charts ---------------- */
+const AXIS = { fontSize: 11, fill: '#8a94a6' }
+function PerfChart({ data, height = 260 }) {
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <AreaChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+        <defs>
+          <linearGradient id="gSpend" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#1a4fd6" stopOpacity={0.22} />
+            <stop offset="100%" stopColor="#1a4fd6" stopOpacity={0} />
+          </linearGradient>
+          <linearGradient id="gSales" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#1aa260" stopOpacity={0.22} />
+            <stop offset="100%" stopColor="#1aa260" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
+        <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={4} />
+        <YAxis tick={AXIS} tickLine={false} axisLine={false} width={48}
+          tickFormatter={(v) => (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v)} />
+        <Tooltip contentStyle={tipStyle} />
+        <Legend wrapperStyle={{ fontSize: 12 }} />
+        <Area type="monotone" dataKey="sales" name="Sales" stroke="#1aa260" strokeWidth={2} fill="url(#gSales)" />
+        <Area type="monotone" dataKey="spend" name="Spend" stroke="#1a4fd6" strokeWidth={2} fill="url(#gSpend)" />
+      </AreaChart>
+    </ResponsiveContainer>
+  )
+}
+function MiniLine({ data, dataKey, color = '#1a4fd6', height = 40 }) {
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data}>
+        <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
+function DualBar({ data, height = 260, keys }) {
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
+        <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} />
+        <YAxis tick={AXIS} tickLine={false} axisLine={false} width={42} />
+        <Tooltip contentStyle={tipStyle} />
+        <Legend wrapperStyle={{ fontSize: 12 }} />
+        {keys.map((k) => <Bar key={k.key} dataKey={k.key} name={k.label} fill={k.color} radius={[4, 4, 0, 0]} />)}
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+const tipStyle = { background: '#fff', border: '1px solid #e6e9ef', borderRadius: 10, fontSize: 12, boxShadow: '0 8px 28px rgba(16,24,40,.12)' }
+
+/* ---------------- Toolbar bits ---------------- */
+function SearchBox({ value, onChange, placeholder = 'Search…' }) {
+  return (
+    <div className="search">
+      <Icon name="search" size={15} />
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+    </div>
+  )
+}
+function Btn({ icon, children, primary, ghost, sm, onClick }) {
+  return (
+    <button className={`btn ${primary ? 'primary' : ''} ${ghost ? 'ghost' : ''} ${sm ? 'sm' : ''}`} onClick={onClick}>
+      {icon && <Icon name={icon} size={sm ? 13 : 15} />}{children}
+    </button>
+  )
+}
+function ViewTabs({ tabs, active, onChange }) {
+  return (
+    <div className="viewtabs">
+      {tabs.map((t) => (
+        <div key={t} className={`viewtab ${active === t ? 'active' : ''}`} onClick={() => onChange(t)}>{t}</div>
+      ))}
+    </div>
+  )
+}
+
+
+/* ===================== src/state.jsx ===================== */
+
+const Ctx = createContext(null)
+function AppProvider({ children }) {
+  const [profileId, setProfileId] = useState('all')
+  const [range, setRange] = useState('Last 30 days')
+  const value = { profileId, setProfileId, range, setRange, profiles }
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+}
+const useApp = () => useContext(Ctx)
+
+
+/* ===================== src/components/Layout.jsx ===================== */
+
+const NAV = [
+  { section: null, items: [{ to: '/', label: 'Overview', icon: 'dashboard', end: true }] },
+  {
+    section: 'Sponsored Ads', module: true,
+    items: [
+      { to: '/ads/campaigns', label: 'Campaigns', icon: 'ads' },
+      { to: '/ads/adgroups', label: 'Ad Groups', icon: 'layers' },
+      { to: '/ads/targeting', label: 'Targeting', icon: 'target' },
+      { to: '/ads/search-terms', label: 'Search Terms', icon: 'search' },
+      { to: '/ads/sov', label: 'Share of Voice', icon: 'bars' },
+      { to: '/ads/dayparting', label: 'Dayparting', icon: 'clock' },
+    ],
+  },
+  {
+    section: 'DSP', module: true,
+    items: [
+      { to: '/dsp', label: 'DSP Campaigns', icon: 'globe', end: true },
+      { to: '/dsp/audiences', label: 'Audience Builder', icon: 'users' },
+      { to: '/dsp/amc', label: 'AMC', icon: 'database' },
+    ],
+  },
+  {
+    section: 'Commerce', module: true,
+    items: [
+      { to: '/commerce/shelf', label: 'Digital Shelf', icon: 'store' },
+      { to: '/commerce/buybox', label: 'Buy Box & Inventory', icon: 'shield' },
+      { to: '/commerce/products', label: 'Product Center', icon: 'box' },
+    ],
+  },
+  {
+    section: 'Automation',
+    items: [
+      { to: '/rules', label: 'Rule Manager', icon: 'sliders' },
+      { to: '/budgets', label: 'Budget Manager', icon: 'wallet' },
+    ],
+  },
+  {
+    section: 'Insights',
+    items: [
+      { to: '/reports', label: 'Report Center', icon: 'file' },
+      { to: '/alerts', label: 'Alerts', icon: 'bell' },
+    ],
+  },
+]
+
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-brand">
+        <div className="brand-logo">C</div>
+        <div className="brand-name">Commerce<span>Hub</span></div>
+      </div>
+      <nav className="nav-section">
+        {NAV.map((grp, i) => (
+          <div key={i}>
+            {grp.section && (
+              <div className="nav-section-title">{grp.module ? '◆ ' : ''}{grp.section}</div>
+            )}
+            {grp.items.map((it) => (
+              <NavLink key={it.to} to={it.to} end={it.end}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <Icon name={it.icon} size={16} />{it.label}
+                {it.badge && <span className="nav-badge">{it.badge}</span>}
+              </NavLink>
+            ))}
+          </div>
+        ))}
+      </nav>
+      <div className="sidebar-foot">
+        <div className="avatar">JL</div>
+        <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
+      </div>
+    </aside>
+  )
+}
+
+const CRUMBS = {
+  '/': 'Overview', '/ads/campaigns': 'Sponsored Ads · Campaigns', '/ads/adgroups': 'Sponsored Ads · Ad Groups',
+  '/ads/targeting': 'Sponsored Ads · Targeting', '/ads/search-terms': 'Sponsored Ads · Search Terms',
+  '/ads/sov': 'Sponsored Ads · Share of Voice', '/ads/dayparting': 'Sponsored Ads · Dayparting',
+  '/dsp': 'DSP · Campaigns', '/dsp/audiences': 'DSP · Audience Builder', '/dsp/amc': 'DSP · Amazon Marketing Cloud',
+  '/commerce/shelf': 'Commerce · Digital Shelf', '/commerce/buybox': 'Commerce · Buy Box & Inventory',
+  '/commerce/products': 'Commerce · Product Center', '/rules': 'Automation · Rule Manager',
+  '/budgets': 'Automation · Budget Manager', '/reports': 'Insights · Report Center', '/alerts': 'Insights · Alerts',
+  '/settings': 'Settings',
+}
+
+function Topbar() {
+  const { profileId, setProfileId, profiles, range, setRange } = useApp()
+  const loc = useLocation()
+  const [pOpen, setPOpen] = useState(false)
+  const [rOpen, setROpen] = useState(false)
+  const unread = alerts.filter((a) => !a.read).length
+  const crumb = CRUMBS[loc.pathname] || ''
+  const [main, sub] = crumb.includes('·') ? crumb.split('·').map((s) => s.trim()) : [crumb, null]
+  const selProfile = profileId === 'all' ? 'All Profiles' : profiles.find((p) => p.id === profileId)?.market
+  const ranges = ['Today', 'Yesterday', 'Last 7 days', 'Last 30 days', 'This month', 'Last month', 'Custom…']
+  return (
+    <div className="topbar">
+      <div className="crumb">
+        {sub ? <><span>{main}</span><span className="sep">/</span><b>{sub}</b></> : <b>{main}</b>}
+      </div>
+      <div className="topbar-spacer" />
+
+      <div style={{ position: 'relative' }}>
+        <button className="topbar-ctrl" onClick={() => { setPOpen(!pOpen); setROpen(false) }}>
+          <Icon name="store" size={15} />{selProfile}<Icon name="chevDown" size={13} />
+        </button>
+        {pOpen && (
+          <Dropdown onClose={() => setPOpen(false)}>
+            <DItem active={profileId === 'all'} onClick={() => { setProfileId('all'); setPOpen(false) }}>All Profiles</DItem>
+            {profiles.map((p) => (
+              <DItem key={p.id} active={profileId === p.id} onClick={() => { setProfileId(p.id); setPOpen(false) }}>
+                {p.market} <span className="tag" style={{ marginLeft: 6 }}>{p.type}</span>
+              </DItem>
+            ))}
+          </Dropdown>
+        )}
+      </div>
+
+      <div style={{ position: 'relative' }}>
+        <button className="topbar-ctrl" onClick={() => { setROpen(!rOpen); setPOpen(false) }}>
+          <Icon name="calendar" size={15} />{range}<Icon name="chevDown" size={13} />
+        </button>
+        {rOpen && (
+          <Dropdown onClose={() => setROpen(false)}>
+            {ranges.map((r) => <DItem key={r} active={range === r} onClick={() => { setRange(r); setROpen(false) }}>{r}</DItem>)}
+          </Dropdown>
+        )}
+      </div>
+
+      <button className="topbar-ctrl"><Icon name="filter" size={15} />Filters<span className="badge">2</span></button>
+      <NavLink to="/alerts" className="topbar-ctrl" style={{ position: 'relative' }}>
+        <Icon name="bell" size={16} />
+        {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--red)', color: '#fff', borderRadius: 9, fontSize: 9, padding: '1px 5px', fontWeight: 700 }}>{unread}</span>}
+      </NavLink>
+      <NavLink to="/settings" className="topbar-ctrl"><Icon name="gear" size={16} /></NavLink>
+    </div>
+  )
+}
+
+function Dropdown({ children, onClose }) {
+  return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={onClose} />
+      <div style={{ position: 'absolute', right: 0, top: 38, minWidth: 200, background: '#fff', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--shadow-lg)', padding: 6, zIndex: 41 }}>
+        {children}
+      </div>
+    </>
+  )
+}
+function DItem({ children, active, onClick }) {
+  return (
+    <div onClick={onClick} style={{ padding: '8px 10px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: active ? 'var(--brand)' : 'var(--text)', background: active ? 'var(--brand-soft)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--surface-2)' }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent' }}>
+      <span style={{ display: 'flex', alignItems: 'center' }}>{children}</span>
+      {active && <Icon name="check" size={14} />}
+    </div>
+  )
+}
+
+function Layout({ children }) {
+  return (
+    <div className="app">
+      <Sidebar />
+      <div className="main">
+        <Topbar />
+        <div className="content">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+
+/* ===================== src/pages/Overview.jsx ===================== */
+
+function Overview() {
+  const { profileId } = useApp()
+  const camps = profileId === 'all' ? campaigns : campaigns.filter((c) => c.profileId === profileId)
+  const a = aggregate(camps)
+  const dspSpend = dspOrders.reduce((s, d) => s + d.spend, 0)
+  const dspSales = dspOrders.reduce((s, d) => s + d.sales, 0)
+  const oosCount = digitalShelf.filter((d) => !d.inStock).length
+  const buyBoxAvg = digitalShelf.reduce((s, d) => s + d.buyBox, 0) / digitalShelf.length
+  const tacos = ((a.spend + dspSpend) / (a.sales + dspSales + 380000)) * 100
+
+  const channelData = [
+    { label: 'Sponsored Products', spend: 38200, sales: 119000, color: '#1a4fd6' },
+    { label: 'Sponsored Brands', spend: 14800, sales: 41200, color: '#1a73e8' },
+    { label: 'Sponsored Display', spend: 7400, sales: 18900, color: '#6b3fd6' },
+    { label: 'DSP', spend: Math.round(dspSpend / 100) * 100, sales: Math.round(dspSales / 100) * 100, color: '#1aa260' },
+  ]
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <div className="page-title">Commerce Overview</div>
+          <div className="page-sub">Unified view across Sponsored Ads, DSP and Commerce · {profileId === 'all' ? 'All profiles' : camps[0]?.profileId.toUpperCase()}</div>
+        </div>
+        <div className="page-actions">
+          <Btn icon="refresh" ghost>Refresh</Btn>
+          <Btn icon="download">Export</Btn>
+          <Btn icon="plus" primary>Create Campaign</Btn>
+        </div>
+      </div>
+
+      <KpiGrid>
+        <Kpi label="Ad Spend" value={money(a.spend)} delta={8.2} deltaGood={false} />
+        <Kpi label="Ad Sales" value={money(a.sales)} delta={12.6} />
+        <Kpi label="ACoS" value={pct(a.acos)} delta={-3.1} deltaGood />
+        <Kpi label="ROAS" value={dec2(a.roas)} delta={4.4} />
+        <Kpi label="TACoS" value={pct(tacos)} delta={-1.2} deltaGood />
+        <Kpi label="Impressions" value={compact(a.impr)} delta={6.7} />
+        <Kpi label="Orders" value={compact(a.orders)} delta={9.1} />
+        <Kpi label="Avg Buy Box" value={pct(buyBoxAvg)} delta={-2.4} deltaGood={false} />
+      </KpiGrid>
+
+      <div className="grid-2" style={{ marginBottom: 16 }}>
+        <Card title="Performance trend" sub="Spend vs Sales · last 30 days"
+          actions={<Btn sm ghost icon="download">CSV</Btn>}>
+          <PerfChart data={timeseries} />
+        </Card>
+        <Card title="Spend & sales by channel" sub="Full-funnel media mix">
+          <DualBar data={channelData} keys={[{ key: 'spend', label: 'Spend', color: '#1a4fd6' }, { key: 'sales', label: 'Sales', color: '#1aa260' }]} />
+        </Card>
+      </div>
+
+      <div className="grid-3">
+        <Card title="Action center" sub={`${alerts.filter(x => !x.read).length} need attention`}
+          actions={<Link to="/alerts" className="btn sm ghost">View all</Link>}>
+          {alerts.slice(0, 4).map((al) => (
+            <div key={al.id} className="lrow" style={{ padding: '11px 0', borderColor: 'var(--border)' }}>
+              <div className="icobox" style={{ background: sevBg(al.sev), color: sevColor(al.sev) }}>
+                <Icon name={al.icon} size={17} />
+              </div>
+              <div className="grow">
+                <div className="title">{al.title}</div>
+                <div className="desc">{al.body}</div>
+              </div>
+              <div className="muted" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{al.time}</div>
+            </div>
+          ))}
+        </Card>
+
+        <Card title="Budget pacing" sub="Month-to-date vs target"
+          actions={<Link to="/budgets" className="btn sm ghost">Manage</Link>}>
+          {budgets.map((b) => (
+            <div key={b.profileId} style={{ marginBottom: 16 }}>
+              <div className="flex between items-center" style={{ marginBottom: 6 }}>
+                <b style={{ fontSize: 12.5 }}>{b.profile}</b>
+                <Pill>{b.status}</Pill>
+              </div>
+              <div className="pace">
+                <span style={{ width: Math.min(100, (b.spent / b.monthlyCap) * 100) + '%', background: ovPace(b.status) }} />
+              </div>
+              <div className="pacelabel">
+                <span>{cur(b.spent, b.currency)} of {cur(b.monthlyCap, b.currency)}</span>
+                <span>{pct(b.pacePct)} of pace</span>
+              </div>
+            </div>
+          ))}
+        </Card>
+
+        <Card title="Digital shelf health" sub="Retail signals affecting ads"
+          actions={<Link to="/commerce/shelf" className="btn sm ghost">Open</Link>}>
+          <ShelfStat label="ASINs out of stock" value={oosCount} tone={oosCount ? 'red' : 'green'} icon="box" note="Ads auto-paused by Rule R5" />
+          <ShelfStat label="Avg Buy Box ownership" value={pct(buyBoxAvg)} tone={buyBoxAvg > 70 ? 'green' : 'amber'} icon="shield" note="ASIN-level monitoring" />
+          <ShelfStat label="Listings with content issues" value={digitalShelf.filter(d => d.contentIssues > 0).length} tone="amber" icon="file" note="Title / image / A+ gaps" />
+          <ShelfStat label="Avg rating" value={(digitalShelf.reduce((s, d) => s + d.rating, 0) / digitalShelf.length).toFixed(2) + '★'} tone="green" icon="star" note="Across catalog" />
+        </Card>
+      </div>
+    </>
+  )
+}
+
+function ShelfStat({ label, value, tone, icon, note }) {
+  return (
+    <div className="lrow" style={{ padding: '11px 0' }}>
+      <div className="icobox" style={{ background: sevBg(tone === 'red' ? 'high' : tone === 'amber' ? 'med' : 'low'), color: tone === 'red' ? 'var(--red)' : tone === 'amber' ? 'var(--amber)' : 'var(--green)' }}>
+        <Icon name={icon} size={17} />
+      </div>
+      <div className="grow">
+        <div className="title">{value}</div>
+        <div className="desc">{label} · {note}</div>
+      </div>
+    </div>
+  )
+}
+const sevBg = (s) => ({ high: 'var(--red-soft)', med: 'var(--amber-soft)', low: 'var(--green-soft)' }[s] || 'var(--brand-soft)')
+const sevColor = (s) => ({ high: 'var(--red)', med: 'var(--amber)', low: 'var(--green)' }[s] || 'var(--brand)')
+const ovPace = (s) => (s === 'Over pace' ? 'var(--red)' : s === 'Under pace' ? 'var(--amber)' : 'var(--green)')
+
+
+/* ===================== src/pages/Ads.jsx ===================== */
+
+const symA = (pid) => profileById[pid]?.currency || '$'
+const typeTone = (t) => (t.startsWith('SP') ? 'blue' : t.startsWith('SB') ? 'purple' : 'amber')
+
+function useProfileFilter(rows) {
+  const { profileId } = useApp()
+  return useMemo(() => (profileId === 'all' ? rows : rows.filter((r) => r.profileId === profileId)), [rows, profileId])
+}
+
+function PageHead({ title, sub, children }) {
+  return (
+    <div className="page-head">
+      <div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div>
+      <div className="page-actions">{children}</div>
+    </div>
+  )
+}
+
+function KpiRow({ rows }) {
+  const a = aggregate(rows)
+  return (
+    <KpiGrid>
+      <Kpi label="Impressions" value={compact(a.impr)} delta={6.7} />
+      <Kpi label="Clicks" value={compact(a.clk)} delta={4.1} />
+      <Kpi label="CTR" value={pct(a.ctr, 2)} delta={1.2} />
+      <Kpi label="Spend" value={money(a.spend)} delta={8.2} deltaGood={false} />
+      <Kpi label="Sales" value={money(a.sales)} delta={12.6} />
+      <Kpi label="ACoS" value={pct(a.acos)} delta={-3.1} deltaGood />
+      <Kpi label="ROAS" value={dec2(a.roas)} delta={4.4} />
+      <Kpi label="Orders" value={compact(a.orders)} delta={9.1} />
+    </KpiGrid>
+  )
+}
+
+/* ============================ CAMPAIGNS ============================ */
+function Campaigns() {
+  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const [overrides, setOverrides] = useState({})
+  const [q, setQ] = useState('')
+  const [typeFilter, setTypeFilter] = useState('All')
+  const [sel, setSel] = useState(new Set())
+
+  const data = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
+  const types = ['All', 'SP-Auto', 'SP-Manual', 'SB', 'SBV', 'SD-Product', 'SD-Audience']
+  const filtered = data.filter((c) =>
+    (typeFilter === 'All' || c.campaignType === typeFilter) &&
+    c.name.toLowerCase().includes(q.toLowerCase()))
+  const { sorted, sort, toggle } = useSort(filtered, { key: 'spend', dir: 'desc' })
+
+  const ov = (st) => ({ state: st, status: st === 'Paused' ? 'Paused' : 'Enabled' })
+  const setState = (id, st) => setOverrides((o) => ({ ...o, [id]: ov(st) }))
+  const bulkState = (st) => { setOverrides((o) => { const n = { ...o }; sel.forEach((id) => { n[id] = ov(st) }); return n }); setSel(new Set()) }
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleAll = () => setSel((s) => s.size === sorted.length ? new Set() : new Set(sorted.map((r) => r.id)))
+
+  const SH = ({ k, children, num }) => (
+    <span onClick={() => toggle(k)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+      {children}{sort.key === k && <Icon name={sort.dir === 'asc' ? 'arrowUp' : 'arrowDown'} size={11} style={{ marginLeft: 3, verticalAlign: 'middle' }} />}
+    </span>
+  )
+
+  const columns = [
+    { key: 'name', label: <SH k="name">Campaign</SH>, sticky: true, width: 320, render: (r) => (
+      <div><div>{r.name}</div><small>{r.profileId.toUpperCase()} · {r.product?.split('—')[0]}</small></div>) },
+    { key: 'state', label: 'State', render: (r) => <Toggle on={r.state === 'Enabled'} onClick={() => setState(r.id, r.state === 'Enabled' ? 'Paused' : 'Enabled')} /> },
+    { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
+    { key: 'campaignType', label: 'Type', render: (r) => <span className={`pill ${typeTone(r.campaignType)}`} style={{ borderRadius: 5 }}>{r.campaignType}</span> },
+    { key: 'adGroups', label: 'Ad Groups', num: true, render: (r) => <span className="muted">{r.adGroups.active}/{r.adGroups.total}</span> },
+    { key: 'dailyBudget', label: <SH k="dailyBudget">Daily Budget</SH>, num: true, render: (r) => (
+      <span className="bidcell" style={{ justifyContent: 'flex-end' }}>{cur(r.dailyBudget, symA(r.profileId), 0)}<Icon name="edit" size={12} className="ed" /></span>) },
+    { key: 'bid', label: 'Bid (Act/Avl)', num: true, render: (r) => <span className="muted">{r.actlBid} / {r.avlBid}</span> },
+    { key: 'impr', label: <SH k="impr">Impr.</SH>, num: true, render: (r) => compact(r.impr) },
+    { key: 'clk', label: <SH k="clk">Clicks</SH>, num: true, render: (r) => int(r.clk) },
+    { key: 'ctr', label: 'CTR', num: true, render: (r) => pct(r.ctr, 2) },
+    { key: 'spend', label: <SH k="spend">Spend</SH>, num: true, render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'cpc', label: 'CPC', num: true, render: (r) => cur(r.cpc, symA(r.profileId), 2) },
+    { key: 'sales', label: <SH k="sales">Sales</SH>, num: true, render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: <SH k="orders">Orders</SH>, num: true, render: (r) => int(r.orders) },
+    { key: 'cvr', label: 'CVR', num: true, render: (r) => pct(r.cvr) },
+    { key: 'acos', label: <SH k="acos">ACoS</SH>, num: true, render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
+    { key: 'roas', label: 'ROAS', num: true, render: (r) => dec2(r.roas) },
+    { key: 'ntb', label: 'NTB Orders', num: true, render: (r) => int(r.ntb) },
+  ]
+
+  return (
+    <>
+      <PageHead title="Campaigns" sub={`${filtered.length} campaigns · Sponsored Products, Brands & Display`}>
+        <Btn icon="sliders" ghost>Columns</Btn>
+        <Btn icon="download">Export</Btn>
+        <Btn icon="plus" primary>Create Campaign</Btn>
+      </PageHead>
+      <KpiRow rows={filtered} />
+
+      <div className="toolbar">
+        <SearchBox value={q} onChange={setQ} placeholder="Search campaigns…" />
+        {types.map((t) => (
+          <span key={t} className={`chip ${typeFilter === t ? 'on' : ''}`} onClick={() => setTypeFilter(t)}>{t}</span>
+        ))}
+        <div style={{ flex: 1 }} />
+        <Btn sm ghost icon="filter">More filters</Btn>
+      </div>
+
+      {sel.size > 0 && (
+        <div className="bulkbar">
+          <span className="sel">{sel.size} selected</span>
+          <Btn sm icon="play" onClick={() => bulkState('Enabled')}>Enable</Btn>
+          <Btn sm icon="pause" onClick={() => bulkState('Paused')}>Pause</Btn>
+          <Btn sm icon="target">Adjust Bids</Btn>
+          <Btn sm icon="wallet">Adjust Budget</Btn>
+          <Btn sm icon="clock">Dayparting</Btn>
+          <Btn sm icon="sliders">Apply Rule</Btn>
+          <Btn sm icon="tag">Tag</Btn>
+          <div style={{ flex: 1 }} />
+          <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
+        </div>
+      )}
+
+      <DataTable columns={columns} rows={sorted} selectable selected={sel} onToggle={toggleSel} onToggleAll={toggleAll} />
+      <div className="footnote">Bulk operations apply across selected line items — bids, budgets, dayparting, rules, negatives and tags. Bid shown as Actual / Available (suggested ceiling).</div>
+    </>
+  )
+}
+
+/* ============================ AD GROUPS ============================ */
+function AdGroups() {
+  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const rows = base.slice(0, 30).map((c, i) => ({
+    id: c.id + '-ag', name: c.name.split('-').slice(0, 2).join('-') + ' · Ad Group ' + (1 + (i % 3)),
+    campaign: c.name, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
+    targets: 4 + (i % 9), impr: c.impr, clk: c.clk, spend: c.spend, sales: c.sales, orders: c.orders, acos: c.acos, roas: c.roas, ctr: c.ctr,
+  }))
+  const { sorted } = useSort(rows, { key: 'spend', dir: 'desc' })
+  const columns = [
+    { key: 'name', label: 'Ad Group', sticky: true, width: 300, render: (r) => <div>{r.name}<small>{r.campaign}</small></div> },
+    { key: 'state', label: 'State', render: (r) => <Pill>{r.state === 'Enabled' ? 'Enabled' : 'Paused'}</Pill> },
+    { key: 'defaultBid', label: 'Default Bid', num: true, render: (r) => cur(r.defaultBid, symA(r.profileId), 2) },
+    { key: 'targets', label: 'Targets', num: true },
+    { key: 'impr', label: 'Impr.', num: true, render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, render: (r) => int(r.clk) },
+    { key: 'ctr', label: 'CTR', num: true, render: (r) => pct(r.ctr, 2) },
+    { key: 'spend', label: 'Spend', num: true, render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, render: (r) => int(r.orders) },
+    { key: 'acos', label: 'ACoS', num: true, render: (r) => pct(r.acos) },
+    { key: 'roas', label: 'ROAS', num: true, render: (r) => dec2(r.roas) },
+  ]
+  return (
+    <>
+      <PageHead title="Ad Groups" sub={`${rows.length} ad groups`}><Btn icon="download">Export</Btn><Btn icon="plus" primary>New Ad Group</Btn></PageHead>
+      <KpiRow rows={base} />
+      <DataTable columns={columns} rows={sorted} />
+    </>
+  )
+}
+
+/* ============================ TARGETING (Keywords) ============================ */
+function Targeting() {
+  const base = useProfileFilter(keywords)
+  const [tab, setTab] = useState('Keywords')
+  const [sel, setSel] = useState(new Set())
+  const { sorted } = useSort(base, { key: 'spend', dir: 'desc' })
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleAll = () => setSel((s) => s.size === sorted.length ? new Set() : new Set(sorted.map((r) => r.id)))
+  const columns = [
+    { key: 'keyword', label: 'Targeting', sticky: true, width: 240, render: (r) => <div>{r.keyword}<small>{r.campaign.split('-').slice(0, 2).join('-')}</small></div> },
+    { key: 'matchType', label: 'Match', render: (r) => <span className="tag">{r.matchType}</span> },
+    { key: 'state', label: 'State', render: (r) => <Pill>{r.state}</Pill> },
+    { key: 'bid', label: 'Bid', num: true, render: (r) => <span className="bidcell" style={{ justifyContent: 'flex-end' }}>{cur(r.bid, symA(r.profileId), 2)}<Icon name="edit" size={12} className="ed" /></span> },
+    { key: 'sugBid', label: 'Suggested', num: true, render: (r) => <span className="muted">{cur(r.sugBid, symA(r.profileId), 2)}</span> },
+    { key: 'topOfSearchIS', label: 'Top-of-Search IS', num: true, render: (r) => pct(r.topOfSearchIS) },
+    { key: 'impr', label: 'Impr.', num: true, render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, render: (r) => int(r.clk) },
+    { key: 'spend', label: 'Spend', num: true, render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, render: (r) => int(r.orders) },
+    { key: 'acos', label: 'ACoS', num: true, render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : 'inherit' }}>{pct(r.acos)}</span> },
+    { key: 'roas', label: 'ROAS', num: true, render: (r) => dec2(r.roas) },
+  ]
+  return (
+    <>
+      <PageHead title="Targeting" sub="Keywords & product targets with bid management"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Add Keywords</Btn></PageHead>
+      <div className="viewtabs" style={{ maxWidth: 360 }}>
+        {['Keywords', 'Product Targets', 'Negatives'].map((t) => <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</div>)}
+      </div>
+      {sel.size > 0 && (
+        <div className="bulkbar">
+          <span className="sel">{sel.size} selected</span>
+          <Btn sm icon="target">Set Bid</Btn><Btn sm icon="trendUp">Bid +%</Btn><Btn sm icon="trendDown">Bid −%</Btn>
+          <Btn sm icon="pause">Pause</Btn><Btn sm icon="x">Add as Negative</Btn>
+          <div style={{ flex: 1 }} /><Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
+        </div>
+      )}
+      <DataTable columns={columns} rows={sorted} selectable selected={sel} onToggle={toggleSel} onToggleAll={toggleAll} />
+      <div className="footnote">Suggested bids and Top-of-Search Impression Share guide bid changes. Select rows for bulk bid actions or to add negatives.</div>
+    </>
+  )
+}
+
+/* ============================ SEARCH TERMS (harvesting) ============================ */
+function SearchTerms() {
+  const base = useProfileFilter(searchTerms)
+  const [filter, setFilter] = useState('All')
+  const [harvested, setHarvested] = useState(new Set())
+  const recTone = { harvest: 'green', negate: 'red', monitor: 'gray' }
+  const filtered = base.filter((r) => filter === 'All' || r.recommend === filter.toLowerCase())
+  const { sorted } = useSort(filtered, { key: 'spend', dir: 'desc' })
+  const counts = { harvest: base.filter(r => r.recommend === 'harvest').length, negate: base.filter(r => r.recommend === 'negate').length }
+  const columns = [
+    { key: 'term', label: 'Customer Search Term', sticky: true, width: 240, render: (r) => <div>{r.term}<small>matched: {r.matchedTarget}</small></div> },
+    { key: 'campaign', label: 'Campaign', render: (r) => <span className="muted">{r.campaign.split('-').slice(0, 2).join('-')}</span> },
+    { key: 'impr', label: 'Impr.', num: true, render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, render: (r) => int(r.clk) },
+    { key: 'spend', label: 'Spend', num: true, render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, render: (r) => int(r.orders) },
+    { key: 'acos', label: 'ACoS', num: true, render: (r) => pct(r.acos) },
+    { key: 'recommend', label: 'Recommendation', render: (r) => <Pill tone={recTone[r.recommend]}>{r.recommend}</Pill> },
+    { key: 'act', label: '', render: (r) => r.recommend === 'harvest'
+        ? <Btn sm primary icon={harvested.has(r.id) ? 'check' : 'plus'} onClick={() => setHarvested(s => new Set(s).add(r.id))}>{harvested.has(r.id) ? 'Harvested' : 'Harvest'}</Btn>
+        : r.recommend === 'negate' ? <Btn sm icon="x">Negate</Btn> : <span className="muted">—</span> },
+  ]
+  return (
+    <>
+      <PageHead title="Search Terms" sub="Auto-harvest winners into manual campaigns · negate wasted spend"><Btn icon="download">Export</Btn><Btn icon="sliders" primary>Harvesting Rules</Btn></PageHead>
+      <div className="hint" style={{ marginBottom: 14 }}>
+        <Icon name="bulb" size={16} />
+        <div><b>{counts.harvest} terms</b> qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%) and <b>{counts.negate} terms</b> are flagged to negate. Rule R3 runs nightly to auto-apply.</div>
+      </div>
+      <div className="toolbar">
+        {['All', 'Harvest', 'Negate', 'Monitor'].map((t) => <span key={t} className={`chip ${filter === t ? 'on' : ''}`} onClick={() => setFilter(t)}>{t}</span>)}
+      </div>
+      <DataTable columns={columns} rows={sorted} />
+    </>
+  )
+}
+
+/* ============================ SHARE OF VOICE ============================ */
+function ShareOfVoice() {
+  const { sorted } = useSort(shareOfVoice, { key: 'searchVolume', dir: 'desc' })
+  const columns = [
+    { key: 'keyword', label: 'Keyword', sticky: true, width: 220 },
+    { key: 'searchVolume', label: 'Search Volume', num: true, render: (r) => compact(r.searchVolume) },
+    { key: 'paidShare', label: 'Paid SOV', num: true, render: (r) => <ShareBar v={r.paidShare} color="#1a4fd6" /> },
+    { key: 'organicShare', label: 'Organic SOV', num: true, render: (r) => <ShareBar v={r.organicShare} color="#1aa260" /> },
+    { key: 'totalShare', label: 'Total SOV', num: true, render: (r) => <b>{pct(r.totalShare)}</b> },
+    { key: 'yourRank', label: 'Your Avg Rank', num: true, render: (r) => `#${r.yourRank}` },
+    { key: 'topCompetitor', label: 'Top Competitor', render: (r) => <span>{r.topCompetitor} <span className="muted">({pct(r.competitorShare)})</span></span> },
+    { key: 'trend', label: '7d Trend', num: true, render: (r) => <span style={{ color: r.trend >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}><Icon name={r.trend >= 0 ? 'trendUp' : 'trendDown'} size={12} /> {Math.abs(r.trend).toFixed(1)}pt</span> },
+  ]
+  const avgPaid = shareOfVoice.reduce((s, r) => s + r.paidShare, 0) / shareOfVoice.length
+  const avgOrg = shareOfVoice.reduce((s, r) => s + r.organicShare, 0) / shareOfVoice.length
+  return (
+    <>
+      <PageHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Track Keyword</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="Avg Paid SOV" value={pct(avgPaid)} delta={3.2} />
+        <Kpi label="Avg Organic SOV" value={pct(avgOrg)} delta={-1.1} deltaGood={false} />
+        <Kpi label="Avg Total SOV" value={pct(avgPaid + avgOrg)} delta={1.8} />
+        <Kpi label="Keywords Tracked" value={shareOfVoice.length} />
+        <Kpi label="#1 Rank Keywords" value={shareOfVoice.filter(r => r.yourRank === 1).length} />
+      </KpiGrid>
+      <DataTable columns={columns} rows={sorted} />
+      <div className="footnote">Defend or expand SOV on priority keywords automatically with bid automation and budget controls (see Rule Manager).</div>
+    </>
+  )
+}
+function ShareBar({ v, color }) {
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end', width: 120 }}>
+      <div className="miniprog" style={{ width: 70 }}><span style={{ width: Math.min(100, v * 1.6) + '%', background: color }} /></div>
+      <span style={{ width: 38, textAlign: 'right' }}>{pct(v)}</span>
+    </div>
+  )
+}
+
+/* ============================ DAYPARTING ============================ */
+function Dayparting() {
+  const [grid] = useState(dayparting)
+  const hours = Array.from({ length: 24 }, (_, h) => h)
+  const color = (v) => {
+    // v ~0.4 to 1.5 → light to dark blue
+    const t = Math.max(0, Math.min(1, (v - 0.4) / 1.1))
+    const r = Math.round(234 - t * (234 - 26))
+    const g = Math.round(241 - t * (241 - 79))
+    const b = Math.round(255 - t * (255 - 214))
+    return `rgb(${r},${g},${b})`
+  }
+  return (
+    <>
+      <PageHead title="Dayparting" sub="Hour-of-day & day-of-week bid multipliers"><Btn icon="refresh" ghost>Reset</Btn><Btn icon="bulb">Suggest Schedule</Btn><Btn icon="check" primary>Apply to Campaigns</Btn></PageHead>
+      <div className="hint" style={{ marginBottom: 14 }}>
+        <Icon name="bulb" size={16} />
+        <div>Multipliers scale bids up during high-converting hours and down during low-traffic windows. Darker = higher multiplier. Apply to selected campaigns or portfolios.</div>
+      </div>
+      <Card title="Bid multiplier schedule" sub="Local account time · 168 hourly slots">
+        <div style={{ overflowX: 'auto' }}>
+          <div className="heat" style={{ minWidth: 760 }}>
+            <div />
+            {hours.map((h) => <div key={h} className="hh">{h}</div>)}
+            {grid.map((row, di) => (
+              <Row key={di} day={DAYS[di]} row={row} color={color} />
+            ))}
+          </div>
+        </div>
+        <div className="legend" style={{ marginTop: 16, justifyContent: 'center' }}>
+          <span><i style={{ background: color(0.4) }} /> 0.4× (overnight)</span>
+          <span><i style={{ background: color(0.8) }} /> 0.8×</span>
+          <span><i style={{ background: color(1.1) }} /> 1.1×</span>
+          <span><i style={{ background: color(1.45) }} /> 1.45× (peak)</span>
+        </div>
+      </Card>
+      <div className="footnote">For shopping events (e.g. Prime Day) apply an event-window override via Rule R6 to boost peak hours automatically.</div>
+    </>
+  )
+}
+function Row({ day, row, color }) {
+  return (
+    <>
+      <div className="rl">{day}</div>
+      {row.map((v, h) => (
+        <div key={h} className="cell" style={{ background: color(v), color: v > 1.0 ? '#fff' : 'var(--text-2)' }} title={`${day} ${h}:00 → ${v}×`}>{v.toFixed(1)}</div>
+      ))}
+    </>
+  )
+}
+
+
+/* ===================== src/pages/Dsp.jsx ===================== */
+
+function PageHead({ title, sub, children }) {
+  return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
+}
+
+/* ============================ DSP CAMPAIGNS ============================ */
+function Dsp() {
+  const { sorted } = useSort(dspOrders, { key: 'spend', dir: 'desc' })
+  const tot = dspOrders.reduce((a, d) => ({ spend: a.spend + d.spend, sales: a.sales + d.sales, impr: a.impr + d.impr, purchases: a.purchases + d.purchases }), { spend: 0, sales: 0, impr: 0, purchases: 0 })
+  const columns = [
+    { key: 'name', label: 'Order / Line Item', sticky: true, width: 280, render: (r) => <div>{r.name}<small>{r.tactic}</small></div> },
+    { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
+    { key: 'budget', label: 'Budget', num: true, render: (r) => money(r.budget) },
+    { key: 'spend', label: 'Spend', num: true, render: (r) => money(r.spend) },
+    { key: 'impr', label: 'Impressions', num: true, render: (r) => compact(r.impr) },
+    { key: 'clicks', label: 'Clicks', num: true, render: (r) => int(r.clicks) },
+    { key: 'dpvr', label: 'DPVR', num: true, render: (r) => pct(r.dpvr, 1) },
+    { key: 'purchases', label: 'Purchases', num: true, render: (r) => int(r.purchases) },
+    { key: 'sales', label: 'Sales', num: true, render: (r) => money(r.sales) },
+    { key: 'roas', label: 'ROAS', num: true, render: (r) => <b style={{ color: r.roas >= 5 ? 'var(--green)' : 'inherit' }}>{dec2(r.roas)}</b> },
+    { key: 'ntbPct', label: 'NTB %', num: true, render: (r) => pct(r.ntbPct, 0) },
+  ]
+  return (
+    <>
+      <PageHead title="DSP Campaigns" sub="Programmatic display & video · retargeting, prospecting, Performance+ & Brand+"><Btn icon="download">Export</Btn><Btn icon="plus" primary>New DSP Order</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="DSP Spend" value={money(tot.spend)} delta={11.2} deltaGood={false} />
+        <Kpi label="DSP Sales" value={money(tot.sales)} delta={18.4} />
+        <Kpi label="ROAS" value={dec2(tot.sales / tot.spend)} delta={6.1} />
+        <Kpi label="Impressions" value={compact(tot.impr)} delta={9.7} />
+        <Kpi label="Purchases" value={compact(tot.purchases)} delta={14.3} />
+        <Kpi label="Avg NTB %" value={pct(dspOrders.reduce((s, d) => s + d.ntbPct, 0) / dspOrders.length, 0)} delta={2.2} />
+      </KpiGrid>
+      <DataTable columns={columns} rows={sorted} />
+      <div className="footnote">DPVR = Detail Page View Rate · NTB = New-to-Brand. Apply AMC audiences and DSP dayparting auto-apply from the Audience Builder & Rule Manager.</div>
+    </>
+  )
+}
+
+/* ============================ AUDIENCE BUILDER ============================ */
+function Audiences() {
+  const [q, setQ] = useState('')
+  const [seedType, setSeedType] = useState('ASINs')
+  const rows = audiences.filter((a) => a.name.toLowerCase().includes(q.toLowerCase()))
+  const toneByType = { Remarketing: 'blue', 'In-market': 'purple', Conquest: 'amber', Lifestyle: 'green', Modeled: 'purple' }
+  const columns = [
+    { key: 'name', label: 'Audience', sticky: true, width: 300, render: (r) => <div>{r.name}<small>{r.source}</small></div> },
+    { key: 'type', label: 'Type', render: (r) => <Pill tone={toneByType[r.type] || 'gray'}>{r.type}</Pill> },
+    { key: 'size', label: 'Reach', num: true, render: (r) => compact(r.size) },
+    { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
+    { key: 'usedIn', label: 'Used in', num: true, render: (r) => `${r.usedIn} orders` },
+    { key: 'act', label: '', render: () => <Btn sm icon="link">Apply to DSP</Btn> },
+  ]
+  return (
+    <>
+      <PageHead title="Audience Builder" sub="Create custom audiences from ASINs or keywords · prebuilt segments & AMC-modeled lookalikes"><Btn icon="plus" primary>Create Audience</Btn></PageHead>
+      <div className="grid-3" style={{ marginBottom: 16 }}>
+        <Card title="Build from seeds" sub="Deep Intelligence audience creation">
+          <div className="viewtabs" style={{ marginBottom: 12 }}>
+            {['ASINs', 'Keywords'].map((t) => <div key={t} className={`viewtab ${seedType === t ? 'active' : ''}`} onClick={() => setSeedType(t)}>{t}</div>)}
+          </div>
+          <div className="search" style={{ maxWidth: '100%', marginBottom: 10 }}>
+            <Icon name="search" size={15} /><input placeholder={seedType === 'ASINs' ? 'Paste ASINs (e.g. B0CFREEZE1)…' : 'Enter seed keywords…'} />
+          </div>
+          <div className="legend" style={{ marginBottom: 12 }}>
+            <span className="tag">Your buyers</span><span className="tag">Competitor viewers</span><span className="tag">Category in-market</span>
+          </div>
+          <Btn primary icon="spark">Generate Audience</Btn>
+        </Card>
+        <Card title="Prebuilt templates" sub="One-click segments">
+          {['Awareness — broad reach', 'Retargeting — viewed not purchased', 'Repeat purchase / replenishment', 'Competitor conquest', 'High-LTV lookalike'].map((t) => (
+            <div key={t} className="lrow" style={{ padding: '9px 0' }}>
+              <div className="icobox" style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}><Icon name="users" size={16} /></div>
+              <div className="grow"><div className="title" style={{ fontSize: 12.5 }}>{t}</div></div>
+              <Btn sm ghost icon="plus">Use</Btn>
+            </div>
+          ))}
+        </Card>
+        <Card title="Audience overlap" sub="SP + DSP exposure (AMC)">
+          <div style={{ display: 'grid', placeItems: 'center', padding: '10px 0' }}>
+            <svg width="180" height="120" viewBox="0 0 180 120">
+              <circle cx="72" cy="60" r="46" fill="#1a4fd6" opacity="0.35" />
+              <circle cx="108" cy="60" r="46" fill="#1aa260" opacity="0.35" />
+              <text x="50" y="64" fontSize="11" fill="#1a4fd6" fontWeight="700">SP</text>
+              <text x="120" y="64" fontSize="11" fill="#1aa260" fontWeight="700">DSP</text>
+              <text x="84" y="64" fontSize="10" fill="#333" fontWeight="700">28%</text>
+            </svg>
+            <div className="footnote" style={{ textAlign: 'center' }}>28% of converters were exposed to both SP and DSP — incremental reach from layering channels.</div>
+          </div>
+        </Card>
+      </div>
+      <div className="toolbar"><SearchBox value={q} onChange={setQ} placeholder="Search audiences…" /></div>
+      <DataTable columns={columns} rows={rows} />
+    </>
+  )
+}
+
+/* ============================ AMC ============================ */
+function Amc() {
+  const { sorted } = useSort(amcQueries, { key: 'rows', dir: 'desc' })
+  const columns = [
+    { key: 'name', label: 'Query / Analysis', sticky: true, width: 300, render: (r) => <div>{r.name}<small>{r.template}</small></div> },
+    { key: 'schedule', label: 'Schedule', render: (r) => <span className="tag">{r.schedule}</span> },
+    { key: 'lastRun', label: 'Last Run', render: (r) => <span className="muted">{r.lastRun}</span> },
+    { key: 'rows', label: 'Rows', num: true, render: (r) => int(r.rows) },
+    { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
+    { key: 'act', label: '', render: () => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><Btn sm ghost icon="eye">View</Btn><Btn sm icon="users">Build Audience</Btn></span> },
+  ]
+  return (
+    <>
+      <PageHead title="Amazon Marketing Cloud" sub="Run instructional queries, schedule refreshes, and activate AMC audiences into DSP"><Btn icon="refresh" ghost>Refresh All</Btn><Btn icon="plus" primary>New Query</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="Saved Queries" value={amcQueries.length} />
+        <Kpi label="AMC Audiences" value={2} />
+        <Kpi label="Scheduled Refreshes" value={amcQueries.filter(q => q.schedule !== 'Ad hoc').length} />
+        <Kpi label="Avg Conversion Lift" value="+18%" delta={4.0} />
+      </KpiGrid>
+      <div className="hint" style={{ marginBottom: 14 }}>
+        <Icon name="database" size={16} />
+        <div>AMC connects clean-room signals — full shopper journey, new-to-brand, audience overlap, and optimal frequency — then activates modeled audiences into DSP. <b>AMC Activate</b> removes manual querying.</div>
+      </div>
+      <Card title="Templates" sub="Prebuilt instructional queries" >
+        <div className="grid-3">
+          {['Customer Journey', 'New-to-Brand Analysis', 'Audience Overlap', 'Frequency Analysis', 'Path to Conversion', 'Custom SQL'].map((t) => (
+            <div key={t} className="lrow" style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+              <div className="icobox" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><Icon name="database" size={16} /></div>
+              <div className="grow"><div className="title" style={{ fontSize: 12.5 }}>{t}</div></div>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <div style={{ height: 16 }} />
+      <DataTable columns={columns} rows={sorted} />
+    </>
+  )
+}
+
+
+/* ===================== src/pages/Commerce.jsx ===================== */
+
+const sym = (pid) => profileById[pid]?.currency || '$'
+function PageHead({ title, sub, children }) {
+  return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
+}
+function useShelf() {
+  const { profileId } = useApp()
+  return useMemo(() => profileId === 'all' ? digitalShelf : digitalShelf.filter((d) => d.profileId === profileId), [profileId])
+}
+function ScoreBar({ v }) {
+  const c = v >= 85 ? 'var(--green)' : v >= 70 ? 'var(--amber)' : 'var(--red)'
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+    <div className="miniprog" style={{ width: 56 }}><span style={{ width: v + '%', background: c }} /></div>
+    <b style={{ width: 28, textAlign: 'right', color: c }}>{v}</b>
+  </span>
+}
+
+/* ============================ DIGITAL SHELF ============================ */
+function DigitalShelf() {
+  const data = useShelf()
+  const [q, setQ] = useState('')
+  const rows = data.filter((d) => d.title.toLowerCase().includes(q.toLowerCase()) || d.asin.toLowerCase().includes(q.toLowerCase()))
+  const { sorted } = useSort(rows, { key: 'glanceViews', dir: 'desc' })
+  const columns = [
+    { key: 'title', label: 'Product', sticky: true, width: 300, render: (r) => <div>{r.title}<small>{r.asin} · {r.profile}</small></div> },
+    { key: 'inStock', label: 'Availability', render: (r) => <Pill tone={r.inStock ? 'green' : 'red'}>{r.inStock ? 'In Stock' : 'Out of Stock'}</Pill> },
+    { key: 'buyBox', label: 'Buy Box', num: true, render: (r) => <span style={{ color: r.buyBox >= 80 ? 'var(--green)' : r.buyBox >= 50 ? 'var(--amber)' : 'var(--red)', fontWeight: 700 }}>{pct(r.buyBox)}</span> },
+    { key: 'price', label: 'Price', num: true, render: (r) => <span>{cur(r.price, sym(r.profileId), 2)}{r.mapViolation && <span className="pill red" style={{ marginLeft: 6, borderRadius: 5 }}>MAP</span>}</span> },
+    { key: 'listingScore', label: 'Content Score', num: true, render: (r) => <ScoreBar v={r.listingScore} /> },
+    { key: 'rating', label: 'Rating', num: true, render: (r) => <span>{r.rating.toFixed(1)}★ <span className="muted">({compact(r.reviews)})</span></span> },
+    { key: 'glanceViews', label: 'Glance Views', num: true, render: (r) => compact(r.glanceViews) },
+    { key: 'conversion', label: 'CVR', num: true, render: (r) => pct(r.conversion) },
+    { key: 'orderedRevenue', label: 'Ordered Rev.', num: true, render: (r) => money(r.orderedRevenue, sym(r.profileId)) },
+  ]
+  const oos = data.filter((d) => !d.inStock).length
+  const lowBB = data.filter((d) => d.buyBox < 80).length
+  const contentGaps = data.filter((d) => d.contentIssues > 0).length
+  return (
+    <>
+      <PageHead title="Digital Shelf" sub="Content, availability, Buy Box, pricing & ratings across the catalog"><Btn icon="download">Export</Btn><Btn icon="refresh" ghost>Recrawl</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="ASINs Monitored" value={data.length} />
+        <Kpi label="Out of Stock" value={oos} delta={oos ? 100 : 0} deltaGood={false} />
+        <Kpi label="Buy Box < 80%" value={lowBB} />
+        <Kpi label="Content Issues" value={contentGaps} />
+        <Kpi label="Avg Content Score" value={Math.round(data.reduce((s, d) => s + d.listingScore, 0) / data.length)} />
+        <Kpi label="Avg Rating" value={(data.reduce((s, d) => s + d.rating, 0) / data.length).toFixed(2) + '★'} />
+      </KpiGrid>
+      <div className="hint" style={{ marginBottom: 14 }}>
+        <Icon name="link" size={16} />
+        <div>Retail signals are wired into advertising automation: out-of-stock or Buy Box loss triggers <b>auto-pause</b> (Rule R5) to stop wasted ad spend on unavailable products.</div>
+      </div>
+      <div className="toolbar"><SearchBox value={q} onChange={setQ} placeholder="Search products / ASIN…" /></div>
+      <DataTable columns={columns} rows={sorted} />
+    </>
+  )
+}
+
+/* ============================ BUY BOX & INVENTORY ============================ */
+function BuyBox() {
+  const data = useShelf()
+  const { sorted } = useSort(data, { key: 'buyBox', dir: 'asc' })
+  const columns = [
+    { key: 'title', label: 'Product', sticky: true, width: 300, render: (r) => <div>{r.title}<small>{r.asin} · {r.profile}</small></div> },
+    { key: 'inStock', label: 'Stock', render: (r) => <Pill tone={r.inStock ? 'green' : 'red'}>{r.inStock ? 'In Stock' : 'Out of Stock'}</Pill> },
+    { key: 'repOos', label: 'Rep. OOS days', num: true, render: (r) => r.repOos ? <span style={{ color: 'var(--red)' }}>{r.repOos}</span> : <span className="muted">0</span> },
+    { key: 'buyBox', label: 'Buy Box %', num: true, render: (r) => <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}><div className="miniprog" style={{ width: 60 }}><span style={{ width: r.buyBox + '%', background: r.buyBox >= 80 ? 'var(--green)' : r.buyBox >= 50 ? 'var(--amber)' : 'var(--red)' }} /></div><b style={{ width: 38, textAlign: 'right' }}>{pct(r.buyBox)}</b></span> },
+    { key: 'price', label: 'Your Price', num: true, render: (r) => cur(r.price, sym(r.profileId), 2) },
+    { key: 'mapViolation', label: 'MAP', render: (r) => r.mapViolation ? <Pill tone="red">Violation</Pill> : <span className="muted">OK</span> },
+    { key: 'adImpact', label: 'Ad Action', render: (r) => (!r.inStock || r.buyBox < 50) ? <Pill tone="amber">Ads paused</Pill> : <Pill tone="green">Serving</Pill> },
+  ]
+  return (
+    <>
+      <PageHead title="Buy Box & Inventory" sub="ASIN-level Buy Box ownership, stock status & ad impact"><Btn icon="download">Export</Btn><Btn icon="sliders" primary>Automation Rules</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="Avg Buy Box" value={pct(data.reduce((s, d) => s + d.buyBox, 0) / data.length)} delta={-2.4} deltaGood={false} />
+        <Kpi label="ASINs Losing BB" value={data.filter(d => d.buyBox < 80).length} />
+        <Kpi label="Out of Stock" value={data.filter(d => !d.inStock).length} />
+        <Kpi label="MAP Violations" value={data.filter(d => d.mapViolation).length} />
+        <Kpi label="Ads Auto-Paused" value={data.filter(d => !d.inStock || d.buyBox < 50).length} />
+      </KpiGrid>
+      <DataTable columns={columns} rows={sorted} />
+      <div className="footnote">When Buy Box drops below threshold or stock runs out, advertising is automatically paused for that ASIN and resumed on recovery.</div>
+    </>
+  )
+}
+
+/* ============================ PRODUCT CENTER ============================ */
+function Products() {
+  const data = useShelf()
+  // de-dupe by ASIN
+  const byAsin = Object.values(data.reduce((m, d) => { m[d.asin] = m[d.asin] || d; return m }, {}))
+  const { sorted } = useSort(byAsin, { key: 'orderedRevenue', dir: 'desc' })
+  const columns = [
+    { key: 'title', label: 'Product', sticky: true, width: 320, render: (r) => <div>{r.title}<small>{r.asin} · {r.brand} · {r.category}</small></div> },
+    { key: 'images', label: 'Images', num: true, render: (r) => <span style={{ color: r.images >= 6 ? 'var(--green)' : 'var(--amber)' }}>{r.images}</span> },
+    { key: 'aplus', label: 'A+ Content', render: (r) => r.aplus ? <Pill tone="green">Yes</Pill> : <Pill tone="amber">Missing</Pill> },
+    { key: 'video', label: 'Video', render: (r) => r.video ? <Pill tone="green">Yes</Pill> : <Pill tone="gray">No</Pill> },
+    { key: 'listingScore', label: 'Content Score', num: true, render: (r) => <ScoreBar v={r.listingScore} /> },
+    { key: 'rating', label: 'Rating', num: true, render: (r) => `${r.rating.toFixed(1)}★` },
+    { key: 'reviews', label: 'Reviews', num: true, render: (r) => compact(r.reviews) },
+    { key: 'conversion', label: 'CVR', num: true, render: (r) => pct(r.conversion) },
+    { key: 'orderedRevenue', label: 'Ordered Rev.', num: true, render: (r) => money(r.orderedRevenue) },
+  ]
+  return (
+    <>
+      <PageHead title="Product Center" sub="Catalog content health — images, A+, video, reviews & conversion"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Bulk Edit Content</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="Products" value={byAsin.length} />
+        <Kpi label="Missing A+" value={byAsin.filter(d => !d.aplus).length} />
+        <Kpi label="No Video" value={byAsin.filter(d => !d.video).length} />
+        <Kpi label="Content Score < 75" value={byAsin.filter(d => d.listingScore < 75).length} />
+        <Kpi label="Avg Rating" value={(byAsin.reduce((s, d) => s + d.rating, 0) / byAsin.length).toFixed(2) + '★'} />
+      </KpiGrid>
+      <DataTable columns={columns} rows={sorted} />
+    </>
+  )
+}
+
+
+/* ===================== src/pages/Automation.jsx ===================== */
+
+function PageHead({ title, sub, children }) {
+  return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
+}
+const RULE_ICON = { Bid: 'target', Harvest: 'spark', Negative: 'x', Retail: 'shield', Dayparting: 'clock', Budget: 'wallet' }
+const RULE_COLOR = { Bid: 'var(--brand)', Harvest: 'var(--green)', Negative: 'var(--red)', Retail: 'var(--purple)', Dayparting: 'var(--amber)', Budget: 'var(--brand-2)' }
+
+/* ============================ RULE MANAGER ============================ */
+function Rules() {
+  const [rules, setRules] = useState(RULES)
+  const [filter, setFilter] = useState('All')
+  const toggle = (id) => setRules((rs) => rs.map((r) => r.id === id ? { ...r, status: r.status === 'Active' ? 'Paused' : 'Active' } : r))
+  const types = ['All', 'Bid', 'Harvest', 'Negative', 'Retail', 'Dayparting', 'Budget']
+  const shown = rules.filter((r) => filter === 'All' || r.type === filter)
+  const active = rules.filter((r) => r.status === 'Active').length
+  const affected = rules.reduce((s, r) => s + r.affected, 0)
+  return (
+    <>
+      <PageHead title="Rule Manager" sub="Rules-based automation for bids, budgets, harvesting, negatives, dayparting & retail signals"><Btn icon="bulb" ghost>Templates</Btn><Btn icon="plus" primary>Create Rule</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="Active Rules" value={active} />
+        <Kpi label="Total Rules" value={rules.length} />
+        <Kpi label="Line Items Managed" value={affected.toLocaleString()} />
+        <Kpi label="Actions (24h)" value="1,284" />
+        <Kpi label="Est. Spend Saved (30d)" value="$8.4K" delta={6.2} />
+      </KpiGrid>
+      <div className="toolbar">
+        {types.map((t) => <span key={t} className={`chip ${filter === t ? 'on' : ''}`} onClick={() => setFilter(t)}>{t}</span>)}
+      </div>
+      <Card pad={false}>
+        {shown.map((r) => (
+          <div key={r.id} className="lrow">
+            <div className="icobox" style={{ background: RULE_COLOR[r.type] + '1a', color: RULE_COLOR[r.type] }}><Icon name={RULE_ICON[r.type]} size={18} /></div>
+            <div className="grow">
+              <div className="flex items-center gap-8"><span className="title">{r.name}</span><span className="tag">{r.type}</span></div>
+              <div className="desc"><b>IF</b> {r.trigger} · <b>THEN</b> {r.action}</div>
+              <div className="desc" style={{ color: 'var(--text-3)' }}>Scope: {r.scope} · Runs {r.runs} · Last run {r.lastRun} · {r.affected} affected</div>
+            </div>
+            <Pill>{r.status}</Pill>
+            <Toggle on={r.status === 'Active'} onClick={() => toggle(r.id)} />
+            <Btn sm ghost icon="edit" />
+          </div>
+        ))}
+      </Card>
+      <div className="footnote">Rules evaluate on a schedule and auto-apply actions. Combine with Campaign AI for hands-off budget, keyword and bid management.</div>
+    </>
+  )
+}
+
+/* ============================ BUDGET MANAGER ============================ */
+function Budgets() {
+  const totalCap = budgets.reduce((s, b) => s + b.monthlyCap, 0)
+  const totalSpent = budgets.reduce((s, b) => s + b.spent, 0)
+  return (
+    <>
+      <PageHead title="Budget Manager" sub="Monthly caps, pacing & forecast with auto-pause on cap"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Set Budget Cap</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="Total Monthly Cap" value={money(totalCap)} />
+        <Kpi label="Spent MTD" value={money(totalSpent)} />
+        <Kpi label="Remaining" value={money(totalCap - totalSpent)} />
+        <Kpi label="Forecast EOM" value={money(budgets.reduce((s, b) => s + b.forecast, 0))} />
+        <Kpi label="Avg Pace" value={pct(budgets.reduce((s, b) => s + b.pacePct, 0) / budgets.length)} />
+      </KpiGrid>
+      <div className="hint" style={{ marginBottom: 14 }}>
+        <Icon name="wallet" size={16} />
+        <div>Upload monthly caps for the fiscal year. When a cap is reached, campaigns auto-pause until the budget refreshes next month. Pacing guard (Rule R7) throttles bids if daily pace runs hot.</div>
+      </div>
+      <div className="grid-3">
+        {budgets.map((b) => (
+          <Card key={b.profileId} title={b.profile} sub={`${b.type === '3P' ? 'Seller' : 'Vendor'} · ${b.currency} budget`} actions={<Pill>{b.status}</Pill>}>
+            <div style={{ fontSize: 26, fontWeight: 750, letterSpacing: '-.5px' }}>{cur(b.spent, b.currency)}</div>
+            <div className="muted" style={{ marginBottom: 12 }}>of {cur(b.monthlyCap, b.currency)} cap</div>
+            <div className="pace"><span style={{ width: Math.min(100, (b.spent / b.monthlyCap) * 100) + '%', background: paceColor(b.status) }} /></div>
+            <div className="pacelabel"><span>{pct((b.spent / b.monthlyCap) * 100)} of cap</span><span>{pct(b.pacePct)} of target pace</span></div>
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Mini label="Forecast EOM" value={cur(b.forecast, b.currency)} warn={b.forecast > b.monthlyCap} />
+              <Mini label="Remaining" value={cur(b.remaining, b.currency)} />
+            </div>
+          </Card>
+        ))}
+      </div>
+    </>
+  )
+}
+function Mini({ label, value, warn }) {
+  return <div><div className="muted" style={{ fontSize: 11 }}>{label}</div><div style={{ fontWeight: 700, color: warn ? 'var(--red)' : 'var(--text)' }}>{value}</div></div>
+}
+const paceColor = (s) => (s === 'Over pace' ? 'var(--red)' : s === 'Under pace' ? 'var(--amber)' : 'var(--green)')
+
+
+/* ===================== src/pages/Insights.jsx ===================== */
+
+function PageHead({ title, sub, children }) {
+  return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
+}
+
+/* ============================ REPORT CENTER ============================ */
+function Reports() {
+  const { sorted } = useSort(reports, { key: 'name', dir: 'asc' })
+  const columns = [
+    { key: 'name', label: 'Report', sticky: true, width: 280, render: (r) => <div>{r.name}<small>{r.type}</small></div> },
+    { key: 'cadence', label: 'Schedule', render: (r) => <span className="tag">{r.cadence}</span> },
+    { key: 'format', label: 'Format' },
+    { key: 'recipients', label: 'Recipients', num: true, render: (r) => `${r.recipients}` },
+    { key: 'owner', label: 'Owner' },
+    { key: 'updated', label: 'Updated', render: (r) => <span className="muted">{r.updated}</span> },
+    { key: 'act', label: '', render: () => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><Btn sm ghost icon="play">Run</Btn><Btn sm ghost icon="download" /></span> },
+  ]
+  return (
+    <>
+      <PageHead title="Report Center" sub="Custom & scheduled reports, dashboards and exports"><Btn icon="file" ghost>Templates</Btn><Btn icon="plus" primary>Build Report</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="Saved Reports" value={reports.length} />
+        <Kpi label="Scheduled" value={reports.filter(r => /·/.test(r.cadence)).length} />
+        <Kpi label="Recipients" value={reports.reduce((s, r) => s + r.recipients, 0)} />
+        <Kpi label="Widgets Available" value={reportTemplates.length} />
+      </KpiGrid>
+      <Card title="Report builder — data sources" sub="Drag widgets onto a custom dashboard" >
+        <div className="grid-3">
+          {reportTemplates.map((t) => (
+            <div key={t} className="lrow" style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 11 }}>
+              <div className="icobox" style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}><Icon name="bars" size={16} /></div>
+              <div className="grow"><div className="title" style={{ fontSize: 12.5 }}>{t}</div></div>
+              <Icon name="plus" size={15} className="muted" />
+            </div>
+          ))}
+        </div>
+      </Card>
+      <div style={{ height: 16 }} />
+      <DataTable columns={columns} rows={sorted} />
+    </>
+  )
+}
+
+/* ============================ ALERTS ============================ */
+function Alerts() {
+  const [alerts, setAlerts] = useState(ALERTS)
+  const [filter, setFilter] = useState('All')
+  const markRead = (id) => setAlerts((a) => a.map((x) => x.id === id ? { ...x, read: true } : x))
+  const markAll = () => setAlerts((a) => a.map((x) => ({ ...x, read: true })))
+  const sevTone = { high: 'red', med: 'amber', low: 'gray' }
+  const shown = alerts.filter((a) => filter === 'All' || (filter === 'Unread' ? !a.read : a.sev === filter.toLowerCase()))
+  return (
+    <>
+      <PageHead title="Alerts" sub="Real-time notifications across ads, budget & retail signals"><Btn icon="check" ghost onClick={markAll}>Mark all read</Btn><Btn icon="gear" primary>Alert Settings</Btn></PageHead>
+      <KpiGrid>
+        <Kpi label="Unread" value={alerts.filter(a => !a.read).length} />
+        <Kpi label="High Severity" value={alerts.filter(a => a.sev === 'high').length} />
+        <Kpi label="Today" value={alerts.length} />
+      </KpiGrid>
+      <div className="toolbar">
+        {['All', 'Unread', 'High', 'Med', 'Low'].map((t) => <span key={t} className={`chip ${filter === t ? 'on' : ''}`} onClick={() => setFilter(t)}>{t}</span>)}
+      </div>
+      <Card pad={false}>
+        {shown.map((a) => (
+          <div key={a.id} className="lrow" style={{ background: a.read ? 'transparent' : 'var(--brand-soft)' }}>
+            <div className="icobox" style={{ background: insSevBg(a.sev), color: insSevColor(a.sev) }}><Icon name={a.icon} size={18} /></div>
+            <div className="grow">
+              <div className="flex items-center gap-8"><span className="title">{a.title}</span><Pill tone={sevTone[a.sev]}>{a.sev}</Pill></div>
+              <div className="desc">{a.body}</div>
+            </div>
+            <div className="muted" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{a.time}</div>
+            {!a.read && <Btn sm ghost icon="check" onClick={() => markRead(a.id)} />}
+          </div>
+        ))}
+        {shown.length === 0 && <div className="empty">No alerts match this filter</div>}
+      </Card>
+    </>
+  )
+}
+const insSevBg = (s) => ({ high: 'var(--red-soft)', med: 'var(--amber-soft)', low: '#eef1f6' }[s])
+const insSevColor = (s) => ({ high: 'var(--red)', med: 'var(--amber)', low: 'var(--text-2)' }[s])
+
+/* ============================ SETTINGS ============================ */
+function Settings() {
+  const conns = [
+    { name: 'Amazon Ads API', detail: 'SP · SB · SD · profiles US / CA / UK', status: 'Connected', icon: 'ads' },
+    { name: 'Amazon DSP', detail: 'Seat: Brightleaf Media', status: 'Connected', icon: 'globe' },
+    { name: 'Amazon Marketing Cloud', detail: 'Instance: brightleaf-amc', status: 'Connected', icon: 'database' },
+    { name: 'Selling Partner API (SP-API)', detail: 'Vendor Central · Seller Central', status: 'Connected', icon: 'store' },
+    { name: 'Walmart Connect', detail: 'Not linked', status: 'Disconnected', icon: 'box' },
+  ]
+  return (
+    <>
+      <PageHead title="Settings" sub="Integrations, users & account configuration"><Btn icon="plus" primary>Add Integration</Btn></PageHead>
+      <div className="grid-2">
+        <Card title="Connected data sources" sub="Advertising & retail integrations" pad={false}>
+          {conns.map((c) => (
+            <div key={c.name} className="lrow">
+              <div className="icobox" style={{ background: 'var(--surface-2)', color: 'var(--text-2)' }}><Icon name={c.icon} size={17} /></div>
+              <div className="grow"><div className="title">{c.name}</div><div className="desc">{c.detail}</div></div>
+              <Pill tone={c.status === 'Connected' ? 'green' : 'gray'}>{c.status}</Pill>
+            </div>
+          ))}
+        </Card>
+        <div style={{ display: 'grid', gap: 16, alignContent: 'start' }}>
+          <Card title="Account" sub="Organization profile">
+            <Field label="Organization" value="Brightleaf Media (Agency)" />
+            <Field label="Default currency" value="USD ($)" />
+            <Field label="Account time zone" value="America/Toronto" />
+            <Field label="Plan" value="Enterprise · 3 marketplaces" />
+          </Card>
+          <Card title="Team" sub="4 members">
+            {[['JL', 'Jim Laframboise', 'Owner'], ['AR', 'A. Rivera', 'Analyst'], ['MC', 'M. Chen', 'Manager']].map(([i, n, role]) => (
+              <div key={n} className="lrow" style={{ padding: '9px 0' }}>
+                <div className="avatar" style={{ background: 'var(--brand)' }}>{i}</div>
+                <div className="grow"><div className="title" style={{ fontSize: 12.5 }}>{n}</div></div>
+                <span className="tag">{role}</span>
+              </div>
+            ))}
+          </Card>
+        </div>
+      </div>
+    </>
+  )
+}
+function Field({ label, value }) {
+  return <div className="flex between" style={{ padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
+    <span className="muted">{label}</span><b style={{ fontSize: 12.5 }}>{value}</b>
+  </div>
+}
+
+
+/* ===================== src/App.jsx ===================== */
+
+function App() {
+  return (
+    <AppProvider>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Overview />} />
+          <Route path="/ads/campaigns" element={<Campaigns />} />
+          <Route path="/ads/adgroups" element={<AdGroups />} />
+          <Route path="/ads/targeting" element={<Targeting />} />
+          <Route path="/ads/search-terms" element={<SearchTerms />} />
+          <Route path="/ads/sov" element={<ShareOfVoice />} />
+          <Route path="/ads/dayparting" element={<Dayparting />} />
+          <Route path="/dsp" element={<Dsp />} />
+          <Route path="/dsp/audiences" element={<Audiences />} />
+          <Route path="/dsp/amc" element={<Amc />} />
+          <Route path="/commerce/shelf" element={<DigitalShelf />} />
+          <Route path="/commerce/buybox" element={<BuyBox />} />
+          <Route path="/commerce/products" element={<Products />} />
+          <Route path="/rules" element={<Rules />} />
+          <Route path="/budgets" element={<Budgets />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Overview />} />
+        </Routes>
+      </Layout>
+    </AppProvider>
+  )
+}
+
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <RouterProvider><App /></RouterProvider>
+);
+
+</script>
+</body>
+</html>
