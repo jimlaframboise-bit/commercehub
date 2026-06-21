@@ -1343,7 +1343,7 @@ function useProfileFilter(rows) {
   return useMemo(() => (profileId === 'all' ? rows : rows.filter((r) => r.profileId === profileId)), [rows, profileId])
 }
 
-function PageHead({ title, sub, children }) {
+function AdsHead({ title, sub, children }) {
   return (
     <div className="page-head">
       <div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div>
@@ -1420,11 +1420,11 @@ function Campaigns() {
 
   return (
     <>
-      <PageHead title="Campaigns" sub={`${filtered.length} campaigns · Sponsored Products, Brands & Display`}>
+      <AdsHead title="Campaigns" sub={`${filtered.length} campaigns · Sponsored Products, Brands & Display`}>
         <Btn icon="sliders" ghost>Columns</Btn>
         <Btn icon="download">Export</Btn>
         <Btn icon="plus" primary>Create Campaign</Btn>
-      </PageHead>
+      </AdsHead>
       <KpiRow rows={filtered} />
 
       <div className="toolbar">
@@ -1482,7 +1482,7 @@ function AdGroups() {
   ]
   return (
     <>
-      <PageHead title="Ad Groups" sub={`${rows.length} ad groups`}><Btn icon="download">Export</Btn><Btn icon="plus" primary>New Ad Group</Btn></PageHead>
+      <AdsHead title="Ad Groups" sub={`${rows.length} ad groups`}><Btn icon="download">Export</Btn><Btn icon="plus" primary>New Ad Group</Btn></AdsHead>
       <KpiRow rows={base} />
       <DataTable columns={columns} rows={sorted} />
     </>
@@ -1514,7 +1514,7 @@ function Targeting() {
   ]
   return (
     <>
-      <PageHead title="Targeting" sub="Keywords & product targets with bid management"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Add Keywords</Btn></PageHead>
+      <AdsHead title="Targeting" sub="Keywords & product targets with bid management"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Add Keywords</Btn></AdsHead>
       <div className="viewtabs" style={{ maxWidth: 360 }}>
         {['Keywords', 'Product Targets', 'Negatives'].map((t) => <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</div>)}
       </div>
@@ -1557,7 +1557,7 @@ function SearchTerms() {
   ]
   return (
     <>
-      <PageHead title="Search Terms" sub="Auto-harvest winners into manual campaigns · negate wasted spend"><Btn icon="download">Export</Btn><Btn icon="sliders" primary>Harvesting Rules</Btn></PageHead>
+      <AdsHead title="Search Terms" sub="Auto-harvest winners into manual campaigns · negate wasted spend"><Btn icon="download">Export</Btn><Btn icon="sliders" primary>Harvesting Rules</Btn></AdsHead>
       <div className="hint" style={{ marginBottom: 14 }}>
         <Icon name="bulb" size={16} />
         <div><b>{counts.harvest} terms</b> qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%) and <b>{counts.negate} terms</b> are flagged to negate. Rule R3 runs nightly to auto-apply.</div>
@@ -1587,7 +1587,7 @@ function ShareOfVoice() {
   const avgOrg = shareOfVoice.reduce((s, r) => s + r.organicShare, 0) / shareOfVoice.length
   return (
     <>
-      <PageHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Track Keyword</Btn></PageHead>
+      <AdsHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Track Keyword</Btn></AdsHead>
       <KpiGrid>
         <Kpi label="Avg Paid SOV" value={pct(avgPaid)} delta={3.2} />
         <Kpi label="Avg Organic SOV" value={pct(avgOrg)} delta={-1.1} deltaGood={false} />
@@ -1623,7 +1623,7 @@ function Dayparting() {
   }
   return (
     <>
-      <PageHead title="Dayparting" sub="Hour-of-day & day-of-week bid multipliers"><Btn icon="refresh" ghost>Reset</Btn><Btn icon="bulb">Suggest Schedule</Btn><Btn icon="check" primary>Apply to Campaigns</Btn></PageHead>
+      <AdsHead title="Dayparting" sub="Hour-of-day & day-of-week bid multipliers"><Btn icon="refresh" ghost>Reset</Btn><Btn icon="bulb">Suggest Schedule</Btn><Btn icon="check" primary>Apply to Campaigns</Btn></AdsHead>
       <div className="hint" style={{ marginBottom: 14 }}>
         <Icon name="bulb" size={16} />
         <div>Multipliers scale bids up during high-converting hours and down during low-traffic windows. Darker = higher multiplier. Apply to selected campaigns or portfolios.</div>
@@ -1663,7 +1663,7 @@ function Row({ day, row, color }) {
 
 /* ===================== src/pages/Dsp.jsx ===================== */
 
-function PageHead({ title, sub, children }) {
+function DspHead({ title, sub, children }) {
   return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
 }
 
@@ -1686,7 +1686,7 @@ function Dsp() {
   ]
   return (
     <>
-      <PageHead title="DSP Campaigns" sub="Programmatic display & video · retargeting, prospecting, Performance+ & Brand+"><Btn icon="download">Export</Btn><Btn icon="plus" primary>New DSP Order</Btn></PageHead>
+      <DspHead title="DSP Campaigns" sub="Programmatic display & video · retargeting, prospecting, Performance+ & Brand+"><Btn icon="download">Export</Btn><Btn icon="plus" primary>New DSP Order</Btn></DspHead>
       <KpiGrid>
         <Kpi label="DSP Spend" value={money(tot.spend)} delta={11.2} deltaGood={false} />
         <Kpi label="DSP Sales" value={money(tot.sales)} delta={18.4} />
@@ -1717,7 +1717,7 @@ function Audiences() {
   ]
   return (
     <>
-      <PageHead title="Audience Builder" sub="Create custom audiences from ASINs or keywords · prebuilt segments & AMC-modeled lookalikes"><Btn icon="plus" primary>Create Audience</Btn></PageHead>
+      <DspHead title="Audience Builder" sub="Create custom audiences from ASINs or keywords · prebuilt segments & AMC-modeled lookalikes"><Btn icon="plus" primary>Create Audience</Btn></DspHead>
       <div className="grid-3" style={{ marginBottom: 16 }}>
         <Card title="Build from seeds" sub="Deep Intelligence audience creation">
           <div className="viewtabs" style={{ marginBottom: 12 }}>
@@ -1772,7 +1772,7 @@ function Amc() {
   ]
   return (
     <>
-      <PageHead title="Amazon Marketing Cloud" sub="Run instructional queries, schedule refreshes, and activate AMC audiences into DSP"><Btn icon="refresh" ghost>Refresh All</Btn><Btn icon="plus" primary>New Query</Btn></PageHead>
+      <DspHead title="Amazon Marketing Cloud" sub="Run instructional queries, schedule refreshes, and activate AMC audiences into DSP"><Btn icon="refresh" ghost>Refresh All</Btn><Btn icon="plus" primary>New Query</Btn></DspHead>
       <KpiGrid>
         <Kpi label="Saved Queries" value={amcQueries.length} />
         <Kpi label="AMC Audiences" value={2} />
@@ -1803,7 +1803,7 @@ function Amc() {
 /* ===================== src/pages/Commerce.jsx ===================== */
 
 const sym = (pid) => profileById[pid]?.currency || '$'
-function PageHead({ title, sub, children }) {
+function CommerceHead({ title, sub, children }) {
   return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
 }
 function useShelf() {
@@ -1840,7 +1840,7 @@ function DigitalShelf() {
   const contentGaps = data.filter((d) => d.contentIssues > 0).length
   return (
     <>
-      <PageHead title="Digital Shelf" sub="Content, availability, Buy Box, pricing & ratings across the catalog"><Btn icon="download">Export</Btn><Btn icon="refresh" ghost>Recrawl</Btn></PageHead>
+      <CommerceHead title="Digital Shelf" sub="Content, availability, Buy Box, pricing & ratings across the catalog"><Btn icon="download">Export</Btn><Btn icon="refresh" ghost>Recrawl</Btn></CommerceHead>
       <KpiGrid>
         <Kpi label="ASINs Monitored" value={data.length} />
         <Kpi label="Out of Stock" value={oos} delta={oos ? 100 : 0} deltaGood={false} />
@@ -1874,7 +1874,7 @@ function BuyBox() {
   ]
   return (
     <>
-      <PageHead title="Buy Box & Inventory" sub="ASIN-level Buy Box ownership, stock status & ad impact"><Btn icon="download">Export</Btn><Btn icon="sliders" primary>Automation Rules</Btn></PageHead>
+      <CommerceHead title="Buy Box & Inventory" sub="ASIN-level Buy Box ownership, stock status & ad impact"><Btn icon="download">Export</Btn><Btn icon="sliders" primary>Automation Rules</Btn></CommerceHead>
       <KpiGrid>
         <Kpi label="Avg Buy Box" value={pct(data.reduce((s, d) => s + d.buyBox, 0) / data.length)} delta={-2.4} deltaGood={false} />
         <Kpi label="ASINs Losing BB" value={data.filter(d => d.buyBox < 80).length} />
@@ -1907,7 +1907,7 @@ function Products() {
   ]
   return (
     <>
-      <PageHead title="Product Center" sub="Catalog content health — images, A+, video, reviews & conversion"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Bulk Edit Content</Btn></PageHead>
+      <CommerceHead title="Product Center" sub="Catalog content health — images, A+, video, reviews & conversion"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Bulk Edit Content</Btn></CommerceHead>
       <KpiGrid>
         <Kpi label="Products" value={byAsin.length} />
         <Kpi label="Missing A+" value={byAsin.filter(d => !d.aplus).length} />
@@ -1923,7 +1923,7 @@ function Products() {
 
 /* ===================== src/pages/Automation.jsx ===================== */
 
-function PageHead({ title, sub, children }) {
+function AutoHead({ title, sub, children }) {
   return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
 }
 const RULE_ICON = { Bid: 'target', Harvest: 'spark', Negative: 'x', Retail: 'shield', Dayparting: 'clock', Budget: 'wallet' }
@@ -1940,7 +1940,7 @@ function Rules() {
   const affected = rules.reduce((s, r) => s + r.affected, 0)
   return (
     <>
-      <PageHead title="Rule Manager" sub="Rules-based automation for bids, budgets, harvesting, negatives, dayparting & retail signals"><Btn icon="bulb" ghost>Templates</Btn><Btn icon="plus" primary>Create Rule</Btn></PageHead>
+      <AutoHead title="Rule Manager" sub="Rules-based automation for bids, budgets, harvesting, negatives, dayparting & retail signals"><Btn icon="bulb" ghost>Templates</Btn><Btn icon="plus" primary>Create Rule</Btn></AutoHead>
       <KpiGrid>
         <Kpi label="Active Rules" value={active} />
         <Kpi label="Total Rules" value={rules.length} />
@@ -1977,7 +1977,7 @@ function Budgets() {
   const totalSpent = budgets.reduce((s, b) => s + b.spent, 0)
   return (
     <>
-      <PageHead title="Budget Manager" sub="Monthly caps, pacing & forecast with auto-pause on cap"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Set Budget Cap</Btn></PageHead>
+      <AutoHead title="Budget Manager" sub="Monthly caps, pacing & forecast with auto-pause on cap"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Set Budget Cap</Btn></AutoHead>
       <KpiGrid>
         <Kpi label="Total Monthly Cap" value={money(totalCap)} />
         <Kpi label="Spent MTD" value={money(totalSpent)} />
@@ -2014,7 +2014,7 @@ const paceColor = (s) => (s === 'Over pace' ? 'var(--red)' : s === 'Under pace' 
 
 /* ===================== src/pages/Insights.jsx ===================== */
 
-function PageHead({ title, sub, children }) {
+function InsHead({ title, sub, children }) {
   return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
 }
 
@@ -2032,7 +2032,7 @@ function Reports() {
   ]
   return (
     <>
-      <PageHead title="Report Center" sub="Custom & scheduled reports, dashboards and exports"><Btn icon="file" ghost>Templates</Btn><Btn icon="plus" primary>Build Report</Btn></PageHead>
+      <InsHead title="Report Center" sub="Custom & scheduled reports, dashboards and exports"><Btn icon="file" ghost>Templates</Btn><Btn icon="plus" primary>Build Report</Btn></InsHead>
       <KpiGrid>
         <Kpi label="Saved Reports" value={reports.length} />
         <Kpi label="Scheduled" value={reports.filter(r => /·/.test(r.cadence)).length} />
@@ -2066,7 +2066,7 @@ function Alerts() {
   const shown = alerts.filter((a) => filter === 'All' || (filter === 'Unread' ? !a.read : a.sev === filter.toLowerCase()))
   return (
     <>
-      <PageHead title="Alerts" sub="Real-time notifications across ads, budget & retail signals"><Btn icon="check" ghost onClick={markAll}>Mark all read</Btn><Btn icon="gear" primary>Alert Settings</Btn></PageHead>
+      <InsHead title="Alerts" sub="Real-time notifications across ads, budget & retail signals"><Btn icon="check" ghost onClick={markAll}>Mark all read</Btn><Btn icon="gear" primary>Alert Settings</Btn></InsHead>
       <KpiGrid>
         <Kpi label="Unread" value={alerts.filter(a => !a.read).length} />
         <Kpi label="High Severity" value={alerts.filter(a => a.sev === 'high').length} />
@@ -2106,7 +2106,7 @@ function Settings() {
   ]
   return (
     <>
-      <PageHead title="Settings" sub="Integrations, users & account configuration"><Btn icon="plus" primary>Add Integration</Btn></PageHead>
+      <InsHead title="Settings" sub="Integrations, users & account configuration"><Btn icon="plus" primary>Add Integration</Btn></InsHead>
       <div className="grid-2">
         <Card title="Connected data sources" sub="Advertising & retail integrations" pad={false}>
           {conns.map((c) => (
