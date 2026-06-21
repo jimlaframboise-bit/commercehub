@@ -290,6 +290,72 @@ thead .sticky-l { z-index: 3; background: var(--surface-2); }
 .footnote { color: var(--text-3); font-size: 11px; margin-top: 10px; }
 .empty { padding: 40px; text-align:center; color: var(--text-3); }
 
+/* ---------------- DataGrid ---------------- */
+.gridbar { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.gridbar .gb-left { display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1; min-width:240px; }
+.gridbar .gb-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.gtoggle { display:inline-flex; align-items:center; gap:7px; font-size:11.5px; font-weight:600; color:var(--text-2); white-space:nowrap; }
+
+/* sortable headers */
+table.dt th.sortable { cursor:pointer; user-select:none; }
+table.dt th.sortable:hover { background: var(--brand-soft); }
+.th-in { display:inline-flex; align-items:center; gap:4px; }
+table.dt th.num .th-in { flex-direction:row-reverse; }
+.caret { color: var(--text-3); opacity:.0; transition:opacity .12s; }
+table.dt th.sortable:hover .caret { opacity:.55; }
+.caret.on { color: var(--brand); opacity:1; }
+
+/* density */
+table.dt.dense th, table.dt.dense td { padding: 5px 12px; }
+
+/* totals row */
+table.dt tfoot .trow td { position: sticky; bottom: 0; background: var(--surface-2); border-top: 2px solid var(--border-strong); font-weight: 700; z-index: 2; }
+table.dt tfoot .trow td.sticky-l { z-index: 4; }
+
+/* group-by rows */
+table.dt tr.grow td { background: var(--brand-soft); font-weight: 700; color: var(--text); border-top: 1px solid #cdddff; border-bottom: 1px solid #cdddff; }
+table.dt tr.grow td.sticky-l { background: var(--brand-soft); }
+
+/* compare delta chip */
+.gdelta { display:inline-block; margin-left:6px; font-size:10px; font-weight:700; }
+.gdelta.up { color: var(--green); }
+.gdelta.down { color: var(--red); }
+
+/* pager */
+.pager { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:10px 2px; font-size:12px; color:var(--text-2); }
+.pager b { color: var(--text); }
+.pg-size select { margin-left:6px; height:28px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); padding:0 6px; font-size:12px; }
+.pg-nav { display:flex; align-items:center; gap:4px; }
+.pg-nav button { min-width:28px; height:28px; padding:0 7px; border:1px solid var(--border); background:var(--surface); border-radius:6px; color:var(--text-2); font-size:12px; cursor:pointer; }
+.pg-nav button:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+.pg-nav button.on { background: var(--brand); border-color: var(--brand); color:#fff; }
+.pg-nav button:disabled { opacity:.4; cursor:not-allowed; }
+.pg-gap { padding:0 2px; color: var(--text-3); }
+.pg-go { display:inline-flex; align-items:center; gap:6px; margin-left:6px; }
+.pg-go input { width:52px; height:28px; border:1px solid var(--border); border-radius:6px; padding:0 6px; font-size:12px; background:var(--surface); color:var(--text); }
+
+/* popover + column menu */
+.pop-wrap { position: relative; display:inline-block; }
+.pop { position:absolute; top: calc(100% + 6px); left:0; z-index:50; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow: var(--shadow-lg); padding:6px; }
+.pop.pop-r { left:auto; right:0; }
+.colmenu { font-size:12px; }
+.cm-head { font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3); font-weight:700; padding:6px 8px 4px; }
+.cm-presets { display:flex; flex-wrap:wrap; gap:4px; padding:4px 6px 8px; border-bottom:1px solid var(--border); margin-bottom:4px; }
+.cm-preset { border:1px solid var(--border); background:var(--surface); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:600; color:var(--text-2); cursor:pointer; }
+.cm-preset:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+.cm-preset.on { background: var(--brand-soft); border-color:#cdddff; color: var(--brand); }
+.cm-preset:disabled { opacity:.55; cursor:default; }
+.cm-list { max-height: 320px; overflow-y:auto; }
+.cm-cols .cm-row { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:6px; }
+.cm-cols .cm-row:hover { background: var(--surface-2); }
+.cm-label { flex:1; white-space:nowrap; }
+.cm-move { display:inline-flex; gap:2px; }
+.cm-move button { width:20px; height:20px; border:1px solid var(--border); background:var(--surface); border-radius:5px; color:var(--text-3); cursor:pointer; line-height:1; font-size:11px; }
+.cm-move button:hover { border-color: var(--brand); color: var(--brand); }
+.cm-opt { padding:7px 10px; border-radius:6px; cursor:pointer; }
+.cm-opt:hover { background: var(--surface-2); }
+.cm-opt.on { background: var(--brand-soft); color: var(--brand); font-weight:600; }
+
 #boot { position:fixed; inset:0; display:grid; place-items:center; font-family:sans-serif; color:#5b6577; }
 </style>
 </head>
@@ -1098,6 +1164,283 @@ function ViewTabs({ tabs, active, onChange }) {
   )
 }
 
+/* ============================================================================
+   DataGrid — the reusable Pacvue-style grid used by every advertising view.
+   Features: sort every column, column presets + custom chooser (show/hide/
+   reorder, persisted), pagination (page-size · total · go-to-page), pinned
+   totals row, frozen first column + horizontal scroll, group-by (Dimensions),
+   period-compare toggle, density toggle.
+
+   columns: [{ key, label, num?, sticky?, width?, render?(row), sortVal?(row),
+               sort?:false, foot?(rows)=>node, delta?:true }]
+   presets: { 'View Name': [colKey,...] }      dimensions: [{ key, label }]
+   ========================================================================== */
+const gridStore = {
+  get(id) { try { return JSON.parse(localStorage.getItem('chgrid:' + id)) } catch (e) { return null } },
+  set(id, v) { try { localStorage.setItem('chgrid:' + id, JSON.stringify(v)) } catch (e) { /* ignore */ } },
+}
+function hashUnit(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) } return ((h >>> 0) % 1000) / 1000 }
+function pageList(cur, total) {
+  const out = []
+  if (total <= 7) { for (let i = 1; i <= total; i++) out.push(i); return out }
+  out.push(1)
+  if (cur > 3) out.push('…')
+  for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) out.push(i)
+  if (cur < total - 2) out.push('…')
+  out.push(total)
+  return out
+}
+
+function Popover({ trigger, children, align = 'left', width }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const k = (e) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', h); document.addEventListener('keydown', k)
+    return () => { document.removeEventListener('mousedown', h); document.removeEventListener('keydown', k) }
+  }, [open])
+  return (
+    <div className="pop-wrap" ref={ref}>
+      <span onClick={() => setOpen((o) => !o)}>{trigger}</span>
+      {open && (
+        <div className={`pop ${align === 'right' ? 'pop-r' : ''}`} style={width ? { width } : undefined}>
+          {typeof children === 'function' ? children(() => setOpen(false)) : children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SortCaret({ active, dir }) {
+  if (!active) return <Icon name="chevDown" size={11} className="caret" />
+  return <Icon name={dir === 'asc' ? 'arrowUp' : 'arrowDown'} size={11} className="caret on" />
+}
+function DeltaChip({ row, ck, rk }) {
+  const d = (hashUnit(String(row[rk]) + ':' + ck) - 0.42) * 0.6 // ~ -0.25 .. +0.35
+  const up = d >= 0
+  return <span className={`gdelta ${up ? 'up' : 'down'}`}>{up ? '▲' : '▼'}{Math.abs(d * 100).toFixed(1)}%</span>
+}
+
+function DataGrid({
+  id, columns, rows, initialSort,
+  presets, defaultPreset, dimensions, totals, compare,
+  selectable, selected, onToggle, onToggleAll, rowKey = 'id',
+  pageSizes = [25, 50, 100], empty = 'No data', toolbarLeft,
+}) {
+  const colByKey = useMemo(() => Object.fromEntries(columns.map((c) => [c.key, c])), [columns])
+  const allKeys = useMemo(() => columns.map((c) => c.key), [columns])
+  const stickyKey = (columns.find((c) => c.sticky) || {}).key
+  const presetCols = (name) => (presets && presets[name]) ? presets[name] : allKeys
+
+  const saved = useMemo(() => (id ? gridStore.get(id) : null), [id])
+  const firstPreset = defaultPreset || (presets ? Object.keys(presets)[0] : null)
+  const [view, setView] = useState(saved?.view || firstPreset || 'Default')
+  const [order, setOrder] = useState(saved?.order?.filter((k) => colByKey[k])?.concat(allKeys.filter((k) => !(saved.order || []).includes(k))) || (firstPreset ? [...presetCols(firstPreset), ...allKeys.filter((k) => !presetCols(firstPreset).includes(k))] : allKeys))
+  const [hidden, setHidden] = useState(new Set(saved?.hidden || (firstPreset ? allKeys.filter((k) => !presetCols(firstPreset).includes(k)) : [])))
+
+  useEffect(() => { if (id) gridStore.set(id, { view, order, hidden: [...hidden] }) }, [id, view, order, hidden])
+
+  const applyPreset = (name) => {
+    setView(name)
+    const keys = presetCols(name)
+    setOrder([...keys, ...allKeys.filter((k) => !keys.includes(k))])
+    setHidden(new Set(allKeys.filter((k) => !keys.includes(k))))
+  }
+  const toggleCol = (k) => { setView('Custom'); setHidden((h) => { const n = new Set(h); n.has(k) ? n.delete(k) : n.add(k); return n }) }
+  const moveCol = (k, dir) => {
+    setView('Custom')
+    setOrder((o) => { const a = [...o]; const i = a.indexOf(k); const j = i + dir; if (i < 0 || j < 0 || j >= a.length) return a;[a[i], a[j]] = [a[j], a[i]]; return a })
+  }
+
+  const visibleCols = useMemo(() => {
+    const ordered = [...order.filter((k) => colByKey[k]), ...allKeys.filter((k) => !order.includes(k))]
+    let vis = ordered.filter((k) => k === stickyKey || !hidden.has(k)).map((k) => colByKey[k])
+    if (stickyKey) vis = [colByKey[stickyKey], ...vis.filter((c) => c.key !== stickyKey)]
+    return vis
+  }, [order, hidden, colByKey, allKeys, stickyKey])
+
+  const [sort, setSort] = useState(initialSort || { key: null, dir: 'desc' })
+  const onSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key: k, dir: typeof rows[0]?.[k] === 'number' ? 'desc' : 'asc' }))
+  const sortedAll = useMemo(() => {
+    if (!sort.key) return rows
+    const col = colByKey[sort.key]
+    const val = (r) => (col?.sortVal ? col.sortVal(r) : r[sort.key])
+    return [...rows].sort((a, b) => {
+      const x = val(a), y = val(b)
+      if (typeof x === 'number' && typeof y === 'number') return sort.dir === 'asc' ? x - y : y - x
+      return sort.dir === 'asc' ? String(x).localeCompare(String(y)) : String(y).localeCompare(String(x))
+    })
+  }, [rows, sort, colByKey])
+
+  const [compareOn, setCompareOn] = useState(false)
+  const [dense, setDense] = useState(false)
+  const [groupKey, setGroupKey] = useState(null)
+  const grouped = !!groupKey
+
+  const [pageSize, setPageSize] = useState(pageSizes[0])
+  const [page, setPage] = useState(1)
+  const totalEntries = rows.length
+  const pageCount = Math.max(1, Math.ceil(totalEntries / pageSize))
+  const curPage = Math.min(page, pageCount)
+  useEffect(() => { setPage(1) }, [pageSize, groupKey, totalEntries, sort.key, sort.dir])
+  const pageRows = grouped ? sortedAll : sortedAll.slice((curPage - 1) * pageSize, curPage * pageSize)
+
+  const groups = useMemo(() => {
+    if (!grouped) return null
+    const map = new Map()
+    for (const r of sortedAll) { const g = r[groupKey] ?? '—'; if (!map.has(g)) map.set(g, []); map.get(g).push(r) }
+    return [...map.entries()].map(([k, rs]) => ({ key: k, rows: rs }))
+  }, [grouped, groupKey, sortedAll])
+
+  const colSpan = visibleCols.length + (selectable ? 1 : 0)
+  const allOn = selectable && pageRows.length > 0 && pageRows.every((r) => selected?.has(r[rowKey]))
+
+  const cell = (c, r) => (
+    <td key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l cellname' : ''}`}>
+      {c.render ? c.render(r) : r[c.key]}
+      {compareOn && c.delta && <DeltaChip row={r} ck={c.key} rk={rowKey} />}
+    </td>
+  )
+  const dimLabel = grouped ? (dimensions.find((d) => d.key === groupKey)?.label || groupKey) : null
+
+  return (
+    <>
+      <div className="gridbar">
+        <div className="gb-left">{toolbarLeft}</div>
+        <div className="gb-right">
+          {compare && (
+            <label className="gtoggle"><Toggle on={compareOn} onClick={() => setCompareOn((v) => !v)} /> vs prev period</label>
+          )}
+          <span className={`chip ${dense ? 'on' : ''}`} onClick={() => setDense((d) => !d)}><Icon name="bars" size={13} /> Compact</span>
+          {dimensions && (
+            <Popover align="right" width={200} trigger={<Btn sm ghost icon="layers">{grouped ? `Grouped: ${dimLabel}` : 'Dimensions'}</Btn>}>
+              {(close) => (
+                <div className="colmenu">
+                  <div className="cm-head">Group rows by</div>
+                  <div className="cm-list">
+                    <div className={`cm-opt ${!grouped ? 'on' : ''}`} onClick={() => { setGroupKey(null); close() }}>None</div>
+                    {dimensions.map((d) => (
+                      <div key={d.key} className={`cm-opt ${groupKey === d.key ? 'on' : ''}`} onClick={() => { setGroupKey(d.key); close() }}>{d.label}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Popover>
+          )}
+          <Popover align="right" width={272} trigger={<Btn sm ghost icon="sliders">Columns</Btn>}>
+            <div className="colmenu">
+              {presets && (
+                <div className="cm-presets">
+                  {Object.keys(presets).map((p) => (
+                    <button key={p} className={`cm-preset ${view === p ? 'on' : ''}`} onClick={() => applyPreset(p)}>{p}</button>
+                  ))}
+                  <button className={`cm-preset ${view === 'Custom' ? 'on' : ''}`} disabled>Custom</button>
+                </div>
+              )}
+              <div className="cm-head">Columns ({visibleCols.length})</div>
+              <div className="cm-list cm-cols">
+                {[...order.filter((k) => colByKey[k]), ...allKeys.filter((k) => !order.includes(k))].map((k) => {
+                  const c = colByKey[k]; const isSticky = k === stickyKey
+                  return (
+                    <div key={k} className="cm-row">
+                      <Check on={isSticky || !hidden.has(k)} onClick={() => !isSticky && toggleCol(k)} />
+                      <span className="cm-label">{c.label || k}{isSticky && <span className="muted"> · pinned</span>}</span>
+                      <span className="cm-move">
+                        <button onClick={() => moveCol(k, -1)} title="Move up">↑</button>
+                        <button onClick={() => moveCol(k, 1)} title="Move down">↓</button>
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </Popover>
+        </div>
+      </div>
+
+      <div className="tablewrap">
+        <table className={`dt ${dense ? 'dense' : ''}`}>
+          <thead>
+            <tr>
+              {selectable && <th className="sticky-l" style={{ width: 36 }}><Check on={allOn} onClick={onToggleAll} /></th>}
+              {visibleCols.map((c) => (
+                <th key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l' : ''} ${c.sort === false ? '' : 'sortable'}`}
+                  style={c.width ? { minWidth: c.width } : undefined}
+                  onClick={() => c.sort !== false && onSort(c.key)}>
+                  <span className="th-in">{c.label}{c.sort !== false && <SortCaret active={sort.key === c.key} dir={sort.dir} />}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.length === 0 && <tr><td colSpan={colSpan} className="empty">{empty}</td></tr>}
+            {!grouped && pageRows.map((r) => (
+              <tr key={r[rowKey]}>
+                {selectable && <td className="sticky-l"><Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} /></td>}
+                {visibleCols.map((c) => cell(c, r))}
+              </tr>
+            ))}
+            {grouped && groups.map((g) => (
+              <Fragment key={g.key}>
+                <tr className="grow">
+                  <td className="sticky-l" colSpan={1 + (selectable ? 1 : 0)}><Icon name="chevDown" size={12} /> {String(g.key)} <span className="muted">({g.rows.length})</span></td>
+                  {visibleCols.slice(1).map((c) => <td key={c.key} className={c.num ? 'num' : ''}>{c.foot ? c.foot(g.rows) : ''}</td>)}
+                </tr>
+                {g.rows.map((r) => (
+                  <tr key={r[rowKey]}>
+                    {selectable && <td className="sticky-l"><Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} /></td>}
+                    {visibleCols.map((c) => cell(c, r))}
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+          {totals && (
+            <tfoot>
+              <tr className="trow">
+                {selectable && <td className="sticky-l" />}
+                {visibleCols.map((c, i) => (
+                  <td key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l' : ''}`}>
+                    {i === 0 ? <b>Total · {totalEntries}</b> : (c.foot ? c.foot(rows) : '')}
+                  </td>
+                ))}
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      <div className="pager">
+        <span className="pg-total">Total <b>{totalEntries.toLocaleString()}</b> entries</span>
+        <div className="pg-size">
+          Rows:
+          <select value={pageSize} onChange={(e) => setPageSize(+e.target.value)}>
+            {pageSizes.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1 }} />
+        {grouped ? (
+          <span className="muted">Grouped — all rows shown</span>
+        ) : (
+          <div className="pg-nav">
+            <button disabled={curPage <= 1} onClick={() => setPage(curPage - 1)}>‹</button>
+            {pageList(curPage, pageCount).map((p, i) => (p === '…'
+              ? <span key={'g' + i} className="pg-gap">…</span>
+              : <button key={p} className={p === curPage ? 'on' : ''} onClick={() => setPage(p)}>{p}</button>))}
+            <button disabled={curPage >= pageCount} onClick={() => setPage(curPage + 1)}>›</button>
+            <span className="pg-go">Go to
+              <input type="number" min={1} max={pageCount} defaultValue={curPage}
+                onKeyDown={(e) => { if (e.key === 'Enter') { const v = +e.target.value; if (v >= 1 && v <= pageCount) setPage(v) } }} />
+            </span>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
 
 /* ===================== src/state.jsx ===================== */
 
@@ -1412,6 +1755,8 @@ const ovPace = (s) => (s === 'Over pace' ? 'var(--red)' : s === 'Under pace' ? '
 
 const symA = (pid) => profileById[pid]?.currency || '$'
 const typeTone = (t) => (t.startsWith('SP') ? 'blue' : t.startsWith('SB') ? 'purple' : 'amber')
+const symOf = (rs) => (rs[0] ? symA(rs[0].profileId) : '$')
+const sumKey = (k) => (rs) => rs.reduce((a, b) => a + (b[k] || 0), 0)
 
 function useProfileFilter(rows) {
   const { profileId } = useApp()
@@ -1456,60 +1801,55 @@ function Campaigns() {
   const filtered = data.filter((c) =>
     (typeFilter === 'All' || c.campaignType === typeFilter) &&
     c.name.toLowerCase().includes(q.toLowerCase()))
-  const { sorted, sort, toggle } = useSort(filtered, { key: 'spend', dir: 'desc' })
 
   const ov = (st) => ({ state: st, status: st === 'Paused' ? 'Paused' : 'Enabled' })
   const setState = (id, st) => setOverrides((o) => ({ ...o, [id]: ov(st) }))
   const bulkState = (st) => { setOverrides((o) => { const n = { ...o }; sel.forEach((id) => { n[id] = ov(st) }); return n }); setSel(new Set()) }
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleAll = () => setSel((s) => s.size === sorted.length ? new Set() : new Set(sorted.map((r) => r.id)))
-
-  const SH = ({ k, children, num }) => (
-    <span onClick={() => toggle(k)} style={{ cursor: 'pointer', userSelect: 'none' }}>
-      {children}{sort.key === k && <Icon name={sort.dir === 'asc' ? 'arrowUp' : 'arrowDown'} size={11} style={{ marginLeft: 3, verticalAlign: 'middle' }} />}
-    </span>
-  )
+  const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
 
   const columns = [
-    { key: 'name', label: <SH k="name">Campaign</SH>, sticky: true, width: 320, render: (r) => (
+    { key: 'name', label: 'Campaign', sticky: true, width: 320, render: (r) => (
       <div><div>{r.name}</div><small>{r.profileId.toUpperCase()} · {r.product?.split('—')[0]}</small></div>) },
     { key: 'state', label: 'State', render: (r) => <Toggle on={r.state === 'Enabled'} onClick={() => setState(r.id, r.state === 'Enabled' ? 'Paused' : 'Enabled')} /> },
     { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
     { key: 'campaignType', label: 'Type', render: (r) => <span className={`pill ${typeTone(r.campaignType)}`} style={{ borderRadius: 5 }}>{r.campaignType}</span> },
-    { key: 'adGroups', label: 'Ad Groups', num: true, render: (r) => <span className="muted">{r.adGroups.active}/{r.adGroups.total}</span> },
-    { key: 'dailyBudget', label: <SH k="dailyBudget">Daily Budget</SH>, num: true, render: (r) => (
+    { key: 'adGroups', label: 'Ad Groups', num: true, sort: false, render: (r) => <span className="muted">{r.adGroups.active}/{r.adGroups.total}</span> },
+    { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: (rs) => cur(sumKey('dailyBudget')(rs), symOf(rs), 0), render: (r) => (
       <span className="bidcell" style={{ justifyContent: 'flex-end' }}>{cur(r.dailyBudget, symA(r.profileId), 0)}<Icon name="edit" size={12} className="ed" /></span>) },
-    { key: 'bid', label: 'Bid (Act/Avl)', num: true, render: (r) => <span className="muted">{r.actlBid} / {r.avlBid}</span> },
-    { key: 'impr', label: <SH k="impr">Impr.</SH>, num: true, render: (r) => compact(r.impr) },
-    { key: 'clk', label: <SH k="clk">Clicks</SH>, num: true, render: (r) => int(r.clk) },
-    { key: 'ctr', label: 'CTR', num: true, render: (r) => pct(r.ctr, 2) },
-    { key: 'spend', label: <SH k="spend">Spend</SH>, num: true, render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'cpc', label: 'CPC', num: true, render: (r) => cur(r.cpc, symA(r.profileId), 2) },
-    { key: 'sales', label: <SH k="sales">Sales</SH>, num: true, render: (r) => cur(r.sales, symA(r.profileId)) },
-    { key: 'orders', label: <SH k="orders">Orders</SH>, num: true, render: (r) => int(r.orders) },
-    { key: 'cvr', label: 'CVR', num: true, render: (r) => pct(r.cvr) },
-    { key: 'acos', label: <SH k="acos">ACoS</SH>, num: true, render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
-    { key: 'roas', label: 'ROAS', num: true, render: (r) => dec2(r.roas) },
-    { key: 'ntb', label: 'NTB Orders', num: true, render: (r) => int(r.ntb) },
+    { key: 'bid', label: 'Bid (Act/Avl)', num: true, sort: false, render: (r) => <span className="muted">{r.actlBid} / {r.avlBid}</span> },
+    { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'cpc', label: 'CPC', num: true, foot: (rs) => cur(aggregate(rs).cpc, symOf(rs), 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
+    { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
+    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
+    { key: 'ntb', label: 'NTB Orders', num: true, foot: (rs) => int(sumKey('ntb')(rs)), render: (r) => int(r.ntb) },
+  ]
+
+  const presets = {
+    Default: ['name', 'state', 'status', 'campaignType', 'adGroups', 'dailyBudget', 'bid', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'ntb'],
+    Performance: ['name', 'state', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas'],
+    'Target ACOS': ['name', 'state', 'dailyBudget', 'spend', 'sales', 'acos', 'roas', 'cpc', 'orders'],
+  }
+  const dims = [
+    { key: 'campaignType', label: 'Campaign Type' },
+    { key: 'portfolio', label: 'Portfolio' },
+    { key: 'targetingType', label: 'Targeting' },
+    { key: 'profileId', label: 'Profile' },
   ]
 
   return (
     <>
       <AdsHead title="Campaigns" sub={`${filtered.length} campaigns · Sponsored Products, Brands & Display`}>
-        <Btn icon="sliders" ghost>Columns</Btn>
         <Btn icon="download">Export</Btn>
         <Btn icon="plus" primary>Create Campaign</Btn>
       </AdsHead>
       <KpiRow rows={filtered} />
-
-      <div className="toolbar">
-        <SearchBox value={q} onChange={setQ} placeholder="Search campaigns…" />
-        {types.map((t) => (
-          <span key={t} className={`chip ${typeFilter === t ? 'on' : ''}`} onClick={() => setTypeFilter(t)}>{t}</span>
-        ))}
-        <div style={{ flex: 1 }} />
-        <Btn sm ghost icon="filter">More filters</Btn>
-      </div>
 
       {sel.size > 0 && (
         <div className="bulkbar">
@@ -1526,8 +1866,28 @@ function Campaigns() {
         </div>
       )}
 
-      <DataTable columns={columns} rows={sorted} selectable selected={sel} onToggle={toggleSel} onToggleAll={toggleAll} />
-      <div className="footnote">Bulk operations apply across selected line items — bids, budgets, dayparting, rules, negatives and tags. Bid shown as Actual / Available (suggested ceiling).</div>
+      <DataGrid
+        id="ads-campaigns"
+        columns={columns}
+        rows={filtered}
+        initialSort={{ key: 'spend', dir: 'desc' }}
+        presets={presets}
+        defaultPreset="Default"
+        dimensions={dims}
+        totals
+        compare
+        selectable
+        selected={sel}
+        onToggle={toggleSel}
+        onToggleAll={toggleAll}
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search campaigns…" />
+          {types.map((t) => (
+            <span key={t} className={`chip ${typeFilter === t ? 'on' : ''}`} onClick={() => setTypeFilter(t)}>{t}</span>
+          ))}
+        </>}
+      />
+      <div className="footnote">Bulk operations apply across selected line items — bids, budgets, dayparting, rules, negatives and tags. Bid shown as Actual / Available (suggested ceiling). Use Columns for view presets, Dimensions to group, and the compare toggle for period-over-period deltas.</div>
     </>
   )
 }
@@ -1540,26 +1900,32 @@ function AdGroups() {
     campaign: c.name, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
     targets: 4 + (i % 9), impr: c.impr, clk: c.clk, spend: c.spend, sales: c.sales, orders: c.orders, acos: c.acos, roas: c.roas, ctr: c.ctr,
   }))
-  const { sorted } = useSort(rows, { key: 'spend', dir: 'desc' })
   const columns = [
     { key: 'name', label: 'Ad Group', sticky: true, width: 300, render: (r) => <div>{r.name}<small>{r.campaign}</small></div> },
     { key: 'state', label: 'State', render: (r) => <Pill>{r.state === 'Enabled' ? 'Enabled' : 'Paused'}</Pill> },
     { key: 'defaultBid', label: 'Default Bid', num: true, render: (r) => cur(r.defaultBid, symA(r.profileId), 2) },
-    { key: 'targets', label: 'Targets', num: true },
-    { key: 'impr', label: 'Impr.', num: true, render: (r) => compact(r.impr) },
-    { key: 'clk', label: 'Clicks', num: true, render: (r) => int(r.clk) },
-    { key: 'ctr', label: 'CTR', num: true, render: (r) => pct(r.ctr, 2) },
-    { key: 'spend', label: 'Spend', num: true, render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'sales', label: 'Sales', num: true, render: (r) => cur(r.sales, symA(r.profileId)) },
-    { key: 'orders', label: 'Orders', num: true, render: (r) => int(r.orders) },
-    { key: 'acos', label: 'ACoS', num: true, render: (r) => pct(r.acos) },
-    { key: 'roas', label: 'ROAS', num: true, render: (r) => dec2(r.roas) },
+    { key: 'targets', label: 'Targets', num: true, foot: (rs) => int(sumKey('targets')(rs)) },
+    { key: 'impr', label: 'Impr.', num: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
+    { key: 'spend', label: 'Spend', num: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'acos', label: 'ACoS', num: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => pct(r.acos) },
+    { key: 'roas', label: 'ROAS', num: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
   ]
   return (
     <>
       <AdsHead title="Ad Groups" sub={`${rows.length} ad groups`}><Btn icon="download">Export</Btn><Btn icon="plus" primary>New Ad Group</Btn></AdsHead>
       <KpiRow rows={base} />
-      <DataTable columns={columns} rows={sorted} />
+      <DataGrid
+        id="ads-adgroups"
+        columns={columns}
+        rows={rows}
+        initialSort={{ key: 'spend', dir: 'desc' }}
+        dimensions={[{ key: 'profileId', label: 'Profile' }, { key: 'state', label: 'State' }]}
+        totals
+      />
     </>
   )
 }
@@ -1569,9 +1935,8 @@ function Targeting() {
   const base = useProfileFilter(keywords)
   const [tab, setTab] = useState('Keywords')
   const [sel, setSel] = useState(new Set())
-  const { sorted } = useSort(base, { key: 'spend', dir: 'desc' })
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleAll = () => setSel((s) => s.size === sorted.length ? new Set() : new Set(sorted.map((r) => r.id)))
+  const toggleAll = () => setSel((s) => (s.size === base.length ? new Set() : new Set(base.map((r) => r.id))))
   const columns = [
     { key: 'keyword', label: 'Targeting', sticky: true, width: 240, render: (r) => <div>{r.keyword}<small>{r.campaign.split('-').slice(0, 2).join('-')}</small></div> },
     { key: 'matchType', label: 'Match', render: (r) => <span className="tag">{r.matchType}</span> },
@@ -1579,13 +1944,13 @@ function Targeting() {
     { key: 'bid', label: 'Bid', num: true, render: (r) => <span className="bidcell" style={{ justifyContent: 'flex-end' }}>{cur(r.bid, symA(r.profileId), 2)}<Icon name="edit" size={12} className="ed" /></span> },
     { key: 'sugBid', label: 'Suggested', num: true, render: (r) => <span className="muted">{cur(r.sugBid, symA(r.profileId), 2)}</span> },
     { key: 'topOfSearchIS', label: 'Top-of-Search IS', num: true, render: (r) => pct(r.topOfSearchIS) },
-    { key: 'impr', label: 'Impr.', num: true, render: (r) => compact(r.impr) },
-    { key: 'clk', label: 'Clicks', num: true, render: (r) => int(r.clk) },
-    { key: 'spend', label: 'Spend', num: true, render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'sales', label: 'Sales', num: true, render: (r) => cur(r.sales, symA(r.profileId)) },
-    { key: 'orders', label: 'Orders', num: true, render: (r) => int(r.orders) },
-    { key: 'acos', label: 'ACoS', num: true, render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : 'inherit' }}>{pct(r.acos)}</span> },
-    { key: 'roas', label: 'ROAS', num: true, render: (r) => dec2(r.roas) },
+    { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : 'inherit' }}>{pct(r.acos)}</span> },
+    { key: 'roas', label: 'ROAS', num: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
   ]
   return (
     <>
@@ -1601,7 +1966,19 @@ function Targeting() {
           <div style={{ flex: 1 }} /><Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
         </div>
       )}
-      <DataTable columns={columns} rows={sorted} selectable selected={sel} onToggle={toggleSel} onToggleAll={toggleAll} />
+      <DataGrid
+        id="ads-targeting"
+        columns={columns}
+        rows={base}
+        initialSort={{ key: 'spend', dir: 'desc' }}
+        dimensions={[{ key: 'matchType', label: 'Match Type' }, { key: 'state', label: 'State' }]}
+        totals
+        compare
+        selectable
+        selected={sel}
+        onToggle={toggleSel}
+        onToggleAll={toggleAll}
+      />
       <div className="footnote">Suggested bids and Top-of-Search Impression Share guide bid changes. Select rows for bulk bid actions or to add negatives.</div>
     </>
   )
@@ -1614,21 +1991,20 @@ function SearchTerms() {
   const [harvested, setHarvested] = useState(new Set())
   const recTone = { harvest: 'green', negate: 'red', monitor: 'gray' }
   const filtered = base.filter((r) => filter === 'All' || r.recommend === filter.toLowerCase())
-  const { sorted } = useSort(filtered, { key: 'spend', dir: 'desc' })
-  const counts = { harvest: base.filter(r => r.recommend === 'harvest').length, negate: base.filter(r => r.recommend === 'negate').length }
+  const counts = { harvest: base.filter((r) => r.recommend === 'harvest').length, negate: base.filter((r) => r.recommend === 'negate').length }
   const columns = [
     { key: 'term', label: 'Customer Search Term', sticky: true, width: 240, render: (r) => <div>{r.term}<small>matched: {r.matchedTarget}</small></div> },
     { key: 'campaign', label: 'Campaign', render: (r) => <span className="muted">{r.campaign.split('-').slice(0, 2).join('-')}</span> },
-    { key: 'impr', label: 'Impr.', num: true, render: (r) => compact(r.impr) },
-    { key: 'clk', label: 'Clicks', num: true, render: (r) => int(r.clk) },
-    { key: 'spend', label: 'Spend', num: true, render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'sales', label: 'Sales', num: true, render: (r) => cur(r.sales, symA(r.profileId)) },
-    { key: 'orders', label: 'Orders', num: true, render: (r) => int(r.orders) },
-    { key: 'acos', label: 'ACoS', num: true, render: (r) => pct(r.acos) },
+    { key: 'impr', label: 'Impr.', num: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'spend', label: 'Spend', num: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'acos', label: 'ACoS', num: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => pct(r.acos) },
     { key: 'recommend', label: 'Recommendation', render: (r) => <Pill tone={recTone[r.recommend]}>{r.recommend}</Pill> },
-    { key: 'act', label: '', render: (r) => r.recommend === 'harvest'
-        ? <Btn sm primary icon={harvested.has(r.id) ? 'check' : 'plus'} onClick={() => setHarvested(s => new Set(s).add(r.id))}>{harvested.has(r.id) ? 'Harvested' : 'Harvest'}</Btn>
-        : r.recommend === 'negate' ? <Btn sm icon="x">Negate</Btn> : <span className="muted">—</span> },
+    { key: 'act', label: '', sort: false, render: (r) => (r.recommend === 'harvest'
+      ? <Btn sm primary icon={harvested.has(r.id) ? 'check' : 'plus'} onClick={() => setHarvested((s) => new Set(s).add(r.id))}>{harvested.has(r.id) ? 'Harvested' : 'Harvest'}</Btn>
+      : r.recommend === 'negate' ? <Btn sm icon="x">Negate</Btn> : <span className="muted">—</span>) },
   ]
   return (
     <>
@@ -1637,20 +2013,26 @@ function SearchTerms() {
         <Icon name="bulb" size={16} />
         <div><b>{counts.harvest} terms</b> qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%) and <b>{counts.negate} terms</b> are flagged to negate. Rule R3 runs nightly to auto-apply.</div>
       </div>
-      <div className="toolbar">
-        {['All', 'Harvest', 'Negate', 'Monitor'].map((t) => <span key={t} className={`chip ${filter === t ? 'on' : ''}`} onClick={() => setFilter(t)}>{t}</span>)}
-      </div>
-      <DataTable columns={columns} rows={sorted} />
+      <DataGrid
+        id="ads-searchterms"
+        columns={columns}
+        rows={filtered}
+        initialSort={{ key: 'spend', dir: 'desc' }}
+        dimensions={[{ key: 'recommend', label: 'Recommendation' }]}
+        totals
+        toolbarLeft={['All', 'Harvest', 'Negate', 'Monitor'].map((t) => (
+          <span key={t} className={`chip ${filter === t ? 'on' : ''}`} onClick={() => setFilter(t)}>{t}</span>
+        ))}
+      />
     </>
   )
 }
 
 /* ============================ SHARE OF VOICE ============================ */
 function ShareOfVoice() {
-  const { sorted } = useSort(shareOfVoice, { key: 'searchVolume', dir: 'desc' })
   const columns = [
     { key: 'keyword', label: 'Keyword', sticky: true, width: 220 },
-    { key: 'searchVolume', label: 'Search Volume', num: true, render: (r) => compact(r.searchVolume) },
+    { key: 'searchVolume', label: 'Search Volume', num: true, foot: (rs) => compact(sumKey('searchVolume')(rs)), render: (r) => compact(r.searchVolume) },
     { key: 'paidShare', label: 'Paid SOV', num: true, render: (r) => <ShareBar v={r.paidShare} color="#1a4fd6" /> },
     { key: 'organicShare', label: 'Organic SOV', num: true, render: (r) => <ShareBar v={r.organicShare} color="#1aa260" /> },
     { key: 'totalShare', label: 'Total SOV', num: true, render: (r) => <b>{pct(r.totalShare)}</b> },
@@ -1668,9 +2050,15 @@ function ShareOfVoice() {
         <Kpi label="Avg Organic SOV" value={pct(avgOrg)} delta={-1.1} deltaGood={false} />
         <Kpi label="Avg Total SOV" value={pct(avgPaid + avgOrg)} delta={1.8} />
         <Kpi label="Keywords Tracked" value={shareOfVoice.length} />
-        <Kpi label="#1 Rank Keywords" value={shareOfVoice.filter(r => r.yourRank === 1).length} />
+        <Kpi label="#1 Rank Keywords" value={shareOfVoice.filter((r) => r.yourRank === 1).length} />
       </KpiGrid>
-      <DataTable columns={columns} rows={sorted} />
+      <DataGrid
+        id="ads-sov"
+        columns={columns}
+        rows={shareOfVoice}
+        initialSort={{ key: 'searchVolume', dir: 'desc' }}
+        dimensions={[{ key: 'topCompetitor', label: 'Top Competitor' }]}
+      />
       <div className="footnote">Defend or expand SOV on priority keywords automatically with bid automation and budget controls (see Rule Manager).</div>
     </>
   )
@@ -1689,7 +2077,6 @@ function Dayparting() {
   const [grid] = useState(dayparting)
   const hours = Array.from({ length: 24 }, (_, h) => h)
   const color = (v) => {
-    // v ~0.4 to 1.5 → light to dark blue
     const t = Math.max(0, Math.min(1, (v - 0.4) / 1.1))
     const r = Math.round(234 - t * (234 - 26))
     const g = Math.round(241 - t * (241 - 79))
