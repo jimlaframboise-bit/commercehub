@@ -2341,7 +2341,10 @@ function AdsHead({ title, sub, children }) {
 }
 
 /* ---- Create-Campaign Super Wizard ---- */
-const PRODUCT_LIST = [...new Map(ALL_CAMPAIGNS.map((c) => [c.asin, { asin: c.asin, title: c.product, brand: (c.product || 'Brightleaf').split(' ')[0] }])).values()]
+// NOTE: computed lazily (function, not module-const) because in the single-file
+// build the `ALL_CAMPAIGNS` alias is injected at the end — a top-level const here
+// would hit a temporal-dead-zone error.
+const getProductList = () => [...new Map(ALL_CAMPAIGNS.map((c) => [c.asin, { asin: c.asin, title: c.product, brand: (c.product || 'Brightleaf').split(' ')[0] }])).values()]
 const WIZ_TYPES = [
   { v: 'SP-Auto', t: 'Sponsored Products — Auto', s: 'Amazon matches your ASINs to relevant shopper searches.' },
   { v: 'SP-Manual', t: 'Sponsored Products — Manual', s: 'You choose keywords and match types.' },
@@ -2635,7 +2638,7 @@ function Campaigns() {
       {modal === 'bid' && <BulkBidModal count={sel.size} currency="$" suggestedLabel="available bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
       {modal === 'budget' && <BulkBudgetModal count={sel.size} currency="$" onApply={applyBulkBudget} onClose={() => setModal(null)} />}
       {modal === 'tag' && <BulkTagModal count={sel.size} onApply={applyBulkTag} onClose={() => setModal(null)} />}
-      {wizard && <CreateCampaignWizard products={PRODUCT_LIST} profileId={profileId === 'all' ? 'us' : profileId} onClose={() => setWizard(false)} onLaunch={onLaunch} />}
+      {wizard && <CreateCampaignWizard products={getProductList()} profileId={profileId === 'all' ? 'us' : profileId} onClose={() => setWizard(false)} onLaunch={onLaunch} />}
 
       <DataGrid
         id="ads-campaigns"
