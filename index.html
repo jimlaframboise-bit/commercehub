@@ -390,6 +390,38 @@ table.dt tr.grow td.sticky-l { background: var(--brand-soft); }
 .fp-save { display:flex; align-items:center; gap:8px; padding-top:8px; border-top:1px solid var(--border); }
 .fp-save input { flex:1; height:30px; border:1px solid var(--border); border-radius:6px; padding:0 8px; font-size:12px; background:var(--surface); color:var(--text); }
 
+/* ---------------- Phase 3: inline edit, state select, modal, toast ---------------- */
+.bidcell.editable { cursor:pointer; padding:2px 4px; border-radius:5px; }
+.bidcell.editable:hover { background: var(--brand-soft); }
+.bidcell.editable .ed { opacity:.45; }
+.bidcell.editable:hover .ed { opacity:1; }
+.editnum input { width:84px; height:28px; border:1.5px solid var(--brand); border-radius:6px; padding:0 6px; font-size:12px; text-align:right; font-variant-numeric:tabular-nums; outline:none; }
+
+.statesel { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); font-size:11.5px; font-weight:600; color:var(--text); cursor:pointer; }
+.statesel:hover { border-color: var(--border-strong); }
+.statesel .dot { width:7px; height:7px; border-radius:50%; }
+.statesel.green .dot { background: var(--green); }
+.statesel.gray .dot { background: var(--text-3); }
+
+.modal-ov { position:fixed; inset:0; background:rgba(16,24,40,.42); display:grid; place-items:center; z-index:200; padding:20px; }
+.modal { background:var(--surface); border-radius:14px; box-shadow:var(--shadow-lg); max-width:100%; overflow:hidden; }
+.modal-h { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:16px 18px 10px; }
+.modal-h h3 { margin:0; font-size:15px; }
+.modal-h .sub { color:var(--text-3); font-size:12px; margin-top:2px; }
+.modal-b { padding:6px 18px 14px; }
+.modal-f { display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid var(--border); background:var(--surface-2); }
+.fld { display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:600; color:var(--text-2); margin-bottom:12px; }
+.fld select, .fld input { height:34px; border:1px solid var(--border); border-radius:7px; padding:0 9px; font-size:13px; background:var(--surface); color:var(--text); font-weight:500; }
+.fld select:focus, .fld input:focus { outline:none; border-color:var(--brand); }
+.modal-note { display:flex; gap:8px; align-items:flex-start; background:var(--brand-soft); border:1px solid #cdddff; border-radius:8px; padding:9px 11px; font-size:11.5px; color:var(--text-2); }
+
+.toasthost { position:fixed; right:18px; bottom:18px; display:flex; flex-direction:column; gap:8px; z-index:300; }
+.toast { display:flex; align-items:center; gap:9px; background:var(--navy); color:#fff; padding:11px 14px; border-radius:10px; box-shadow:var(--shadow-lg); font-size:12.5px; font-weight:600; max-width:360px; animation:toastIn .18s ease; }
+.toast.success svg { color:#4ade80; }
+.toast.error svg { color:#fda4a4; }
+.toast.info svg { color:#93c5fd; }
+@keyframes toastIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
 #boot { position:fixed; inset:0; display:grid; place-items:center; font-family:sans-serif; color:#5b6577; }
 </style>
 </head>
@@ -1670,6 +1702,101 @@ function FilterBar({ id, fields, value, onChange }) {
   )
 }
 
+/* ============================================================================
+   Phase 3 primitives — inline editing, state dropdown, modal, toasts.
+   ========================================================================== */
+
+/* Inline-editable numeric cell (click to edit, Enter/blur commit, Esc cancel). */
+function EditableNum({ value, onCommit, prefix = '', dec = 0, align = 'flex-end' }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(value)
+  const editingRef = useRef(false)
+  useEffect(() => { if (!editingRef.current) setVal(value) }, [value])
+  const start = () => { editingRef.current = true; setVal(value); setEditing(true) }
+  const finish = (save) => {
+    if (!editingRef.current) return
+    editingRef.current = false; setEditing(false)
+    if (save) { const n = Number(val); if (!isNaN(n) && n !== value) onCommit(n) } else setVal(value)
+  }
+  if (editing) {
+    return (
+      <span className="editnum">
+        <input autoFocus type="number" value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') finish(false) }}
+          onBlur={() => finish(true)} onClick={(e) => e.stopPropagation()} />
+      </span>
+    )
+  }
+  return (
+    <span className="bidcell editable" style={{ justifyContent: align }} onClick={start} title="Click to edit">
+      {prefix}{Number(value).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec })}
+      <Icon name="edit" size={12} className="ed" />
+    </span>
+  )
+}
+
+/* Inline State dropdown: Enabled / Paused / Archived. */
+function StateSelect({ value, onChange, options = ['Enabled', 'Paused', 'Archived'] }) {
+  const tone = { Enabled: 'green', Paused: 'gray', Archived: 'gray' }[value] || 'gray'
+  return (
+    <Popover width={150} trigger={(
+      <button className={`statesel ${tone}`}><span className="dot" />{value}<Icon name="chevDown" size={11} /></button>
+    )}>
+      {(close) => (
+        <div className="colmenu"><div className="cm-list">
+          {options.map((s) => <div key={s} className={`cm-opt ${value === s ? 'on' : ''}`} onClick={() => { onChange(s); close() }}>{s}</div>)}
+        </div></div>
+      )}
+    </Popover>
+  )
+}
+
+/* Generic modal dialog. */
+function Modal({ title, sub, onClose, children, footer, width = 440 }) {
+  useEffect(() => {
+    const k = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k)
+  }, [])
+  return (
+    <div className="modal-ov" onMouseDown={onClose}>
+      <div className="modal" style={{ width }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-h">
+          <div><h3>{title}</h3>{sub && <div className="sub">{sub}</div>}</div>
+          <button className="gf-x" onClick={onClose}><Icon name="x" size={15} /></button>
+        </div>
+        <div className="modal-b">{children}</div>
+        {footer && <div className="modal-f">{footer}</div>}
+      </div>
+    </div>
+  )
+}
+
+/* Toast system — call toast(message) from anywhere; ToastHost renders them. */
+const toastListeners = new Set()
+let toastSeq = 0
+function toast(message, kind = 'success') {
+  const t = { id: ++toastSeq, message, kind }
+  toastListeners.forEach((fn) => fn(t))
+}
+function ToastHost() {
+  const [items, setItems] = useState([])
+  useEffect(() => {
+    const fn = (t) => { setItems((x) => [...x, t]); setTimeout(() => setItems((x) => x.filter((i) => i.id !== t.id)), 3800) }
+    toastListeners.add(fn); return () => toastListeners.delete(fn)
+  }, [])
+  return (
+    <div className="toasthost">
+      {items.map((t) => (
+        <div key={t.id} className={`toast ${t.kind}`}>
+          <Icon name={t.kind === 'success' ? 'check' : t.kind === 'error' ? 'x' : 'bulb'} size={15} />
+          <span>{t.message}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 
 /* ===================== src/state.jsx ===================== */
 
@@ -1855,6 +1982,7 @@ function Layout({ children }) {
         <Topbar />
         <div className="content">{children}</div>
       </div>
+      <ToastHost />
     </div>
   )
 }
@@ -1991,8 +2119,8 @@ const CAMPAIGN_FIELDS = [
   { key: 'name', label: 'Campaign Name', type: 'text' },
   { key: 'asin', label: 'ASIN', type: 'text' },
   { key: 'campaignType', label: 'Type', type: 'enum', options: ['SP-Auto', 'SP-Manual', 'SB', 'SBV', 'SD-Product', 'SD-Audience'] },
-  { key: 'status', label: 'Status', type: 'enum', options: ['Enabled', 'Paused', 'Out of Budget'] },
-  { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused'] },
+  { key: 'status', label: 'Status', type: 'enum', options: ['Enabled', 'Paused', 'Out of Budget', 'Archived'] },
+  { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused', 'Archived'] },
   { key: 'portfolio', label: 'Portfolio', type: 'enum', options: ['Always-On', 'New Launch', 'Brand Defense', 'Competitor Conquest', 'Seasonal'] },
   { key: 'bidStrategy', label: 'Bid Strategy', type: 'enum', options: ['Dynamic - down only', 'Dynamic - up & down', 'Fixed bids'] },
   { key: 'dailyBudget', label: 'Daily Budget', type: 'number' },
@@ -2028,7 +2156,7 @@ const TARGETING_FIELDS = [
   { key: 'keyword', label: 'Targeting', type: 'text' },
   { key: 'campaign', label: 'Campaign', type: 'text' },
   { key: 'matchType', label: 'Match Type', type: 'enum', options: ['Broad', 'Phrase', 'Exact'] },
-  { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused'] },
+  { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused', 'Archived'] },
   { key: 'bid', label: 'Bid', type: 'number' },
   { key: 'sugBid', label: 'Suggested Bid', type: 'number' },
   { key: 'topOfSearchIS', label: 'Top-of-Search IS %', type: 'number' },
@@ -2070,6 +2198,82 @@ function useProfileFilter(rows) {
   return useMemo(() => (profileId === 'all' ? rows : rows.filter((r) => r.profileId === profileId)), [rows, profileId])
 }
 
+/* ---- bulk bid / budget math ---- */
+const round2 = (n) => Math.round(n * 100) / 100
+const applyBidOp = (cur, suggested, mode, amt) => {
+  if (mode === 'set') return round2(amt)
+  if (mode === 'inc') return round2(cur * (1 + amt / 100))
+  if (mode === 'dec') return round2(cur * (1 - amt / 100))
+  if (mode === 'suggested') return round2(suggested)
+  if (mode === 'ceiling') return round2(Math.min(cur, amt))
+  if (mode === 'floor') return round2(Math.max(cur, amt))
+  return cur
+}
+const applyBudgetOp = (cur, mode, amt) => {
+  if (mode === 'set') return round2(amt)
+  if (mode === 'inc') return round2(cur * (1 + amt / 100))
+  if (mode === 'dec') return round2(cur * (1 - amt / 100))
+  return cur
+}
+
+function BulkBidModal({ count, currency, onApply, onClose, suggestedLabel = 'suggested', initialMode = 'set' }) {
+  const [mode, setMode] = useState(initialMode)
+  const [amt, setAmt] = useState('')
+  const modes = [['set', 'Set to value'], ['inc', 'Increase by %'], ['dec', 'Decrease by %'], ['suggested', `Set to ${suggestedLabel}`], ['ceiling', 'Set ceiling (max)'], ['floor', 'Set floor (min)']]
+  const needsAmt = mode !== 'suggested'
+  const isPct = mode === 'inc' || mode === 'dec'
+  return (
+    <Modal title="Adjust bids" sub={`${count} line item${count === 1 ? '' : 's'} selected`} onClose={onClose} footer={<>
+      <Btn ghost onClick={onClose}>Cancel</Btn>
+      <Btn primary disabled={needsAmt && amt === ''} onClick={() => onApply(mode, Number(amt))}>Apply to {count}</Btn>
+    </>}>
+      <label className="fld">Action
+        <select value={mode} onChange={(e) => setMode(e.target.value)}>{modes.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      </label>
+      {needsAmt && (
+        <label className="fld">{isPct ? 'Percent (%)' : `Amount (${currency})`}
+          <input type="number" value={amt} autoFocus placeholder={isPct ? 'e.g. 10' : `e.g. 1.20`} onChange={(e) => setAmt(e.target.value)} />
+        </label>
+      )}
+      <div className="modal-note"><Icon name="bulb" size={14} />Applies to the actual bid on each selected line. Bids are floored at the account minimum on save.</div>
+    </Modal>
+  )
+}
+
+function BulkBudgetModal({ count, currency, onApply, onClose }) {
+  const [mode, setMode] = useState('set')
+  const [amt, setAmt] = useState('')
+  const modes = [['set', 'Set to value'], ['inc', 'Increase by %'], ['dec', 'Decrease by %']]
+  const isPct = mode === 'inc' || mode === 'dec'
+  return (
+    <Modal title="Adjust daily budget" sub={`${count} campaign${count === 1 ? '' : 's'} selected`} onClose={onClose} footer={<>
+      <Btn ghost onClick={onClose}>Cancel</Btn>
+      <Btn primary disabled={amt === ''} onClick={() => onApply(mode, Number(amt))}>Apply to {count}</Btn>
+    </>}>
+      <label className="fld">Action
+        <select value={mode} onChange={(e) => setMode(e.target.value)}>{modes.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      </label>
+      <label className="fld">{isPct ? 'Percent (%)' : `Amount (${currency})`}
+        <input type="number" value={amt} autoFocus placeholder={isPct ? 'e.g. 15' : 'e.g. 50'} onChange={(e) => setAmt(e.target.value)} />
+      </label>
+    </Modal>
+  )
+}
+
+function BulkTagModal({ count, onApply, onClose }) {
+  const [tag, setTag] = useState('')
+  return (
+    <Modal title="Apply tag" sub={`${count} campaign${count === 1 ? '' : 's'} selected`} onClose={onClose} footer={<>
+      <Btn ghost onClick={onClose}>Cancel</Btn>
+      <Btn primary disabled={!tag.trim()} onClick={() => onApply(tag.trim())}>Tag {count}</Btn>
+    </>}>
+      <label className="fld">Tag name
+        <input value={tag} autoFocus placeholder="e.g. Q3 Push" onChange={(e) => setTag(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && tag.trim()) onApply(tag.trim()) }} />
+      </label>
+    </Modal>
+  )
+}
+
 function AdsHead({ title, sub, children }) {
   return (
     <div className="page-head">
@@ -2103,25 +2307,36 @@ function Campaigns() {
   const [filters, setFilters] = useState(() => loadFilterModel('ads-campaigns'))
   const [sel, setSel] = useState(new Set())
 
+  const [modal, setModal] = useState(null) // 'bid' | 'budget' | 'tag'
+
   const data = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
   const searched = data.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, CAMPAIGN_FIELDS)
 
-  const ov = (st) => ({ state: st, status: st === 'Paused' ? 'Paused' : 'Enabled' })
-  const setState = (id, st) => setOverrides((o) => ({ ...o, [id]: ov(st) }))
-  const bulkState = (st) => { setOverrides((o) => { const n = { ...o }; sel.forEach((id) => { n[id] = ov(st) }); return n }); setSel(new Set()) }
+  const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
+  const mergeMany = (ids, fn) => setOverrides((o) => { const n = { ...o }; ids.forEach((id) => { n[id] = { ...n[id], ...fn(id) } }); return n })
+  const statusFor = (st) => (st === 'Enabled' ? 'Enabled' : st) // Paused / Archived pass through
+  const setState = (id, st) => merge(id, { state: st, status: statusFor(st) })
+  const byId = Object.fromEntries(data.map((c) => [c.id, c]))
+
+  const bulkState = (st) => { const ids = [...sel]; mergeMany(ids, () => ({ state: st, status: statusFor(st) })); setSel(new Set()); toast(`${ids.length} campaign${ids.length === 1 ? '' : 's'} ${st.toLowerCase()}`) }
+  const applyBulkBid = (mode, amt) => { const ids = [...sel]; mergeMany(ids, (id) => ({ actlBid: applyBidOp(byId[id].actlBid, byId[id].avlBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} campaign${ids.length === 1 ? '' : 's'} — all succeeded`) }
+  const applyBulkBudget = (mode, amt) => { const ids = [...sel]; mergeMany(ids, (id) => ({ dailyBudget: applyBudgetOp(byId[id].dailyBudget, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated daily budget on ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
+  const applyBulkTag = (tag) => { const ids = [...sel]; mergeMany(ids, () => ({ tag })); setSel(new Set()); setModal(null); toast(`Tagged ${ids.length} campaign${ids.length === 1 ? '' : 's'} “${tag}”`) }
+  const bulkNoop = (label) => { const n = sel.size; setSel(new Set()); toast(`${label} applied to ${n} campaign${n === 1 ? '' : 's'}`) }
+
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
 
   const columns = [
     { key: 'name', label: 'Campaign', sticky: true, width: 320, render: (r) => (
-      <div><div>{r.name}</div><small>{r.profileId.toUpperCase()} · {r.product?.split('—')[0]}</small></div>) },
-    { key: 'state', label: 'State', render: (r) => <Toggle on={r.state === 'Enabled'} onClick={() => setState(r.id, r.state === 'Enabled' ? 'Paused' : 'Enabled')} /> },
+      <div><div>{r.name}{r.tag && <span className="tag" style={{ marginLeft: 6 }}>{r.tag}</span>}</div><small>{r.profileId.toUpperCase()} · {r.product?.split('—')[0]}</small></div>) },
+    { key: 'state', label: 'State', render: (r) => <StateSelect value={r.state} onChange={(st) => setState(r.id, st)} /> },
     { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
     { key: 'campaignType', label: 'Type', render: (r) => <span className={`pill ${typeTone(r.campaignType)}`} style={{ borderRadius: 5 }}>{r.campaignType}</span> },
     { key: 'adGroups', label: 'Ad Groups', num: true, sort: false, render: (r) => <span className="muted">{r.adGroups.active}/{r.adGroups.total}</span> },
     { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: (rs) => cur(sumKey('dailyBudget')(rs), symOf(rs), 0), render: (r) => (
-      <span className="bidcell" style={{ justifyContent: 'flex-end' }}>{cur(r.dailyBudget, symA(r.profileId), 0)}<Icon name="edit" size={12} className="ed" /></span>) },
+      <EditableNum value={r.dailyBudget} prefix={symA(r.profileId)} dec={0} onCommit={(v) => { merge(r.id, { dailyBudget: v }); toast(`Daily budget set to ${cur(v, symA(r.profileId), 0)}`) }} />) },
     { key: 'bid', label: 'Bid (Act/Avl)', num: true, sort: false, render: (r) => <span className="muted">{r.actlBid} / {r.avlBid}</span> },
     { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
     { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
@@ -2161,15 +2376,19 @@ function Campaigns() {
           <span className="sel">{sel.size} selected</span>
           <Btn sm icon="play" onClick={() => bulkState('Enabled')}>Enable</Btn>
           <Btn sm icon="pause" onClick={() => bulkState('Paused')}>Pause</Btn>
-          <Btn sm icon="target">Adjust Bids</Btn>
-          <Btn sm icon="wallet">Adjust Budget</Btn>
-          <Btn sm icon="clock">Dayparting</Btn>
-          <Btn sm icon="sliders">Apply Rule</Btn>
-          <Btn sm icon="tag">Tag</Btn>
+          <Btn sm icon="box" onClick={() => bulkState('Archived')}>Archive</Btn>
+          <Btn sm icon="target" onClick={() => setModal('bid')}>Adjust Bids</Btn>
+          <Btn sm icon="wallet" onClick={() => setModal('budget')}>Adjust Budget</Btn>
+          <Btn sm icon="clock" onClick={() => bulkNoop('Dayparting')}>Dayparting</Btn>
+          <Btn sm icon="sliders" onClick={() => bulkNoop('Rule')}>Apply Rule</Btn>
+          <Btn sm icon="tag" onClick={() => setModal('tag')}>Tag</Btn>
           <div style={{ flex: 1 }} />
           <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
         </div>
       )}
+      {modal === 'bid' && <BulkBidModal count={sel.size} currency="$" suggestedLabel="available bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
+      {modal === 'budget' && <BulkBudgetModal count={sel.size} currency="$" onApply={applyBulkBudget} onClose={() => setModal(null)} />}
+      {modal === 'tag' && <BulkTagModal count={sel.size} onApply={applyBulkTag} onClose={() => setModal(null)} />}
 
       <DataGrid
         id="ads-campaigns"
@@ -2241,15 +2460,25 @@ function Targeting() {
   const base = useProfileFilter(keywords)
   const [tab, setTab] = useState('Keywords')
   const [sel, setSel] = useState(new Set())
+  const [overrides, setOverrides] = useState({})
+  const [modal, setModal] = useState(null) // 'set' | 'inc' | 'dec'
   const [filters, setFilters] = useState(() => loadFilterModel('ads-targeting'))
-  const filtered = applyFilters(base, filters, TARGETING_FIELDS)
+  const data = base.map((k) => (overrides[k.id] ? { ...k, ...overrides[k.id] } : k))
+  const filtered = applyFilters(data, filters, TARGETING_FIELDS)
+  const byId = Object.fromEntries(data.map((k) => [k.id, k]))
+  const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
+  const mergeMany = (ids, fn) => setOverrides((o) => { const n = { ...o }; ids.forEach((id) => { n[id] = { ...n[id], ...fn(id) } }); return n })
+  const setState = (id, st) => merge(id, { state: st })
+  const applyBulkBid = (mode, amt) => { const ids = [...sel]; mergeMany(ids, (id) => ({ bid: applyBidOp(byId[id].bid, byId[id].sugBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} target${ids.length === 1 ? '' : 's'} — all succeeded`) }
+  const bulkPause = () => { const ids = [...sel]; mergeMany(ids, () => ({ state: 'Paused' })); setSel(new Set()); toast(`Paused ${ids.length} target${ids.length === 1 ? '' : 's'}`) }
+  const bulkNegative = () => { const n = sel.size; setSel(new Set()); toast(`Added ${n} term${n === 1 ? '' : 's'} as negative exact`) }
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
   const columns = [
     { key: 'keyword', label: 'Targeting', sticky: true, width: 240, render: (r) => <div>{r.keyword}<small>{r.campaign.split('-').slice(0, 2).join('-')}</small></div> },
     { key: 'matchType', label: 'Match', render: (r) => <span className="tag">{r.matchType}</span> },
-    { key: 'state', label: 'State', render: (r) => <Pill>{r.state}</Pill> },
-    { key: 'bid', label: 'Bid', num: true, render: (r) => <span className="bidcell" style={{ justifyContent: 'flex-end' }}>{cur(r.bid, symA(r.profileId), 2)}<Icon name="edit" size={12} className="ed" /></span> },
+    { key: 'state', label: 'State', render: (r) => <StateSelect value={r.state} onChange={(st) => setState(r.id, st)} /> },
+    { key: 'bid', label: 'Bid', num: true, render: (r) => <EditableNum value={r.bid} prefix={symA(r.profileId)} dec={2} onCommit={(v) => { merge(r.id, { bid: v }); toast(`Bid set to ${cur(v, symA(r.profileId), 2)}`) }} /> },
     { key: 'sugBid', label: 'Suggested', num: true, render: (r) => <span className="muted">{cur(r.sugBid, symA(r.profileId), 2)}</span> },
     { key: 'topOfSearchIS', label: 'Top-of-Search IS', num: true, render: (r) => pct(r.topOfSearchIS) },
     { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
@@ -2269,11 +2498,15 @@ function Targeting() {
       {sel.size > 0 && (
         <div className="bulkbar">
           <span className="sel">{sel.size} selected</span>
-          <Btn sm icon="target">Set Bid</Btn><Btn sm icon="trendUp">Bid +%</Btn><Btn sm icon="trendDown">Bid −%</Btn>
-          <Btn sm icon="pause">Pause</Btn><Btn sm icon="x">Add as Negative</Btn>
+          <Btn sm icon="target" onClick={() => setModal('set')}>Set Bid</Btn>
+          <Btn sm icon="trendUp" onClick={() => setModal('inc')}>Bid +%</Btn>
+          <Btn sm icon="trendDown" onClick={() => setModal('dec')}>Bid −%</Btn>
+          <Btn sm icon="pause" onClick={bulkPause}>Pause</Btn>
+          <Btn sm icon="x" onClick={bulkNegative}>Add as Negative</Btn>
           <div style={{ flex: 1 }} /><Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
         </div>
       )}
+      {modal && <BulkBidModal count={sel.size} currency="$" initialMode={modal} suggestedLabel="suggested bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
       <DataGrid
         id="ads-targeting"
         columns={columns}
