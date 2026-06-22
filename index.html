@@ -2008,6 +2008,63 @@ const CAMPAIGN_FIELDS = [
   { key: 'clk', label: 'Clicks', type: 'number' },
 ]
 
+const ADGROUP_FIELDS = [
+  { key: 'name', label: 'Ad Group', type: 'text' },
+  { key: 'campaign', label: 'Campaign', type: 'text' },
+  { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused'] },
+  { key: 'defaultBid', label: 'Default Bid', type: 'number' },
+  { key: 'targets', label: 'Targets', type: 'number' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+  { key: 'ctr', label: 'CTR %', type: 'number' },
+  { key: 'orders', label: 'Orders', type: 'number' },
+  { key: 'impr', label: 'Impressions', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+]
+
+const TARGETING_FIELDS = [
+  { key: 'keyword', label: 'Targeting', type: 'text' },
+  { key: 'campaign', label: 'Campaign', type: 'text' },
+  { key: 'matchType', label: 'Match Type', type: 'enum', options: ['Broad', 'Phrase', 'Exact'] },
+  { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused'] },
+  { key: 'bid', label: 'Bid', type: 'number' },
+  { key: 'sugBid', label: 'Suggested Bid', type: 'number' },
+  { key: 'topOfSearchIS', label: 'Top-of-Search IS %', type: 'number' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+  { key: 'orders', label: 'Orders', type: 'number' },
+  { key: 'impr', label: 'Impressions', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+]
+
+const SEARCHTERM_FIELDS = [
+  { key: 'term', label: 'Search Term', type: 'text' },
+  { key: 'campaign', label: 'Campaign', type: 'text' },
+  { key: 'matchedTarget', label: 'Matched Target', type: 'text' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+  { key: 'orders', label: 'Orders', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+  { key: 'impr', label: 'Impressions', type: 'number' },
+]
+
+const SOV_FIELDS = [
+  { key: 'keyword', label: 'Keyword', type: 'text' },
+  { key: 'topCompetitor', label: 'Top Competitor', type: 'enum', options: ['Pawthentic', 'NorthernPack', 'TrueNature', 'AlphaPet', 'WildHarvest'] },
+  { key: 'searchVolume', label: 'Search Volume', type: 'number' },
+  { key: 'paidShare', label: 'Paid SOV %', type: 'number' },
+  { key: 'organicShare', label: 'Organic SOV %', type: 'number' },
+  { key: 'totalShare', label: 'Total SOV %', type: 'number' },
+  { key: 'yourRank', label: 'Your Avg Rank', type: 'number' },
+  { key: 'competitorShare', label: 'Competitor SOV %', type: 'number' },
+  { key: 'trend', label: '7d Trend', type: 'number' },
+]
+
 function useProfileFilter(rows) {
   const { profileId } = useApp()
   return useMemo(() => (profileId === 'all' ? rows : rows.filter((r) => r.profileId === profileId)), [rows, profileId])
@@ -2146,6 +2203,8 @@ function AdGroups() {
     campaign: c.name, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
     targets: 4 + (i % 9), impr: c.impr, clk: c.clk, spend: c.spend, sales: c.sales, orders: c.orders, acos: c.acos, roas: c.roas, ctr: c.ctr,
   }))
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-adgroups'))
+  const filtered = applyFilters(rows, filters, ADGROUP_FIELDS)
   const columns = [
     { key: 'name', label: 'Ad Group', sticky: true, width: 300, render: (r) => <div>{r.name}<small>{r.campaign}</small></div> },
     { key: 'state', label: 'State', render: (r) => <Pill>{r.state === 'Enabled' ? 'Enabled' : 'Paused'}</Pill> },
@@ -2162,15 +2221,16 @@ function AdGroups() {
   ]
   return (
     <>
-      <AdsHead title="Ad Groups" sub={`${rows.length} ad groups`}><Btn icon="download">Export</Btn><Btn icon="plus" primary>New Ad Group</Btn></AdsHead>
-      <KpiRow rows={base} />
+      <AdsHead title="Ad Groups" sub={`${filtered.length} ad groups`}><Btn icon="download">Export</Btn><Btn icon="plus" primary>New Ad Group</Btn></AdsHead>
+      <KpiRow rows={filtered} />
       <DataGrid
         id="ads-adgroups"
         columns={columns}
-        rows={rows}
+        rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }}
         dimensions={[{ key: 'profileId', label: 'Profile' }, { key: 'state', label: 'State' }]}
         totals
+        toolbarLeft={<FilterBar id="ads-adgroups" fields={ADGROUP_FIELDS} value={filters} onChange={setFilters} />}
       />
     </>
   )
@@ -2181,8 +2241,10 @@ function Targeting() {
   const base = useProfileFilter(keywords)
   const [tab, setTab] = useState('Keywords')
   const [sel, setSel] = useState(new Set())
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-targeting'))
+  const filtered = applyFilters(base, filters, TARGETING_FIELDS)
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleAll = () => setSel((s) => (s.size === base.length ? new Set() : new Set(base.map((r) => r.id))))
+  const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
   const columns = [
     { key: 'keyword', label: 'Targeting', sticky: true, width: 240, render: (r) => <div>{r.keyword}<small>{r.campaign.split('-').slice(0, 2).join('-')}</small></div> },
     { key: 'matchType', label: 'Match', render: (r) => <span className="tag">{r.matchType}</span> },
@@ -2215,7 +2277,7 @@ function Targeting() {
       <DataGrid
         id="ads-targeting"
         columns={columns}
-        rows={base}
+        rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }}
         dimensions={[{ key: 'matchType', label: 'Match Type' }, { key: 'state', label: 'State' }]}
         totals
@@ -2224,6 +2286,7 @@ function Targeting() {
         selected={sel}
         onToggle={toggleSel}
         onToggleAll={toggleAll}
+        toolbarLeft={<FilterBar id="ads-targeting" fields={TARGETING_FIELDS} value={filters} onChange={setFilters} />}
       />
       <div className="footnote">Suggested bids and Top-of-Search Impression Share guide bid changes. Select rows for bulk bid actions or to add negatives.</div>
     </>
@@ -2235,8 +2298,10 @@ function SearchTerms() {
   const base = useProfileFilter(searchTerms)
   const [filter, setFilter] = useState('All')
   const [harvested, setHarvested] = useState(new Set())
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-searchterms'))
   const recTone = { harvest: 'green', negate: 'red', monitor: 'gray' }
-  const filtered = base.filter((r) => filter === 'All' || r.recommend === filter.toLowerCase())
+  const chipFiltered = base.filter((r) => filter === 'All' || r.recommend === filter.toLowerCase())
+  const filtered = applyFilters(chipFiltered, filters, SEARCHTERM_FIELDS)
   const counts = { harvest: base.filter((r) => r.recommend === 'harvest').length, negate: base.filter((r) => r.recommend === 'negate').length }
   const columns = [
     { key: 'term', label: 'Customer Search Term', sticky: true, width: 240, render: (r) => <div>{r.term}<small>matched: {r.matchedTarget}</small></div> },
@@ -2266,9 +2331,12 @@ function SearchTerms() {
         initialSort={{ key: 'spend', dir: 'desc' }}
         dimensions={[{ key: 'recommend', label: 'Recommendation' }]}
         totals
-        toolbarLeft={['All', 'Harvest', 'Negate', 'Monitor'].map((t) => (
-          <span key={t} className={`chip ${filter === t ? 'on' : ''}`} onClick={() => setFilter(t)}>{t}</span>
-        ))}
+        toolbarLeft={<>
+          {['All', 'Harvest', 'Negate', 'Monitor'].map((t) => (
+            <span key={t} className={`chip ${filter === t ? 'on' : ''}`} onClick={() => setFilter(t)}>{t}</span>
+          ))}
+          <FilterBar id="ads-searchterms" fields={SEARCHTERM_FIELDS} value={filters} onChange={setFilters} />
+        </>}
       />
     </>
   )
@@ -2286,8 +2354,11 @@ function ShareOfVoice() {
     { key: 'topCompetitor', label: 'Top Competitor', render: (r) => <span>{r.topCompetitor} <span className="muted">({pct(r.competitorShare)})</span></span> },
     { key: 'trend', label: '7d Trend', num: true, render: (r) => <span style={{ color: r.trend >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}><Icon name={r.trend >= 0 ? 'trendUp' : 'trendDown'} size={12} /> {Math.abs(r.trend).toFixed(1)}pt</span> },
   ]
-  const avgPaid = shareOfVoice.reduce((s, r) => s + r.paidShare, 0) / shareOfVoice.length
-  const avgOrg = shareOfVoice.reduce((s, r) => s + r.organicShare, 0) / shareOfVoice.length
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-sov'))
+  const filtered = applyFilters(shareOfVoice, filters, SOV_FIELDS)
+  const n = filtered.length || 1
+  const avgPaid = filtered.reduce((s, r) => s + r.paidShare, 0) / n
+  const avgOrg = filtered.reduce((s, r) => s + r.organicShare, 0) / n
   return (
     <>
       <AdsHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Track Keyword</Btn></AdsHead>
@@ -2295,15 +2366,16 @@ function ShareOfVoice() {
         <Kpi label="Avg Paid SOV" value={pct(avgPaid)} delta={3.2} />
         <Kpi label="Avg Organic SOV" value={pct(avgOrg)} delta={-1.1} deltaGood={false} />
         <Kpi label="Avg Total SOV" value={pct(avgPaid + avgOrg)} delta={1.8} />
-        <Kpi label="Keywords Tracked" value={shareOfVoice.length} />
-        <Kpi label="#1 Rank Keywords" value={shareOfVoice.filter((r) => r.yourRank === 1).length} />
+        <Kpi label="Keywords Tracked" value={filtered.length} />
+        <Kpi label="#1 Rank Keywords" value={filtered.filter((r) => r.yourRank === 1).length} />
       </KpiGrid>
       <DataGrid
         id="ads-sov"
         columns={columns}
-        rows={shareOfVoice}
+        rows={filtered}
         initialSort={{ key: 'searchVolume', dir: 'desc' }}
         dimensions={[{ key: 'topCompetitor', label: 'Top Competitor' }]}
+        toolbarLeft={<FilterBar id="ads-sov" fields={SOV_FIELDS} value={filters} onChange={setFilters} />}
       />
       <div className="footnote">Defend or expand SOV on priority keywords automatically with bid automation and budget controls (see Rule Manager).</div>
     </>
