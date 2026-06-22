@@ -356,6 +356,40 @@ table.dt tr.grow td.sticky-l { background: var(--brand-soft); }
 .cm-opt:hover { background: var(--surface-2); }
 .cm-opt.on { background: var(--brand-soft); color: var(--brand); font-weight:600; }
 
+/* ---------------- FilterBar ---------------- */
+.fb-wrap { display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.btn.fb-on { border-color:#cdddff; background: var(--brand-soft); color: var(--brand); }
+.fb-badge { display:inline-grid; place-items:center; min-width:16px; height:16px; padding:0 4px; margin-left:2px; border-radius:9px; background:var(--brand); color:#fff; font-size:10px; font-weight:700; }
+.fchip { display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 8px; border-radius:14px; background:var(--brand-soft); border:1px solid #cdddff; color:var(--brand); font-size:11px; font-weight:600; white-space:nowrap; }
+.fchip svg { cursor:pointer; opacity:.7; }
+.fchip svg:hover { opacity:1; }
+
+.fpanel { font-size:12px; width:100%; }
+.fp-plans { padding-bottom:8px; margin-bottom:6px; border-bottom:1px solid var(--border); }
+.fp-plan { display:flex; align-items:center; gap:4px; }
+.fp-apply { flex:1; text-align:left; background:none; border:none; padding:6px 8px; border-radius:6px; cursor:pointer; color:var(--text); font-size:12px; font-weight:600; }
+.fp-apply:hover { background: var(--brand-soft); color: var(--brand); }
+.fp-head { display:flex; align-items:center; gap:10px; padding:2px 4px 8px; }
+.seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.seg button { border:none; background:var(--surface); padding:5px 11px; font-size:11.5px; font-weight:600; color:var(--text-2); cursor:pointer; }
+.seg button + button { border-left:1px solid var(--border); }
+.seg button.on { background: var(--brand); color:#fff; }
+.fp-rows { display:flex; flex-direction:column; gap:7px; max-height:300px; overflow-y:auto; padding:2px; }
+.gf-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.gf-row select, .gf-val, .gf-between input { height:30px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-size:12px; padding:0 8px; }
+.gf-field { min-width:120px; }
+.gf-op { min-width:70px; }
+.gf-val { width:130px; }
+.gf-between { display:inline-flex; align-items:center; gap:6px; }
+.gf-between input { width:74px; }
+.gf-enum { display:inline-flex; flex-wrap:wrap; gap:4px; flex:1; min-width:140px; }
+.gf-enum .chip { height:26px; cursor:pointer; }
+.gf-x { width:26px; height:26px; border:1px solid var(--border); background:var(--surface); border-radius:6px; color:var(--text-3); cursor:pointer; display:inline-grid; place-items:center; }
+.gf-x:hover { border-color:var(--red); color:var(--red); }
+.fp-foot { display:flex; align-items:center; gap:8px; padding:8px 2px 6px; border-top:1px solid var(--border); margin-top:8px; }
+.fp-save { display:flex; align-items:center; gap:8px; padding-top:8px; border-top:1px solid var(--border); }
+.fp-save input { flex:1; height:30px; border:1px solid var(--border); border-radius:6px; padding:0 8px; font-size:12px; background:var(--surface); color:var(--text); }
+
 #boot { position:fixed; inset:0; display:grid; place-items:center; font-family:sans-serif; color:#5b6577; }
 </style>
 </head>
@@ -1441,6 +1475,201 @@ function DataGrid({
   )
 }
 
+/* ============================================================================
+   FilterBar — schema-driven filter builder + saved Plans (Phase 2).
+   fields: [{ key, label, type:'text'|'enum'|'number', options? }]
+   model:  { join:'AND'|'OR', conditions:[{ id, field, op, value }] }
+   Use applyFilters(rows, model, fields) to get filtered rows.
+   ========================================================================== */
+const filterStore = {
+  get(id) { try { return JSON.parse(localStorage.getItem('chfilter:' + id)) } catch (e) { return null } },
+  set(id, v) { try { localStorage.setItem('chfilter:' + id, JSON.stringify(v)) } catch (e) { /* ignore */ } },
+}
+const planStore = {
+  get(id) { try { return JSON.parse(localStorage.getItem('chplan:' + id)) } catch (e) { return null } },
+  set(id, v) { try { localStorage.setItem('chplan:' + id, JSON.stringify(v)) } catch (e) { /* ignore */ } },
+}
+function loadFilterModel(id) { return filterStore.get(id) || { join: 'AND', conditions: [] } }
+
+const OPS = {
+  text: [{ op: 'contains', label: 'contains' }, { op: 'notcontains', label: 'does not contain' }, { op: 'equals', label: 'equals' }, { op: 'startswith', label: 'starts with' }],
+  enum: [{ op: 'in', label: 'is any of' }, { op: 'notin', label: 'is not' }],
+  number: [{ op: 'gt', label: '>' }, { op: 'gte', label: '≥' }, { op: 'lt', label: '<' }, { op: 'lte', label: '≤' }, { op: 'eq', label: '=' }, { op: 'between', label: 'between' }],
+}
+const opsFor = (type) => OPS[type] || OPS.text
+const opShort = { contains: '∋', notcontains: '∌', equals: '=', startswith: '^', in: ':', notin: '≠', gt: '>', gte: '≥', lt: '<', lte: '≤', eq: '=', between: '' }
+const normOpts = (f) => (f.options || []).map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) }))
+const uid = () => Math.random().toString(36).slice(2, 8)
+const clone = (v) => JSON.parse(JSON.stringify(v))
+
+function condHasValue(c) {
+  if (Array.isArray(c.value)) return c.value.filter((v) => v !== '' && v != null).length > 0
+  return c.value !== '' && c.value != null
+}
+function activeConds(model, byKey) {
+  return (model?.conditions || []).filter((c) => c.field && byKey[c.field] && condHasValue(c))
+}
+function condMatch(row, c, field) {
+  const v = row[c.field]
+  if (field.type === 'enum') {
+    const arr = c.value || []
+    if (!arr.length) return true
+    return c.op === 'notin' ? !arr.includes(v) : arr.includes(v)
+  }
+  if (field.type === 'number') {
+    const x = Number(v)
+    if (c.op === 'between') {
+      const [a, b] = c.value || []
+      if ((a === '' || a == null) && (b === '' || b == null)) return true
+      if (a !== '' && a != null && x < +a) return false
+      if (b !== '' && b != null && x > +b) return false
+      return true
+    }
+    const n = Number(c.value)
+    if (c.value === '' || c.value == null || isNaN(n)) return true
+    if (c.op === 'gt') return x > n
+    if (c.op === 'gte') return x >= n
+    if (c.op === 'lt') return x < n
+    if (c.op === 'lte') return x <= n
+    if (c.op === 'eq') return x === n
+    return true
+  }
+  // text
+  const s = String(v ?? '').toLowerCase(); const q = String(c.value ?? '').toLowerCase()
+  if (!q) return true
+  if (c.op === 'notcontains') return !s.includes(q)
+  if (c.op === 'equals') return s === q
+  if (c.op === 'startswith') return s.startsWith(q)
+  return s.includes(q)
+}
+function applyFilters(rows, model, fields) {
+  const byKey = Object.fromEntries(fields.map((f) => [f.key, f]))
+  const active = activeConds(model, byKey)
+  if (!active.length) return rows
+  return rows.filter((row) => {
+    const res = active.map((c) => condMatch(row, c, byKey[c.field]))
+    return model.join === 'OR' ? res.some(Boolean) : res.every(Boolean)
+  })
+}
+function describeCond(c, field) {
+  if (field.type === 'enum') return `${field.label}: ${(c.value || []).join(', ')}`
+  if (field.type === 'number' && c.op === 'between') { const [a, b] = c.value || []; return `${field.label} ${a || '…'}–${b || '…'}` }
+  return `${field.label} ${opShort[c.op] || ''} ${Array.isArray(c.value) ? c.value.join(', ') : c.value}`.trim()
+}
+
+function FilterRow({ row, fields, onChange, onRemove }) {
+  const field = fields.find((f) => f.key === row.field) || fields[0]
+  const ops = opsFor(field.type)
+  const opts = normOpts(field)
+  const setField = (k) => { const f = fields.find((x) => x.key === k); onChange({ ...row, field: k, op: opsFor(f.type)[0].op, value: f.type === 'enum' ? [] : '' }) }
+  const setOp = (op) => onChange({ ...row, op, value: op === 'between' ? ['', ''] : (Array.isArray(row.value) && field.type === 'number' ? '' : row.value) })
+  return (
+    <div className="gf-row">
+      <select className="gf-field" value={row.field} onChange={(e) => setField(e.target.value)}>
+        {fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+      </select>
+      <select className="gf-op" value={row.op} onChange={(e) => setOp(e.target.value)}>
+        {ops.map((o) => <option key={o.op} value={o.op}>{o.label}</option>)}
+      </select>
+      {field.type === 'enum' ? (
+        <div className="gf-enum">
+          {opts.map((o) => {
+            const on = (row.value || []).includes(o.value)
+            return <span key={o.value} className={`chip ${on ? 'on' : ''}`} onClick={() => { const set = new Set(row.value || []); on ? set.delete(o.value) : set.add(o.value); onChange({ ...row, value: [...set] }) }}>{o.label}</span>
+          })}
+        </div>
+      ) : field.type === 'number' && row.op === 'between' ? (
+        <span className="gf-between">
+          <input type="number" value={row.value?.[0] ?? ''} placeholder="min" onChange={(e) => onChange({ ...row, value: [e.target.value, row.value?.[1] ?? ''] })} />
+          <span className="muted">–</span>
+          <input type="number" value={row.value?.[1] ?? ''} placeholder="max" onChange={(e) => onChange({ ...row, value: [row.value?.[0] ?? '', e.target.value] })} />
+        </span>
+      ) : field.type === 'number' ? (
+        <input className="gf-val" type="number" value={row.value ?? ''} placeholder="value" onChange={(e) => onChange({ ...row, value: e.target.value })} />
+      ) : (
+        <input className="gf-val" type="text" value={row.value ?? ''} placeholder="text…" onChange={(e) => onChange({ ...row, value: e.target.value })} />
+      )}
+      <button className="gf-x" onClick={onRemove} title="Remove"><Icon name="x" size={13} /></button>
+    </div>
+  )
+}
+
+function FilterBar({ id, fields, value, onChange }) {
+  const model = value || { join: 'AND', conditions: [] }
+  const byKey = useMemo(() => Object.fromEntries(fields.map((f) => [f.key, f])), [fields])
+  const active = activeConds(model, byKey)
+  const [plans, setPlans] = useState(() => (id ? planStore.get(id) : null) || [])
+  const [planName, setPlanName] = useState('')
+
+  useEffect(() => { if (id) filterStore.set(id, model) }, [id, model])
+
+  const set = (m) => onChange(m)
+  const addCond = () => { const f = fields[0]; set({ ...model, conditions: [...model.conditions, { id: uid(), field: f.key, op: opsFor(f.type)[0].op, value: f.type === 'enum' ? [] : '' }] }) }
+  const updateCond = (i, nc) => set({ ...model, conditions: model.conditions.map((c, j) => (j === i ? nc : c)) })
+  const removeCond = (i) => set({ ...model, conditions: model.conditions.filter((c, j) => j !== i) })
+  const removeById = (cid) => set({ ...model, conditions: model.conditions.filter((c) => c.id !== cid) })
+  const clearAll = () => set({ join: model.join, conditions: [] })
+  const savePlan = () => {
+    const name = planName.trim(); if (!name) return
+    const next = [...plans.filter((p) => p.name !== name), { name, model: clone(model) }]
+    setPlans(next); if (id) planStore.set(id, next); setPlanName('')
+  }
+  const applyPlan = (p) => set(clone(p.model))
+  const deletePlan = (name) => { const next = plans.filter((p) => p.name !== name); setPlans(next); if (id) planStore.set(id, next) }
+
+  return (
+    <span className="fb-wrap">
+      <Popover width={460} trigger={(
+        <button className={`btn ghost sm ${active.length ? 'fb-on' : ''}`}>
+          <Icon name="filter" size={13} />Filters{active.length > 0 && <span className="fb-badge">{active.length}</span>}
+        </button>
+      )}>
+        {(close) => (
+          <div className="fpanel">
+            {plans.length > 0 && (
+              <div className="fp-plans">
+                <div className="cm-head">Saved Plans</div>
+                {plans.map((p) => (
+                  <div key={p.name} className="fp-plan">
+                    <button className="fp-apply" onClick={() => { applyPlan(p); close() }}>{p.name}<span className="muted"> · {(p.model.conditions || []).length}</span></button>
+                    <button className="gf-x" onClick={() => deletePlan(p.name)} title="Delete plan"><Icon name="x" size={12} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="fp-head">
+              <span className="cm-head" style={{ padding: 0 }}>Match</span>
+              <div className="seg">
+                <button className={model.join === 'AND' ? 'on' : ''} onClick={() => set({ ...model, join: 'AND' })}>ALL conditions</button>
+                <button className={model.join === 'OR' ? 'on' : ''} onClick={() => set({ ...model, join: 'OR' })}>ANY condition</button>
+              </div>
+            </div>
+            <div className="fp-rows">
+              {model.conditions.length === 0 && <div className="muted" style={{ padding: '6px 4px' }}>No filters yet — add one below.</div>}
+              {model.conditions.map((c, i) => (
+                <FilterRow key={c.id} row={c} fields={fields} onChange={(nc) => updateCond(i, nc)} onRemove={() => removeCond(i)} />
+              ))}
+            </div>
+            <div className="fp-foot">
+              <Btn sm ghost icon="plus" onClick={addCond}>Add filter</Btn>
+              <div style={{ flex: 1 }} />
+              {model.conditions.length > 0 && <Btn sm ghost onClick={clearAll}>Clear all</Btn>}
+            </div>
+            <div className="fp-save">
+              <input value={planName} placeholder="Save these filters as a Plan…" onChange={(e) => setPlanName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') savePlan() }} />
+              <Btn sm primary onClick={savePlan}>Save Plan</Btn>
+            </div>
+          </div>
+        )}
+      </Popover>
+      {active.map((c) => (
+        <span key={c.id} className="fchip">{describeCond(c, byKey[c.field])}<Icon name="x" size={11} onClick={() => removeById(c.id)} /></span>
+      ))}
+    </span>
+  )
+}
+
 
 /* ===================== src/state.jsx ===================== */
 
@@ -1758,6 +1987,27 @@ const typeTone = (t) => (t.startsWith('SP') ? 'blue' : t.startsWith('SB') ? 'pur
 const symOf = (rs) => (rs[0] ? symA(rs[0].profileId) : '$')
 const sumKey = (k) => (rs) => rs.reduce((a, b) => a + (b[k] || 0), 0)
 
+const CAMPAIGN_FIELDS = [
+  { key: 'name', label: 'Campaign Name', type: 'text' },
+  { key: 'asin', label: 'ASIN', type: 'text' },
+  { key: 'campaignType', label: 'Type', type: 'enum', options: ['SP-Auto', 'SP-Manual', 'SB', 'SBV', 'SD-Product', 'SD-Audience'] },
+  { key: 'status', label: 'Status', type: 'enum', options: ['Enabled', 'Paused', 'Out of Budget'] },
+  { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused'] },
+  { key: 'portfolio', label: 'Portfolio', type: 'enum', options: ['Always-On', 'New Launch', 'Brand Defense', 'Competitor Conquest', 'Seasonal'] },
+  { key: 'bidStrategy', label: 'Bid Strategy', type: 'enum', options: ['Dynamic - down only', 'Dynamic - up & down', 'Fixed bids'] },
+  { key: 'dailyBudget', label: 'Daily Budget', type: 'number' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+  { key: 'cpc', label: 'CPC', type: 'number' },
+  { key: 'ctr', label: 'CTR %', type: 'number' },
+  { key: 'cvr', label: 'CVR %', type: 'number' },
+  { key: 'orders', label: 'Orders', type: 'number' },
+  { key: 'impr', label: 'Impressions', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+]
+
 function useProfileFilter(rows) {
   const { profileId } = useApp()
   return useMemo(() => (profileId === 'all' ? rows : rows.filter((r) => r.profileId === profileId)), [rows, profileId])
@@ -1793,14 +2043,12 @@ function Campaigns() {
   const base = useProfileFilter(ALL_CAMPAIGNS)
   const [overrides, setOverrides] = useState({})
   const [q, setQ] = useState('')
-  const [typeFilter, setTypeFilter] = useState('All')
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-campaigns'))
   const [sel, setSel] = useState(new Set())
 
   const data = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
-  const types = ['All', 'SP-Auto', 'SP-Manual', 'SB', 'SBV', 'SD-Product', 'SD-Audience']
-  const filtered = data.filter((c) =>
-    (typeFilter === 'All' || c.campaignType === typeFilter) &&
-    c.name.toLowerCase().includes(q.toLowerCase()))
+  const searched = data.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, CAMPAIGN_FIELDS)
 
   const ov = (st) => ({ state: st, status: st === 'Paused' ? 'Paused' : 'Enabled' })
   const setState = (id, st) => setOverrides((o) => ({ ...o, [id]: ov(st) }))
@@ -1882,12 +2130,10 @@ function Campaigns() {
         onToggleAll={toggleAll}
         toolbarLeft={<>
           <SearchBox value={q} onChange={setQ} placeholder="Search campaigns…" />
-          {types.map((t) => (
-            <span key={t} className={`chip ${typeFilter === t ? 'on' : ''}`} onClick={() => setTypeFilter(t)}>{t}</span>
-          ))}
+          <FilterBar id="ads-campaigns" fields={CAMPAIGN_FIELDS} value={filters} onChange={setFilters} />
         </>}
       />
-      <div className="footnote">Bulk operations apply across selected line items — bids, budgets, dayparting, rules, negatives and tags. Bid shown as Actual / Available (suggested ceiling). Use Columns for view presets, Dimensions to group, and the compare toggle for period-over-period deltas.</div>
+      <div className="footnote">Build multi-condition filters (text, status/type, and metric thresholds with ALL/ANY logic) and save them as reusable <b>Plans</b>. Bulk operations apply across selected line items. Use Columns for view presets, Dimensions to group, and the compare toggle for period-over-period deltas.</div>
     </>
   )
 }
