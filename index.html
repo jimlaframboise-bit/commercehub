@@ -423,6 +423,54 @@ table.dt tr.grow td.sticky-l { background: var(--brand-soft); }
 .toast.info svg { color:#93c5fd; }
 @keyframes toastIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 
+/* ---------------- Phase 4: wizard + rule builder ---------------- */
+.wiz-steps { display:flex; gap:6px; padding:0 18px 10px; flex-wrap:wrap; }
+.wiz-step { display:flex; align-items:center; gap:6px; font-size:10.5px; font-weight:600; color:var(--text-3); padding:3px 0; }
+.wiz-step .num { width:18px; height:18px; border-radius:50%; display:grid; place-items:center; background:var(--surface-2); border:1px solid var(--border); font-size:10px; }
+.wiz-step.on { color:var(--brand); }
+.wiz-step.on .num { background:var(--brand); border-color:var(--brand); color:#fff; }
+.wiz-step.done .num { background:var(--green); border-color:var(--green); color:#fff; }
+.wiz-sep { color:var(--border-strong); }
+.wiz-progress { height:3px; background:var(--border); border-radius:3px; margin:0 18px 12px; overflow:hidden; }
+.wiz-progress span { display:block; height:100%; background:var(--brand); transition:width .2s; }
+.wiz-body { min-height:228px; }
+.wiz-title { font-size:14px; font-weight:700; margin-bottom:3px; }
+.wiz-hint { color:var(--text-3); font-size:12px; margin-bottom:14px; }
+
+.opt-grid { display:flex; flex-direction:column; gap:8px; }
+.opt-card { display:flex; align-items:flex-start; gap:10px; padding:11px 13px; border:1px solid var(--border); border-radius:9px; cursor:pointer; }
+.opt-card:hover { border-color:var(--border-strong); }
+.opt-card.on { border-color:var(--brand); background:var(--brand-soft); }
+.opt-card .oc-title { font-weight:700; font-size:12.5px; }
+.opt-card .oc-sub { color:var(--text-3); font-size:11px; }
+.opt-radio { width:16px; height:16px; border-radius:50%; border:1.5px solid var(--border-strong); margin-top:2px; flex:none; display:grid; place-items:center; }
+.opt-card.on .opt-radio { border-color:var(--brand); }
+.opt-card.on .opt-radio::after { content:''; width:8px; height:8px; border-radius:50%; background:var(--brand); }
+
+.chip-pick { display:flex; flex-wrap:wrap; gap:7px; }
+.chip-pick .chip { cursor:pointer; height:30px; }
+
+.prodlist { max-height:230px; overflow-y:auto; border:1px solid var(--border); border-radius:9px; }
+.prodrow { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid var(--border); cursor:pointer; }
+.prodrow:last-child { border-bottom:none; }
+.prodrow:hover { background:var(--surface-2); }
+.prodrow .pr-asin { font-family:ui-monospace,monospace; font-size:11px; color:var(--text-3); }
+.namepreview { font-family:ui-monospace,monospace; font-size:11.5px; background:var(--navy); color:#cfe0ff; padding:9px 11px; border-radius:8px; word-break:break-all; }
+.varchip { display:inline-block; background:var(--brand-soft); border:1px solid #cdddff; color:var(--brand); border-radius:5px; padding:1px 6px; font-size:10.5px; font-weight:600; margin:0 3px 3px 0; cursor:pointer; font-family:ui-monospace,monospace; }
+.review-tbl { width:100%; font-size:12.5px; border-collapse:collapse; }
+.review-tbl td { padding:6px 0; border-bottom:1px solid var(--border); vertical-align:top; }
+.review-tbl td:first-child { color:var(--text-3); width:140px; font-weight:600; }
+
+/* rule builder rows */
+.rb-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:7px; }
+.rb-row .rb-join { font-size:10.5px; font-weight:700; color:var(--text-3); width:34px; }
+.rb-row select, .rb-row input { height:30px; border:1px solid var(--border); border-radius:6px; padding:0 8px; font-size:12px; background:var(--surface); color:var(--text); }
+.rb-metric { min-width:130px; }
+.rb-val { width:90px; }
+.rb-sec { border-top:1px solid var(--border); margin-top:12px; padding-top:12px; }
+.rb-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.rb-check { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--text-2); cursor:pointer; }
+
 #boot { position:fixed; inset:0; display:grid; place-items:center; font-family:sans-serif; color:#5b6577; }
 </style>
 </head>
@@ -1798,6 +1846,13 @@ function ToastHost() {
   )
 }
 
+/* Persistence for user-created entities (campaigns, rules) — survives reload. */
+const createdStore = {
+  get(kind) { try { return JSON.parse(localStorage.getItem('chcreated:' + kind)) || [] } catch (e) { return [] } },
+  set(kind, arr) { try { localStorage.setItem('chcreated:' + kind, JSON.stringify(arr)) } catch (e) { /* ignore */ } },
+  add(kind, item) { const arr = createdStore.get(kind); arr.unshift(item); createdStore.set(kind, arr); return arr },
+}
+
 
 /* ===================== src/state.jsx ===================== */
 
@@ -1884,7 +1939,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.3.0</span>
+        <span className="app-version" title="CommerceHub build">v0.4.0</span>
       </div>
     </aside>
   )
@@ -2285,6 +2340,190 @@ function AdsHead({ title, sub, children }) {
   )
 }
 
+/* ---- Create-Campaign Super Wizard ---- */
+const PRODUCT_LIST = [...new Map(ALL_CAMPAIGNS.map((c) => [c.asin, { asin: c.asin, title: c.product, brand: (c.product || 'Brightleaf').split(' ')[0] }])).values()]
+const WIZ_TYPES = [
+  { v: 'SP-Auto', t: 'Sponsored Products — Auto', s: 'Amazon matches your ASINs to relevant shopper searches.' },
+  { v: 'SP-Manual', t: 'Sponsored Products — Manual', s: 'You choose keywords and match types.' },
+  { v: 'PAT', t: 'Product Targeting (PAT)', s: 'Target specific ASINs or categories directly.' },
+]
+const WIZ_MATCHES = ['Broad', 'Phrase', 'Exact']
+const WIZ_THEMES = [
+  { v: 'Branded', s: 'Your own brand terms — defend & convert.' },
+  { v: 'Category', s: 'Generic category terms — reach new shoppers.' },
+  { v: 'Competitor', s: 'Competitor brand / ASIN terms — conquest.' },
+]
+
+function CreateCampaignWizard({ products, profileId, currency = '$', onClose, onLaunch }) {
+  const [step, setStep] = useState(0)
+  const today = new Date().toISOString().slice(0, 10)
+  const [f, setF] = useState({
+    products: [], dailyBudget: '50', startDate: today, endDate: '',
+    type: 'SP-Auto', matches: ['Exact'], themes: ['Branded'],
+    naming: '{brand}-{asin}-{type}-{theme}',
+    ai: false, aiTarget: 'ACoS', aiValue: '25', maxBid: '1.20', priority: 'Balanced',
+  })
+  const set = (patch) => setF((x) => ({ ...x, ...patch }))
+  const toggleIn = (key, val) => set({ [key]: f[key].includes(val) ? f[key].filter((v) => v !== val) : [...f[key], val] })
+  const isManual = f.type === 'SP-Manual'
+  const groupCount = (isManual ? Math.max(1, f.matches.length) : 1) * Math.max(1, f.themes.length)
+  const steps = ['Products', 'Daily budget', 'Schedule', 'Campaign type', 'Ad groups', 'Targeting themes', 'Naming', 'Optimization', 'Review']
+  const last = steps.length - 1
+  const canNext = () => {
+    if (step === 0) return f.products.length > 0
+    if (step === 1) return Number(f.dailyBudget) > 0
+    if (step === 2) return !!f.startDate
+    if (step === 4) return isManual ? f.matches.length > 0 : true
+    if (step === 5) return f.themes.length > 0
+    if (step === 6) return f.naming.trim().length > 0
+    return true
+  }
+  const sampleName = (asin) => {
+    const p = products.find((x) => x.asin === asin) || products[0] || { brand: 'Brand', asin: 'ASIN' }
+    return f.naming
+      .replaceAll('{brand}', p.brand || 'Brand').replaceAll('{asin}', asin || p.asin)
+      .replaceAll('{type}', f.type).replaceAll('{theme}', f.themes[0] || 'General')
+      .replaceAll('{match}', isManual ? (f.matches[0] || 'Exact') : (f.type === 'PAT' ? 'PAT' : 'Auto'))
+  }
+  const launch = () => {
+    const tgt = { 'SP-Auto': 'Auto', 'SP-Manual': 'Manual', PAT: 'Product' }[f.type]
+    const zero = { impr: 0, clk: 0, ctr: 0, cpc: 0, spend: 0, cvr: 0, orders: 0, asp: 0, aov: 0, sales: 0, units: 0, ntb: 0, atc: 0, acos: 0, roas: 0, cpa: 0 }
+    const camps = f.products.map((asin, i) => {
+      const p = products.find((x) => x.asin === asin) || {}
+      return {
+        id: 'CNEW' + (Date.now() + i).toString().slice(-7),
+        name: sampleName(asin), asin, product: p.title || asin, profileId,
+        state: 'Enabled', status: 'Enabled', campaignType: f.type, targetingType: tgt,
+        adGroups: { active: groupCount, total: groupCount }, dailyBudget: Number(f.dailyBudget),
+        actlBid: Number(f.maxBid) || 1, avlBid: round2((Number(f.maxBid) || 1) * 1.3),
+        portfolio: 'New Launch', bidStrategy: 'Dynamic - down only',
+        tag: 'NEW', startDate: f.startDate, endDate: f.endDate, ai: f.ai, ...zero,
+      }
+    })
+    onLaunch(camps)
+  }
+  const renderStep = () => {
+    if (step === 0) return (
+      <>
+        <div className="wiz-hint">Choose the products to advertise. One campaign is created per product.</div>
+        <div className="prodlist">
+          {products.map((p) => {
+            const on = f.products.includes(p.asin)
+            return (
+              <div key={p.asin} className="prodrow" onClick={() => toggleIn('products', p.asin)}>
+                <Check on={on} onClick={() => {}} />
+                <div style={{ flex: 1 }}>{p.title}<div className="pr-asin">{p.asin} · {p.brand}</div></div>
+              </div>
+            )
+          })}
+        </div>
+      </>
+    )
+    if (step === 1) return (
+      <>
+        <label className="fld">Daily budget ({currency}) per campaign<input type="number" autoFocus value={f.dailyBudget} onChange={(e) => set({ dailyBudget: e.target.value })} /></label>
+        <div className="modal-note"><Icon name="bulb" size={14} />Applies to each of the {f.products.length} campaign{f.products.length === 1 ? '' : 's'} you're creating.</div>
+      </>
+    )
+    if (step === 2) return (
+      <div className="rb-grid2">
+        <label className="fld">Start date<input type="date" value={f.startDate} onChange={(e) => set({ startDate: e.target.value })} /></label>
+        <label className="fld">End date (optional)<input type="date" value={f.endDate} onChange={(e) => set({ endDate: e.target.value })} /></label>
+      </div>
+    )
+    if (step === 3) return (
+      <div className="opt-grid">
+        {WIZ_TYPES.map((o) => (
+          <div key={o.v} className={`opt-card ${f.type === o.v ? 'on' : ''}`} onClick={() => set({ type: o.v })}>
+            <span className="opt-radio" /><div><div className="oc-title">{o.t}</div><div className="oc-sub">{o.s}</div></div>
+          </div>
+        ))}
+      </div>
+    )
+    if (step === 4) return isManual ? (
+      <>
+        <div className="wiz-hint">Split into one ad group per match type.</div>
+        <div className="chip-pick">{WIZ_MATCHES.map((m) => <span key={m} className={`chip ${f.matches.includes(m) ? 'on' : ''}`} onClick={() => toggleIn('matches', m)}>{m}</span>)}</div>
+      </>
+    ) : (
+      <div className="modal-note"><Icon name="bulb" size={14} />{f.type === 'SP-Auto' ? 'Auto campaigns use a single auto-targeting ad group.' : 'PAT campaigns target products/categories in one ad group.'}</div>
+    )
+    if (step === 5) return (
+      <>
+        <div className="wiz-hint">Group targets by intent — creates a themed ad group for each.</div>
+        <div className="opt-grid">
+          {WIZ_THEMES.map((o) => {
+            const on = f.themes.includes(o.v)
+            return (
+              <div key={o.v} className={`opt-card ${on ? 'on' : ''}`} onClick={() => toggleIn('themes', o.v)}>
+                <Check on={on} onClick={() => {}} /><div><div className="oc-title">{o.v}</div><div className="oc-sub">{o.s}</div></div>
+              </div>
+            )
+          })}
+        </div>
+      </>
+    )
+    if (step === 6) return (
+      <>
+        <label className="fld">Naming template<input value={f.naming} onChange={(e) => set({ naming: e.target.value })} /></label>
+        <div style={{ marginBottom: 10 }}>{['{brand}', '{asin}', '{type}', '{theme}', '{match}'].map((v) => <span key={v} className="varchip" onClick={() => set({ naming: f.naming + v })}>{v}</span>)}</div>
+        <div className="wiz-hint">Preview</div>
+        <div className="namepreview">{sampleName(f.products[0])}</div>
+      </>
+    )
+    if (step === 7) return (
+      <>
+        <label className="rb-check" style={{ marginBottom: 14 }}><Toggle on={f.ai} onClick={() => set({ ai: !f.ai })} /> Enable Campaign AI (automated bidding + pacing)</label>
+        {f.ai ? (
+          <>
+            <div className="rb-grid2">
+              <label className="fld">Optimize for<select value={f.aiTarget} onChange={(e) => set({ aiTarget: e.target.value })}><option>ACoS</option><option>ROAS</option></select></label>
+              <label className="fld">Target {f.aiTarget}{f.aiTarget === 'ACoS' ? ' (%)' : ''}<input type="number" value={f.aiValue} onChange={(e) => set({ aiValue: e.target.value })} /></label>
+            </div>
+            <div className="rb-grid2">
+              <label className="fld">Max bid ({currency})<input type="number" value={f.maxBid} onChange={(e) => set({ maxBid: e.target.value })} /></label>
+              <label className="fld">Priority<select value={f.priority} onChange={(e) => set({ priority: e.target.value })}><option>Balanced</option><option>Spend</option><option>Performance</option></select></label>
+            </div>
+          </>
+        ) : (
+          <div className="modal-note"><Icon name="bulb" size={14} />Without AI, bids start at your max-bid default — attach Rules later for automation.</div>
+        )}
+      </>
+    )
+    return (
+      <table className="review-tbl"><tbody>
+        <tr><td>Products</td><td>{f.products.length} selected</td></tr>
+        <tr><td>Daily budget</td><td>{currency}{f.dailyBudget} each</td></tr>
+        <tr><td>Schedule</td><td>{f.startDate}{f.endDate ? ` → ${f.endDate}` : ' → no end date'}</td></tr>
+        <tr><td>Type</td><td>{f.type}</td></tr>
+        <tr><td>Ad groups</td><td>{groupCount} per campaign{isManual ? ` · ${f.matches.join(', ')}` : ''}</td></tr>
+        <tr><td>Themes</td><td>{f.themes.join(', ')}</td></tr>
+        <tr><td>Campaign AI</td><td>{f.ai ? `On · Target ${f.aiTarget} ${f.aiValue}${f.aiTarget === 'ACoS' ? '%' : ''} · Max bid ${currency}${f.maxBid}` : 'Off'}</td></tr>
+        <tr><td>Example name</td><td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5 }}>{sampleName(f.products[0])}</td></tr>
+      </tbody></table>
+    )
+  }
+  return (
+    <Modal width={640} title="Create Campaign" sub="Super Wizard — build one or many campaigns" onClose={onClose}
+      footer={<>
+        {step > 0 && <Btn ghost onClick={() => setStep(step - 1)}>Back</Btn>}
+        <div style={{ flex: 1 }} />
+        <span className="muted" style={{ fontSize: 11 }}>Step {step + 1} of {steps.length}</span>
+        {step < last
+          ? <Btn primary disabled={!canNext()} onClick={() => setStep(step + 1)}>Next</Btn>
+          : <Btn primary icon="check" onClick={launch}>Launch {f.products.length} campaign{f.products.length === 1 ? '' : 's'}</Btn>}
+      </>}>
+      <div className="wiz-steps">
+        {steps.map((s, i) => (
+          <span key={s} className={`wiz-step ${i === step ? 'on' : i < step ? 'done' : ''}`}><span className="num">{i < step ? '✓' : i + 1}</span>{s}</span>
+        ))}
+      </div>
+      <div className="wiz-progress"><span style={{ width: ((step + 1) / steps.length * 100) + '%' }} /></div>
+      <div className="wiz-body"><div className="wiz-title">{steps[step]}</div>{renderStep()}</div>
+    </Modal>
+  )
+}
+
 function KpiRow({ rows }) {
   const a = aggregate(rows)
   return (
@@ -2303,13 +2542,18 @@ function KpiRow({ rows }) {
 
 /* ============================ CAMPAIGNS ============================ */
 function Campaigns() {
-  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const { profileId } = useApp()
+  const [created, setCreated] = useState(() => createdStore.get('campaigns'))
+  const allCampaigns = useMemo(() => [...created, ...ALL_CAMPAIGNS], [created])
+  const base = useProfileFilter(allCampaigns)
   const [overrides, setOverrides] = useState({})
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ads-campaigns'))
   const [sel, setSel] = useState(new Set())
 
   const [modal, setModal] = useState(null) // 'bid' | 'budget' | 'tag'
+  const [wizard, setWizard] = useState(false)
+  const onLaunch = (camps) => { const next = [...camps, ...created]; createdStore.set('campaigns', next); setCreated(next); setWizard(false); toast(`Launched ${camps.length} campaign${camps.length === 1 ? '' : 's'} — added to the grid`) }
 
   const data = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
   const searched = data.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
@@ -2369,7 +2613,7 @@ function Campaigns() {
     <>
       <AdsHead title="Campaigns" sub={`${filtered.length} campaigns · Sponsored Products, Brands & Display`}>
         <Btn icon="download">Export</Btn>
-        <Btn icon="plus" primary>Create Campaign</Btn>
+        <Btn icon="plus" primary onClick={() => setWizard(true)}>Create Campaign</Btn>
       </AdsHead>
       <KpiRow rows={filtered} />
 
@@ -2391,6 +2635,7 @@ function Campaigns() {
       {modal === 'bid' && <BulkBidModal count={sel.size} currency="$" suggestedLabel="available bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
       {modal === 'budget' && <BulkBudgetModal count={sel.size} currency="$" onApply={applyBulkBudget} onClose={() => setModal(null)} />}
       {modal === 'tag' && <BulkTagModal count={sel.size} onApply={applyBulkTag} onClose={() => setModal(null)} />}
+      {wizard && <CreateCampaignWizard products={PRODUCT_LIST} profileId={profileId === 'all' ? 'us' : profileId} onClose={() => setWizard(false)} onLaunch={onLaunch} />}
 
       <DataGrid
         id="ads-campaigns"
@@ -2944,10 +3189,115 @@ function AutoHead({ title, sub, children }) {
 const RULE_ICON = { Bid: 'target', Harvest: 'spark', Negative: 'x', Retail: 'shield', Dayparting: 'clock', Budget: 'wallet' }
 const RULE_COLOR = { Bid: 'var(--brand)', Harvest: 'var(--green)', Negative: 'var(--red)', Retail: 'var(--purple)', Dayparting: 'var(--amber)', Budget: 'var(--brand-2)' }
 
+/* ---- Rule builder ---- */
+const RB_METRICS = ['ROAS', 'ACoS', 'CVR', 'CPC', 'CTR', 'Impressions', 'Clicks', 'Spend', 'Orders', 'Organic Rank', 'SOV', 'Weeks of Cover']
+const RB_PCT = new Set(['ACoS', 'CTR', 'CVR', 'SOV'])
+const RB_OPS = [['gt', '>'], ['gte', '≥'], ['lt', '<'], ['lte', '≤'], ['between', 'between']]
+const RB_TYPES = ['Bid', 'Harvest', 'Negative', 'Dayparting', 'Budget', 'Retail']
+const RB_SCOPES = ['All SP campaigns', 'Selected campaigns', 'Ad groups', 'By tag', 'All profiles']
+const RB_FREQ = ['Hourly', 'Every 6 hours', 'Daily', 'Every 2 days']
+const RB_ACTIONS = [
+  ['dec_bid', 'Decrease bid by %'], ['inc_bid', 'Increase bid by %'], ['set_bid', 'Set bid to value'],
+  ['ceil_bid', 'Set bid ceiling'], ['floor_bid', 'Set bid floor'], ['pause', 'Pause'], ['enable', 'Enable'],
+  ['adj_budget', 'Adjust daily budget by %'], ['placement', 'Set placement modifier %'],
+  ['harvest', 'Harvest as keyword'], ['negative', 'Add as negative'],
+]
+const RB_NEEDS_VAL = new Set(['dec_bid', 'inc_bid', 'set_bid', 'ceil_bid', 'floor_bid', 'adj_budget', 'placement'])
+const rid = () => Math.random().toString(36).slice(2, 7)
+const opSym = (op) => ({ gt: '>', gte: '≥', lt: '<', lte: '≤', between: 'between' }[op] || op)
+const buildTrigger = (f) => {
+  const parts = f.conditions.filter((c) => c.value !== '' || c.op === 'between').map((c) => {
+    const suf = RB_PCT.has(c.metric) ? '%' : ''
+    if (c.op === 'between') return `${c.metric} between ${c.value || '…'}${suf} and ${c.value2 || '…'}${suf}`
+    return `${c.metric} ${opSym(c.op)} ${c.value}${suf}`
+  })
+  let s = parts.join(` ${f.join} `)
+  const gates = []
+  if (f.minClicks) gates.push(`min ${f.minClicks} clicks`)
+  if (f.minSpend) gates.push(`min $${f.minSpend} spend`)
+  s += ` (${f.lookback}d${f.excludeLatest ? ', excl. latest day' : ''}${gates.length ? ', ' + gates.join(', ') : ''})`
+  return s
+}
+const buildAction = (f) => {
+  const v = f.actionValue
+  return {
+    dec_bid: `Decrease bid by ${v}%`, inc_bid: `Increase bid by ${v}%`, set_bid: `Set bid to $${v}`,
+    ceil_bid: `Set bid ceiling $${v}`, floor_bid: `Set bid floor $${v}`, pause: 'Pause', enable: 'Enable',
+    adj_budget: `Adjust daily budget by ${v}%`, placement: `Set placement modifier ${v}%`,
+    harvest: 'Harvest as keyword to manual', negative: 'Add as negative exact',
+  }[f.action] || f.action
+}
+
+function RuleBuilder({ onClose, onSave }) {
+  const [f, setF] = useState({
+    name: '', type: 'Bid', scope: 'All SP campaigns',
+    conditions: [{ id: rid(), metric: 'ACoS', op: 'gt', value: '', value2: '' }],
+    join: 'AND', lookback: '14', excludeLatest: true, minClicks: '', minSpend: '',
+    action: 'dec_bid', actionValue: '', frequency: 'Every 6 hours',
+  })
+  const upd = (patch) => setF((x) => ({ ...x, ...patch }))
+  const setCond = (i, patch) => setF((x) => ({ ...x, conditions: x.conditions.map((c, j) => (j === i ? { ...c, ...patch } : c)) }))
+  const addCond = () => setF((x) => ({ ...x, conditions: [...x.conditions, { id: rid(), metric: 'ROAS', op: 'gt', value: '', value2: '' }] }))
+  const delCond = (i) => setF((x) => ({ ...x, conditions: x.conditions.filter((c, j) => j !== i) }))
+  const needsVal = RB_NEEDS_VAL.has(f.action)
+  const canSave = f.name.trim() && f.conditions.some((c) => c.value !== '') && (!needsVal || f.actionValue !== '')
+  const save = () => onSave({
+    id: 'RNEW' + Date.now().toString().slice(-5), name: f.name.trim(), type: f.type, scope: f.scope,
+    status: 'Active', trigger: buildTrigger(f), action: buildAction(f), runs: f.frequency, lastRun: 'just now', affected: 0,
+  })
+  return (
+    <Modal width={600} title="Create Rule" sub="IF conditions are met, THEN apply an action — on a schedule" onClose={onClose}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><div style={{ flex: 1 }} /><Btn primary disabled={!canSave} icon="check" onClick={save}>Create rule</Btn></>}>
+      <label className="fld">Rule name<input autoFocus value={f.name} placeholder="e.g. Defend Target ACoS ≤ 28%" onChange={(e) => upd({ name: e.target.value })} /></label>
+      <div className="rb-grid2">
+        <label className="fld">Rule type<select value={f.type} onChange={(e) => upd({ type: e.target.value })}>{RB_TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
+        <label className="fld">Scope<select value={f.scope} onChange={(e) => upd({ scope: e.target.value })}>{RB_SCOPES.map((s) => <option key={s}>{s}</option>)}</select></label>
+      </div>
+      <div className="cm-head" style={{ padding: '4px 0 8px' }}>IF — conditions</div>
+      {f.conditions.map((c, i) => (
+        <div key={c.id} className="rb-row">
+          <span className="rb-join">{i === 0 ? 'IF' : f.join}</span>
+          <select className="rb-metric" value={c.metric} onChange={(e) => setCond(i, { metric: e.target.value })}>{RB_METRICS.map((m) => <option key={m}>{m}</option>)}</select>
+          <select value={c.op} onChange={(e) => setCond(i, { op: e.target.value, ...(e.target.value !== 'between' ? { value2: '' } : {}) })}>{RB_OPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <input className="rb-val" type="number" value={c.value} placeholder="value" onChange={(e) => setCond(i, { value: e.target.value })} />
+          {c.op === 'between' && <><span className="muted">and</span><input className="rb-val" type="number" value={c.value2} placeholder="max" onChange={(e) => setCond(i, { value2: e.target.value })} /></>}
+          {f.conditions.length > 1 && <button className="gf-x" onClick={() => delCond(i)}><Icon name="x" size={13} /></button>}
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
+        <Btn sm ghost icon="plus" onClick={addCond}>Add condition</Btn>
+        {f.conditions.length > 1 && (
+          <div className="seg">
+            {['AND', 'OR', 'EITHER'].map((j) => <button key={j} className={f.join === j ? 'on' : ''} onClick={() => upd({ join: j })}>{j}</button>)}
+          </div>
+        )}
+      </div>
+      <div className="rb-sec rb-grid2">
+        <label className="fld">Lookback window<select value={f.lookback} onChange={(e) => upd({ lookback: e.target.value })}><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option></select></label>
+        <label className="rb-check" style={{ alignSelf: 'end', marginBottom: 9 }}><Check on={f.excludeLatest} onClick={() => upd({ excludeLatest: !f.excludeLatest })} /> Exclude latest day</label>
+      </div>
+      <div className="rb-grid2">
+        <label className="fld">Min clicks gate (optional)<input type="number" value={f.minClicks} placeholder="e.g. 15" onChange={(e) => upd({ minClicks: e.target.value })} /></label>
+        <label className="fld">Min spend gate (optional)<input type="number" value={f.minSpend} placeholder="e.g. 20" onChange={(e) => upd({ minSpend: e.target.value })} /></label>
+      </div>
+      <div className="rb-sec">
+        <div className="cm-head" style={{ padding: '0 0 8px' }}>THEN — action</div>
+        <div className="rb-grid2">
+          <label className="fld">Action<select value={f.action} onChange={(e) => upd({ action: e.target.value })}>{RB_ACTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+          {needsVal && <label className="fld">Value<input type="number" autoFocus value={f.actionValue} onChange={(e) => upd({ actionValue: e.target.value })} /></label>}
+        </div>
+      </div>
+      <label className="fld" style={{ marginTop: 12 }}>Run frequency<select value={f.frequency} onChange={(e) => upd({ frequency: e.target.value })}>{RB_FREQ.map((fr) => <option key={fr}>{fr}</option>)}</select></label>
+    </Modal>
+  )
+}
+
 /* ============================ RULE MANAGER ============================ */
 function Rules() {
-  const [rules, setRules] = useState(RULES)
+  const [rules, setRules] = useState(() => [...createdStore.get('rules'), ...RULES])
   const [filter, setFilter] = useState('All')
+  const [builder, setBuilder] = useState(false)
+  const onSave = (rule) => { const next = [rule, ...createdStore.get('rules')]; createdStore.set('rules', next); setRules((rs) => [rule, ...rs]); setBuilder(false); toast(`Rule “${rule.name}” created`) }
   const toggle = (id) => setRules((rs) => rs.map((r) => r.id === id ? { ...r, status: r.status === 'Active' ? 'Paused' : 'Active' } : r))
   const types = ['All', 'Bid', 'Harvest', 'Negative', 'Retail', 'Dayparting', 'Budget']
   const shown = rules.filter((r) => filter === 'All' || r.type === filter)
@@ -2955,7 +3305,7 @@ function Rules() {
   const affected = rules.reduce((s, r) => s + r.affected, 0)
   return (
     <>
-      <AutoHead title="Rule Manager" sub="Rules-based automation for bids, budgets, harvesting, negatives, dayparting & retail signals"><Btn icon="bulb" ghost>Templates</Btn><Btn icon="plus" primary>Create Rule</Btn></AutoHead>
+      <AutoHead title="Rule Manager" sub="Rules-based automation for bids, budgets, harvesting, negatives, dayparting & retail signals"><Btn icon="bulb" ghost>Templates</Btn><Btn icon="plus" primary onClick={() => setBuilder(true)}>Create Rule</Btn></AutoHead>
       <KpiGrid>
         <Kpi label="Active Rules" value={active} />
         <Kpi label="Total Rules" value={rules.length} />
@@ -2982,6 +3332,7 @@ function Rules() {
         ))}
       </Card>
       <div className="footnote">Rules evaluate on a schedule and auto-apply actions. Combine with Campaign AI for hands-off budget, keyword and bid management.</div>
+      {builder && <RuleBuilder onClose={() => setBuilder(false)} onSave={onSave} />}
     </>
   )
 }
