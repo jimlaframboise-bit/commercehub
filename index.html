@@ -213,6 +213,11 @@ table.dt tbody tr:hover { background: var(--surface-2); }
 table.dt tbody tr:last-child { border-bottom: none; }
 .cellname { font-weight: 600; color: var(--text); max-width: 360px; white-space: normal; }
 .cellname small { display:block; color: var(--text-3); font-weight: 500; }
+.celllink { color: var(--brand); font-weight: 600; cursor: pointer; text-decoration: none; }
+.celllink:hover { text-decoration: underline; }
+.drillbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; padding: 9px 14px; background: var(--brand-soft); border: 1px solid var(--border); border-radius: 10px; font-size: 12.5px; }
+.drillbar .celllink { display: inline-flex; align-items: center; gap: 3px; }
+.cm-foot { padding: 6px 10px; font-size: 11px; border-top: 1px solid var(--border); margin-top: 4px; }
 .sticky-l { position: sticky; left: 0; background: var(--surface); z-index: 1; }
 table.dt tbody tr:hover .sticky-l { background: var(--surface-2); }
 thead .sticky-l { z-index: 3; background: var(--surface-2); }
@@ -481,18 +486,24 @@ table.dt tr.grow td.sticky-l { background: var(--brand-soft); }
 const { useState, useMemo, useEffect, useContext, useRef, createContext, Fragment } = React;
 
 /* ---------------- router shim (replaces react-router-dom) ---------------- */
-const RouterCtx = createContext({ path: '/', navigate: () => {} });
+const RouterCtx = createContext({ path: '/', search: '', navigate: () => {} });
+function _parseHash() {
+  const raw = window.location.hash.slice(1) || '/';
+  const qi = raw.indexOf('?');
+  return qi >= 0 ? { path: raw.slice(0, qi), search: raw.slice(qi) } : { path: raw, search: '' };
+}
 function RouterProvider({ children }) {
-  const [path, setPath] = useState(window.location.hash.slice(1) || '/');
+  const [loc, setLoc] = useState(_parseHash);
   useEffect(() => {
-    const h = () => setPath(window.location.hash.slice(1) || '/');
+    const h = () => setLoc(_parseHash());
     window.addEventListener('hashchange', h);
     return () => window.removeEventListener('hashchange', h);
   }, []);
   const navigate = (to) => { window.location.hash = to; };
-  return <RouterCtx.Provider value={{ path, navigate }}>{children}</RouterCtx.Provider>;
+  return <RouterCtx.Provider value={{ path: loc.path, search: loc.search, navigate }}>{children}</RouterCtx.Provider>;
 }
-const useLocation = () => ({ pathname: useContext(RouterCtx).path });
+const useLocation = () => { const c = useContext(RouterCtx); return { pathname: c.path, search: c.search }; };
+const useNavigate = () => useContext(RouterCtx).navigate;
 function Link({ to, children, className, style, ...rest }) {
   const cn = typeof className === 'function' ? className({ isActive: false }) : className;
   return <a href={'#' + to} className={cn} style={style} onClick={(e) => { e.preventDefault(); window.location.hash = to; }} {...rest}>{children}</a>;
@@ -1332,15 +1343,22 @@ function SortCaret({ active, dir }) {
   if (!active) return <Icon name="chevDown" size={11} className="caret" />
   return <Icon name={dir === 'asc' ? 'arrowUp' : 'arrowDown'} size={11} className="caret on" />
 }
-function DeltaChip({ row, ck, rk }) {
-  const d = (hashUnit(String(row[rk]) + ':' + ck) - 0.42) * 0.6 // ~ -0.25 .. +0.35
+function DeltaChip({ row, ck, rk, prevRow }) {
+  let d
+  if (prevRow) {
+    const cur = Number(row[ck]); const prev = Number(prevRow[ck])
+    if (!isFinite(cur) || !isFinite(prev) || prev === 0) return null
+    d = (cur - prev) / Math.abs(prev)
+  } else {
+    d = (hashUnit(String(row[rk]) + ':' + ck) - 0.42) * 0.6 // fallback mock
+  }
   const up = d >= 0
   return <span className={`gdelta ${up ? 'up' : 'down'}`}>{up ? '▲' : '▼'}{Math.abs(d * 100).toFixed(1)}%</span>
 }
 
 function DataGrid({
   id, columns, rows, initialSort,
-  presets, defaultPreset, dimensions, totals, compare,
+  presets, defaultPreset, dimensions, totals, compare, comparePrev,
   selectable, selected, onToggle, onToggleAll, rowKey = 'id',
   pageSizes = [25, 50, 100], empty = 'No data', toolbarLeft,
 }) {
@@ -1415,7 +1433,7 @@ function DataGrid({
   const cell = (c, r) => (
     <td key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l cellname' : ''}`}>
       {c.render ? c.render(r) : r[c.key]}
-      {compareOn && c.delta && <DeltaChip row={r} ck={c.key} rk={rowKey} />}
+      {compareOn && c.delta && <DeltaChip row={r} ck={c.key} rk={rowKey} prevRow={comparePrev ? comparePrev[r[rowKey]] : null} />}
     </td>
   )
   const dimLabel = grouped ? (dimensions.find((d) => d.key === groupKey)?.label || groupKey) : null
@@ -1853,6 +1871,105 @@ const createdStore = {
   add(kind, item) { const arr = createdStore.get(kind); arr.unshift(item); createdStore.set(kind, arr); return arr },
 }
 
+/* ============================================================================
+   Phase 5 — persistent inline/bulk edit overrides (survive reload).
+   `chedits:<id>` holds { rowId: { field: value, ... } }.
+   ========================================================================== */
+const editStore = {
+  get(id) { try { return JSON.parse(localStorage.getItem('chedits:' + id)) || {} } catch (e) { return {} } },
+  set(id, v) { try { localStorage.setItem('chedits:' + id, JSON.stringify(v)) } catch (e) { /* ignore */ } },
+}
+function usePersistentOverrides(id) {
+  const [overrides, setOverrides] = useState(() => editStore.get(id))
+  useEffect(() => { if (id) editStore.set(id, overrides) }, [id, overrides])
+  return [overrides, setOverrides]
+}
+
+/* ============================================================================
+   Phase 5 — CSV / Excel export. Field schema = [{ key, label }] (the same
+   *_FIELDS arrays the FilterBar uses). Exports the rows passed in (already
+   filtered) as scalar values — no React render involved.
+   ========================================================================== */
+function _download(filename, text, mime) {
+  const blob = new Blob([text], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+function _cell(row, f) {
+  const v = f.csv ? f.csv(row) : row[f.key]
+  return (v == null || (typeof v === 'number' && isNaN(v))) ? '' : v
+}
+function exportCSV(filename, fields, rows) {
+  const esc = (v) => { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s }
+  const header = fields.map((f) => esc(f.label)).join(',')
+  const body = rows.map((r) => fields.map((f) => esc(_cell(r, f))).join(',')).join('\r\n')
+  _download(filename, '﻿' + header + '\r\n' + body, 'text/csv;charset=utf-8;')
+}
+function exportXLS(filename, fields, rows) {
+  const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const isNum = (v) => v !== '' && v != null && !isNaN(Number(v))
+  const head = '<tr>' + fields.map((f) => `<th style="background:#1a4fd6;color:#fff;font-weight:700;border:1px solid #c9d2e3;padding:4px 8px;text-align:left">${esc(f.label)}</th>`).join('') + '</tr>'
+  const body = rows.map((r) => '<tr>' + fields.map((f) => { const v = _cell(r, f); return `<td style="border:1px solid #dfe4ee;padding:3px 8px"${isNum(v) ? ' x:num' : ''}>${esc(v)}</td>` }).join('') + '</tr>').join('')
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Export</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table cellspacing="0">${head}${body}</table></body></html>`
+  _download(filename, html, 'application/vnd.ms-excel;charset=utf-8;')
+}
+function ExportMenu({ name = 'export', fields, rows }) {
+  const stamp = new Date().toISOString().slice(0, 10)
+  const fn = (ext) => `${name}-${stamp}.${ext}`
+  const done = (n, ext) => toast(`Exported ${n} row${n === 1 ? '' : 's'} to ${ext.toUpperCase()}`)
+  return (
+    <Popover align="right" width={170} trigger={<Btn icon="download">Export</Btn>}>
+      {(close) => (
+        <div className="colmenu"><div className="cm-list">
+          <div className="cm-opt" onClick={() => { exportCSV(fn('csv'), fields, rows); done(rows.length, 'csv'); close() }}>CSV (.csv)</div>
+          <div className="cm-opt" onClick={() => { exportXLS(fn('xls'), fields, rows); done(rows.length, 'xls'); close() }}>Excel (.xls)</div>
+          <div className="cm-foot muted">{rows.length.toLocaleString()} rows · current filter</div>
+        </div></div>
+      )}
+    </Popover>
+  )
+}
+
+/* ============================================================================
+   Phase 5 — real date-range scaling + period-compare.
+   Mock metrics represent a ~30-day baseline. scaleForRange() produces the
+   current-period rows for the selected range plus a deterministic prior-period
+   map so the grid/KPIs can show genuine vs-prev deltas.
+   ========================================================================== */
+const RANGE_DAYS = { 'Today': 1, 'Yesterday': 1, 'Last 7 days': 7, 'Last 30 days': 30, 'This month': 23, 'Last month': 30, 'Custom…': 30 }
+function rangeDays(label) { return RANGE_DAYS[label] != null ? RANGE_DAYS[label] : 30 }
+const periodFactor = (k) => 0.85 + hashUnit(k) * 0.30 // 0.85 .. 1.15
+function scaleRow(row, days, periodKey, idKey = 'id') {
+  const f = days / 30
+  const id = String(row[idKey])
+  const demand = periodFactor(id + '|d|' + periodKey) // moves sales/orders/units
+  const cost = periodFactor(id + '|c|' + periodKey)   // moves spend/impr/clicks
+  const impr = Math.round((row.impr || 0) * f * cost)
+  const clk = Math.round((row.clk || 0) * f * cost)
+  const spend = (row.spend || 0) * f * cost
+  const orders = Math.round((row.orders || 0) * f * demand)
+  const sales = (row.sales || 0) * f * demand
+  const units = Math.round((row.units || 0) * f * demand)
+  const ntb = Math.round((row.ntb || 0) * f * demand)
+  return {
+    ...row, impr, clk, spend, orders, sales, units, ntb,
+    ctr: impr ? (clk / impr) * 100 : 0, cpc: clk ? spend / clk : 0,
+    acos: sales ? (spend / sales) * 100 : 0, roas: spend ? sales / spend : 0,
+    cvr: clk ? (orders / clk) * 100 : 0, cpa: orders ? spend / orders : 0,
+    aov: orders ? sales / orders : 0,
+  }
+}
+function scaleForRange(rows, range, idKey = 'id') {
+  const days = rangeDays(range)
+  const cur = rows.map((r) => scaleRow(r, days, range, idKey))
+  const prev = {}
+  rows.forEach((r) => { prev[r[idKey]] = scaleRow(r, days, range + ':prev', idKey) })
+  return { rows: cur, prev, days }
+}
+
 
 /* ===================== src/state.jsx ===================== */
 
@@ -1939,7 +2056,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.4.0</span>
+        <span className="app-version" title="CommerceHub build">v0.5.0</span>
       </div>
     </aside>
   )
@@ -2527,29 +2644,31 @@ function CreateCampaignWizard({ products, profileId, currency = '$', onClose, on
   )
 }
 
-function KpiRow({ rows }) {
+function KpiRow({ rows, prev }) {
   const a = aggregate(rows)
+  const p = prev && prev.length ? aggregate(prev) : null
+  const dl = (cur, prv) => (p && prv ? ((cur - prv) / Math.abs(prv)) * 100 : undefined)
   return (
     <KpiGrid>
-      <Kpi label="Impressions" value={compact(a.impr)} delta={6.7} />
-      <Kpi label="Clicks" value={compact(a.clk)} delta={4.1} />
-      <Kpi label="CTR" value={pct(a.ctr, 2)} delta={1.2} />
-      <Kpi label="Spend" value={money(a.spend)} delta={8.2} deltaGood={false} />
-      <Kpi label="Sales" value={money(a.sales)} delta={12.6} />
-      <Kpi label="ACoS" value={pct(a.acos)} delta={-3.1} deltaGood />
-      <Kpi label="ROAS" value={dec2(a.roas)} delta={4.4} />
-      <Kpi label="Orders" value={compact(a.orders)} delta={9.1} />
+      <Kpi label="Impressions" value={compact(a.impr)} delta={dl(a.impr, p?.impr)} />
+      <Kpi label="Clicks" value={compact(a.clk)} delta={dl(a.clk, p?.clk)} />
+      <Kpi label="CTR" value={pct(a.ctr, 2)} delta={dl(a.ctr, p?.ctr)} />
+      <Kpi label="Spend" value={money(a.spend)} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
+      <Kpi label="Sales" value={money(a.sales)} delta={dl(a.sales, p?.sales)} />
+      <Kpi label="ACoS" value={pct(a.acos)} delta={dl(a.acos, p?.acos)} deltaGood={(dl(a.acos, p?.acos) || 0) <= 0} />
+      <Kpi label="ROAS" value={dec2(a.roas)} delta={dl(a.roas, p?.roas)} />
+      <Kpi label="Orders" value={compact(a.orders)} delta={dl(a.orders, p?.orders)} />
     </KpiGrid>
   )
 }
 
 /* ============================ CAMPAIGNS ============================ */
 function Campaigns() {
-  const { profileId } = useApp()
+  const { profileId, range } = useApp()
   const [created, setCreated] = useState(() => createdStore.get('campaigns'))
   const allCampaigns = useMemo(() => [...created, ...ALL_CAMPAIGNS], [created])
   const base = useProfileFilter(allCampaigns)
-  const [overrides, setOverrides] = useState({})
+  const [overrides, setOverrides] = usePersistentOverrides('ads-campaigns')
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ads-campaigns'))
   const [sel, setSel] = useState(new Set())
@@ -2558,9 +2677,11 @@ function Campaigns() {
   const [wizard, setWizard] = useState(false)
   const onLaunch = (camps) => { const next = [...camps, ...created]; createdStore.set('campaigns', next); setCreated(next); setWizard(false); toast(`Launched ${camps.length} campaign${camps.length === 1 ? '' : 's'} — added to the grid`) }
 
-  const data = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
+  const withEdits = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
+  const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, range), [withEdits, range])
   const searched = data.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, CAMPAIGN_FIELDS)
+  const prevFiltered = filtered.map((r) => prev[r.id])
 
   const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
   const mergeMany = (ids, fn) => setOverrides((o) => { const n = { ...o }; ids.forEach((id) => { n[id] = { ...n[id], ...fn(id) } }); return n })
@@ -2578,8 +2699,8 @@ function Campaigns() {
   const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
 
   const columns = [
-    { key: 'name', label: 'Campaign', sticky: true, width: 320, render: (r) => (
-      <div><div>{r.name}{r.tag && <span className="tag" style={{ marginLeft: 6 }}>{r.tag}</span>}</div><small>{r.profileId.toUpperCase()} · {r.product?.split('—')[0]}</small></div>) },
+    { key: 'name', label: 'Campaign', sticky: true, width: 320, sortVal: (r) => r.name, render: (r) => (
+      <div><div><Link className="celllink" to={`/ads/adgroups?camp=${r.id}`} title="Drill into ad groups">{r.name}</Link>{r.tag && <span className="tag" style={{ marginLeft: 6 }}>{r.tag}</span>}</div><small>{r.profileId.toUpperCase()} · {r.product?.split('—')[0]}</small></div>) },
     { key: 'state', label: 'State', render: (r) => <StateSelect value={r.state} onChange={(st) => setState(r.id, st)} /> },
     { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
     { key: 'campaignType', label: 'Type', render: (r) => <span className={`pill ${typeTone(r.campaignType)}`} style={{ borderRadius: 5 }}>{r.campaignType}</span> },
@@ -2614,11 +2735,11 @@ function Campaigns() {
 
   return (
     <>
-      <AdsHead title="Campaigns" sub={`${filtered.length} campaigns · Sponsored Products, Brands & Display`}>
-        <Btn icon="download">Export</Btn>
+      <AdsHead title="Campaigns" sub={`${filtered.length} campaigns · ${range} · Sponsored Products, Brands & Display`}>
+        <ExportMenu name="campaigns" fields={CAMPAIGN_FIELDS} rows={filtered} />
         <Btn icon="plus" primary onClick={() => setWizard(true)}>Create Campaign</Btn>
       </AdsHead>
-      <KpiRow rows={filtered} />
+      <KpiRow rows={filtered} prev={prevFiltered} />
 
       {sel.size > 0 && (
         <div className="bulkbar">
@@ -2650,6 +2771,7 @@ function Campaigns() {
         dimensions={dims}
         totals
         compare
+        comparePrev={prev}
         selectable
         selected={sel}
         onToggle={toggleSel}
@@ -2665,15 +2787,42 @@ function Campaigns() {
 }
 
 /* ============================ AD GROUPS ============================ */
+const agHash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) } return ((h >>> 0) % 1000) / 1000 }
+const AG_NAMES = ['Branded', 'Category', 'Competitor', 'Auto Catch-All', 'Top ASINs', 'Generic']
+// Split a campaign's metrics across its ad groups (deterministic weights). Used by drill-down.
+function adGroupsForCampaign(c) {
+  const n = Math.max(1, c.adGroups?.total || 1)
+  const w = Array.from({ length: n }, (_, i) => 0.6 + agHash(c.id + ':agw' + i))
+  const sumW = w.reduce((a, b) => a + b, 0)
+  return w.map((wi, i) => {
+    const f = wi / sumW
+    const impr = Math.round((c.impr || 0) * f), clk = Math.round((c.clk || 0) * f)
+    const spend = (c.spend || 0) * f, sales = (c.sales || 0) * f, orders = Math.round((c.orders || 0) * f)
+    return {
+      id: c.id + '-ag' + (i + 1), name: c.name.split('-').slice(0, 2).join('-') + ' · ' + AG_NAMES[i % AG_NAMES.length],
+      campaign: c.name, campaignId: c.id, profileId: c.profileId, state: i === 0 ? c.state : (agHash(c.id + 's' + i) > 0.25 ? 'Enabled' : 'Paused'),
+      defaultBid: c.actlBid, targets: 3 + Math.round(agHash(c.id + 'tg' + i) * 9),
+      impr, clk, spend, sales, orders,
+      ctr: impr ? (clk / impr) * 100 : 0, acos: sales ? (spend / sales) * 100 : 0, roas: spend ? sales / spend : 0,
+    }
+  })
+}
 function AdGroups() {
+  const { range } = useApp()
+  const loc = useLocation()
+  const campId = new URLSearchParams(loc.search || '').get('camp')
+  const allCamps = useMemo(() => [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS], [])
+  const drillCamp = campId ? allCamps.find((c) => c.id === campId) : null
   const base = useProfileFilter(ALL_CAMPAIGNS)
-  const rows = base.slice(0, 30).map((c, i) => ({
+  const rawRows = drillCamp ? adGroupsForCampaign(drillCamp) : base.slice(0, 30).map((c, i) => ({
     id: c.id + '-ag', name: c.name.split('-').slice(0, 2).join('-') + ' · Ad Group ' + (1 + (i % 3)),
-    campaign: c.name, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
+    campaign: c.name, campaignId: c.id, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
     targets: 4 + (i % 9), impr: c.impr, clk: c.clk, spend: c.spend, sales: c.sales, orders: c.orders, acos: c.acos, roas: c.roas, ctr: c.ctr,
   }))
+  const { rows, prev } = useMemo(() => scaleForRange(rawRows, range), [rawRows, range])
   const [filters, setFilters] = useState(() => loadFilterModel('ads-adgroups'))
   const filtered = applyFilters(rows, filters, ADGROUP_FIELDS)
+  const prevFiltered = filtered.map((r) => prev[r.id])
   const columns = [
     { key: 'name', label: 'Ad Group', sticky: true, width: 300, render: (r) => <div>{r.name}<small>{r.campaign}</small></div> },
     { key: 'state', label: 'State', render: (r) => <Pill>{r.state === 'Enabled' ? 'Enabled' : 'Paused'}</Pill> },
@@ -2690,8 +2839,17 @@ function AdGroups() {
   ]
   return (
     <>
-      <AdsHead title="Ad Groups" sub={`${filtered.length} ad groups`}><Btn icon="download">Export</Btn><Btn icon="plus" primary>New Ad Group</Btn></AdsHead>
-      <KpiRow rows={filtered} />
+      <AdsHead title="Ad Groups" sub={drillCamp ? `${filtered.length} ad groups in this campaign` : `${filtered.length} ad groups · ${range}`}>
+        <ExportMenu name="ad-groups" fields={ADGROUP_FIELDS} rows={filtered} /><Btn icon="plus" primary>New Ad Group</Btn>
+      </AdsHead>
+      {drillCamp && (
+        <div className="drillbar">
+          <Link className="celllink" to="/ads/campaigns"><Icon name="chevDown" size={13} style={{ transform: 'rotate(90deg)' }} /> Back to Campaigns</Link>
+          <span className="muted">Ad groups for</span><b>{drillCamp.name}</b>
+          <span className={`pill ${typeTone(drillCamp.campaignType)}`} style={{ borderRadius: 5 }}>{drillCamp.campaignType}</span>
+        </div>
+      )}
+      <KpiRow rows={filtered} prev={prevFiltered} />
       <DataGrid
         id="ads-adgroups"
         columns={columns}
@@ -2707,13 +2865,15 @@ function AdGroups() {
 
 /* ============================ TARGETING (Keywords) ============================ */
 function Targeting() {
+  const { range } = useApp()
   const base = useProfileFilter(keywords)
   const [tab, setTab] = useState('Keywords')
   const [sel, setSel] = useState(new Set())
-  const [overrides, setOverrides] = useState({})
+  const [overrides, setOverrides] = usePersistentOverrides('ads-targeting')
   const [modal, setModal] = useState(null) // 'set' | 'inc' | 'dec'
   const [filters, setFilters] = useState(() => loadFilterModel('ads-targeting'))
-  const data = base.map((k) => (overrides[k.id] ? { ...k, ...overrides[k.id] } : k))
+  const withEdits = base.map((k) => (overrides[k.id] ? { ...k, ...overrides[k.id] } : k))
+  const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, range), [withEdits, range])
   const filtered = applyFilters(data, filters, TARGETING_FIELDS)
   const byId = Object.fromEntries(data.map((k) => [k.id, k]))
   const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
@@ -2741,7 +2901,7 @@ function Targeting() {
   ]
   return (
     <>
-      <AdsHead title="Targeting" sub="Keywords & product targets with bid management"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Add Keywords</Btn></AdsHead>
+      <AdsHead title="Targeting" sub={`Keywords & product targets · ${range}`}><ExportMenu name="targeting" fields={TARGETING_FIELDS} rows={filtered} /><Btn icon="plus" primary>Add Keywords</Btn></AdsHead>
       <div className="viewtabs" style={{ maxWidth: 360 }}>
         {['Keywords', 'Product Targets', 'Negatives'].map((t) => <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</div>)}
       </div>
@@ -2765,6 +2925,7 @@ function Targeting() {
         dimensions={[{ key: 'matchType', label: 'Match Type' }, { key: 'state', label: 'State' }]}
         totals
         compare
+        comparePrev={prev}
         selectable
         selected={sel}
         onToggle={toggleSel}
@@ -2778,7 +2939,9 @@ function Targeting() {
 
 /* ============================ SEARCH TERMS (harvesting) ============================ */
 function SearchTerms() {
-  const base = useProfileFilter(searchTerms)
+  const { range } = useApp()
+  const baseRaw = useProfileFilter(searchTerms)
+  const base = useMemo(() => scaleForRange(baseRaw, range).rows, [baseRaw, range])
   const [filter, setFilter] = useState('All')
   const [harvested, setHarvested] = useState(new Set())
   const [filters, setFilters] = useState(() => loadFilterModel('ads-searchterms'))
@@ -2802,7 +2965,7 @@ function SearchTerms() {
   ]
   return (
     <>
-      <AdsHead title="Search Terms" sub="Auto-harvest winners into manual campaigns · negate wasted spend"><Btn icon="download">Export</Btn><Btn icon="sliders" primary>Harvesting Rules</Btn></AdsHead>
+      <AdsHead title="Search Terms" sub="Auto-harvest winners into manual campaigns · negate wasted spend"><ExportMenu name="search-terms" fields={SEARCHTERM_FIELDS} rows={filtered} /><Btn icon="sliders" primary>Harvesting Rules</Btn></AdsHead>
       <div className="hint" style={{ marginBottom: 14 }}>
         <Icon name="bulb" size={16} />
         <div><b>{counts.harvest} terms</b> qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%) and <b>{counts.negate} terms</b> are flagged to negate. Rule R3 runs nightly to auto-apply.</div>
@@ -2844,7 +3007,7 @@ function ShareOfVoice() {
   const avgOrg = filtered.reduce((s, r) => s + r.organicShare, 0) / n
   return (
     <>
-      <AdsHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Track Keyword</Btn></AdsHead>
+      <AdsHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><ExportMenu name="share-of-voice" fields={SOV_FIELDS} rows={filtered} /><Btn icon="plus" primary>Track Keyword</Btn></AdsHead>
       <KpiGrid>
         <Kpi label="Avg Paid SOV" value={pct(avgPaid)} delta={3.2} />
         <Kpi label="Avg Organic SOV" value={pct(avgOrg)} delta={-1.1} deltaGood={false} />
