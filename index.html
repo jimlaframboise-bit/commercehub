@@ -100,7 +100,11 @@ button { font-family: inherit; cursor: pointer; }
 .module-pill.active { background: var(--brand); color: #fff; }
 .module-pill .ico { width: 17px; height: 17px; flex: 0 0 auto; }
 
-.nav-section { padding: 8px 12px; overflow-y: auto; flex: 1; }
+.nav-section { padding: 8px 12px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.16) transparent; }
+.nav-section::-webkit-scrollbar { width: 8px; }
+.nav-section::-webkit-scrollbar-track { background: transparent; }
+.nav-section::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+.nav-section::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.26); background-clip: padding-box; }
 .nav-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #6b7a96; padding: 12px 10px 6px; }
 .nav-item {
   display: flex; align-items: center; gap: 10px;
@@ -2083,7 +2087,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.5.1</span>
+        <span className="app-version" title="CommerceHub build">v0.5.2</span>
       </div>
     </aside>
   )
