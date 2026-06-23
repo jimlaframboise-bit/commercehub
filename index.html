@@ -1939,8 +1939,31 @@ function ExportMenu({ name = 'export', fields, rows }) {
    current-period rows for the selected range plus a deterministic prior-period
    map so the grid/KPIs can show genuine vs-prev deltas.
    ========================================================================== */
-const RANGE_DAYS = { 'Today': 1, 'Yesterday': 1, 'Last 7 days': 7, 'Last 30 days': 30, 'This month': 23, 'Last month': 30, 'Custom…': 30 }
+const RANGE_DAYS = { 'Today': 1, 'Yesterday': 1, 'Last 7 days': 7, 'Last 30 days': 30, 'This month': 30, 'Last month': 30, 'Custom…': 30 }
 function rangeDays(label) { return RANGE_DAYS[label] != null ? RANGE_DAYS[label] : 30 }
+
+// Resolve a range label (+ optional custom {start,end}) into { label, days, key }.
+// "This month"/"Last month" use the real calendar; "Custom…" uses the picked dates.
+function resolveRange(label, custom) {
+  const now = new Date()
+  const dayMs = 86400000
+  const atMidnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  if (label === 'Custom…' && custom && custom.start && custom.end) {
+    const s = new Date(custom.start + 'T00:00:00'), e = new Date(custom.end + 'T00:00:00')
+    if (!isNaN(s) && !isNaN(e)) {
+      const lo = s <= e ? s : e, hi = s <= e ? e : s
+      const days = Math.max(1, Math.round((atMidnight(hi) - atMidnight(lo)) / dayMs) + 1)
+      return { label: `${fmt(lo)} – ${fmt(hi)}`, days, key: `custom:${custom.start}_${custom.end}` }
+    }
+  }
+  if (label === 'This month') return { label, days: now.getDate(), key: `month:${now.getFullYear()}-${now.getMonth()}` }
+  if (label === 'Last month') {
+    const lastDayPrev = new Date(now.getFullYear(), now.getMonth(), 0)
+    return { label, days: lastDayPrev.getDate(), key: `month:${lastDayPrev.getFullYear()}-${lastDayPrev.getMonth()}` }
+  }
+  return { label, days: rangeDays(label), key: label }
+}
 const periodFactor = (k) => 0.85 + hashUnit(k) * 0.30 // 0.85 .. 1.15
 function scaleRow(row, days, periodKey, idKey = 'id') {
   const f = days / 30
@@ -1962,11 +1985,13 @@ function scaleRow(row, days, periodKey, idKey = 'id') {
     aov: orders ? sales / orders : 0,
   }
 }
+// `range` may be a label string OR a resolved object { label, days, key }.
 function scaleForRange(rows, range, idKey = 'id') {
-  const days = rangeDays(range)
-  const cur = rows.map((r) => scaleRow(r, days, range, idKey))
+  const days = typeof range === 'object' ? range.days : rangeDays(range)
+  const key = typeof range === 'object' ? range.key : range
+  const cur = rows.map((r) => scaleRow(r, days, key, idKey))
   const prev = {}
-  rows.forEach((r) => { prev[r[idKey]] = scaleRow(r, days, range + ':prev', idKey) })
+  rows.forEach((r) => { prev[r[idKey]] = scaleRow(r, days, key + ':prev', idKey) })
   return { rows: cur, prev, days }
 }
 
@@ -1977,7 +2002,9 @@ const Ctx = createContext(null)
 function AppProvider({ children }) {
   const [profileId, setProfileId] = useState('all')
   const [range, setRange] = useState('Last 30 days')
-  const value = { profileId, setProfileId, range, setRange, profiles }
+  const [customRange, setCustomRange] = useState(null) // { start:'YYYY-MM-DD', end:'YYYY-MM-DD' }
+  const rangeResolved = useMemo(() => resolveRange(range, customRange), [range, customRange])
+  const value = { profileId, setProfileId, range, setRange, customRange, setCustomRange, rangeResolved, profiles }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 const useApp = () => useContext(Ctx)
@@ -2056,7 +2083,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.5.0</span>
+        <span className="app-version" title="CommerceHub build">v0.5.1</span>
       </div>
     </aside>
   )
@@ -2073,11 +2100,29 @@ const CRUMBS = {
   '/settings': 'Settings',
 }
 
+function todayISO() { return new Date().toISOString().slice(0, 10) }
+function CustomRangePanel({ initial, onApply, onClose }) {
+  const [start, setStart] = useState(initial?.start || (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10) })())
+  const [end, setEnd] = useState(initial?.end || todayISO())
+  const valid = start && end
+  return (
+    <div style={{ padding: 4 }}>
+      <div className="cm-head" style={{ padding: '2px 6px 8px' }}>Custom date range</div>
+      <label className="fld" style={{ marginBottom: 8 }}>Start<input type="date" value={start} max={end || todayISO()} onChange={(e) => setStart(e.target.value)} /></label>
+      <label className="fld" style={{ marginBottom: 10 }}>End<input type="date" value={end} min={start} max={todayISO()} onChange={(e) => setEnd(e.target.value)} /></label>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button className="btn ghost sm" onClick={onClose}>Cancel</button>
+        <button className="btn primary sm" disabled={!valid} onClick={() => onApply({ start, end })}>Apply</button>
+      </div>
+    </div>
+  )
+}
 function Topbar() {
-  const { profileId, setProfileId, profiles, range, setRange } = useApp()
+  const { profileId, setProfileId, profiles, range, setRange, customRange, setCustomRange, rangeResolved } = useApp()
   const loc = useLocation()
   const [pOpen, setPOpen] = useState(false)
   const [rOpen, setROpen] = useState(false)
+  const [customOpen, setCustomOpen] = useState(false)
   const unread = alerts.filter((a) => !a.read).length
   const crumb = CRUMBS[loc.pathname] || ''
   const [main, sub] = crumb.includes('·') ? crumb.split('·').map((s) => s.trim()) : [crumb, null]
@@ -2107,12 +2152,24 @@ function Topbar() {
       </div>
 
       <div style={{ position: 'relative' }}>
-        <button className="topbar-ctrl" onClick={() => { setROpen(!rOpen); setPOpen(false) }}>
-          <Icon name="calendar" size={15} />{range}<Icon name="chevDown" size={13} />
+        <button className="topbar-ctrl" onClick={() => { setROpen(!rOpen); setCustomOpen(false); setPOpen(false) }}>
+          <Icon name="calendar" size={15} />{rangeResolved.label}<Icon name="chevDown" size={13} />
         </button>
         {rOpen && (
           <Dropdown onClose={() => setROpen(false)}>
-            {ranges.map((r) => <DItem key={r} active={range === r} onClick={() => { setRange(r); setROpen(false) }}>{r}</DItem>)}
+            {ranges.map((r) => <DItem key={r} active={range === r} onClick={() => {
+              if (r === 'Custom…') { setROpen(false); setCustomOpen(true) }
+              else { setRange(r); setROpen(false) }
+            }}>{r}</DItem>)}
+          </Dropdown>
+        )}
+        {customOpen && (
+          <Dropdown onClose={() => setCustomOpen(false)}>
+            <CustomRangePanel
+              initial={customRange}
+              onClose={() => setCustomOpen(false)}
+              onApply={({ start, end }) => { setCustomRange({ start, end }); setRange('Custom…'); setCustomOpen(false) }}
+            />
           </Dropdown>
         )}
       </div>
@@ -2664,7 +2721,7 @@ function KpiRow({ rows, prev }) {
 
 /* ============================ CAMPAIGNS ============================ */
 function Campaigns() {
-  const { profileId, range } = useApp()
+  const { profileId, rangeResolved } = useApp()
   const [created, setCreated] = useState(() => createdStore.get('campaigns'))
   const allCampaigns = useMemo(() => [...created, ...ALL_CAMPAIGNS], [created])
   const base = useProfileFilter(allCampaigns)
@@ -2678,7 +2735,7 @@ function Campaigns() {
   const onLaunch = (camps) => { const next = [...camps, ...created]; createdStore.set('campaigns', next); setCreated(next); setWizard(false); toast(`Launched ${camps.length} campaign${camps.length === 1 ? '' : 's'} — added to the grid`) }
 
   const withEdits = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
-  const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, range), [withEdits, range])
+  const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, rangeResolved), [withEdits, rangeResolved])
   const searched = data.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, CAMPAIGN_FIELDS)
   const prevFiltered = filtered.map((r) => prev[r.id])
@@ -2735,7 +2792,7 @@ function Campaigns() {
 
   return (
     <>
-      <AdsHead title="Campaigns" sub={`${filtered.length} campaigns · ${range} · Sponsored Products, Brands & Display`}>
+      <AdsHead title="Campaigns" sub={`${filtered.length} campaigns · ${rangeResolved.label} · Sponsored Products, Brands & Display`}>
         <ExportMenu name="campaigns" fields={CAMPAIGN_FIELDS} rows={filtered} />
         <Btn icon="plus" primary onClick={() => setWizard(true)}>Create Campaign</Btn>
       </AdsHead>
@@ -2808,7 +2865,7 @@ function adGroupsForCampaign(c) {
   })
 }
 function AdGroups() {
-  const { range } = useApp()
+  const { rangeResolved } = useApp()
   const loc = useLocation()
   const campId = new URLSearchParams(loc.search || '').get('camp')
   const allCamps = useMemo(() => [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS], [])
@@ -2819,7 +2876,7 @@ function AdGroups() {
     campaign: c.name, campaignId: c.id, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
     targets: 4 + (i % 9), impr: c.impr, clk: c.clk, spend: c.spend, sales: c.sales, orders: c.orders, acos: c.acos, roas: c.roas, ctr: c.ctr,
   }))
-  const { rows, prev } = useMemo(() => scaleForRange(rawRows, range), [rawRows, range])
+  const { rows, prev } = useMemo(() => scaleForRange(rawRows, rangeResolved), [rawRows, rangeResolved])
   const [filters, setFilters] = useState(() => loadFilterModel('ads-adgroups'))
   const filtered = applyFilters(rows, filters, ADGROUP_FIELDS)
   const prevFiltered = filtered.map((r) => prev[r.id])
@@ -2839,7 +2896,7 @@ function AdGroups() {
   ]
   return (
     <>
-      <AdsHead title="Ad Groups" sub={drillCamp ? `${filtered.length} ad groups in this campaign` : `${filtered.length} ad groups · ${range}`}>
+      <AdsHead title="Ad Groups" sub={drillCamp ? `${filtered.length} ad groups in this campaign` : `${filtered.length} ad groups · ${rangeResolved.label}`}>
         <ExportMenu name="ad-groups" fields={ADGROUP_FIELDS} rows={filtered} /><Btn icon="plus" primary>New Ad Group</Btn>
       </AdsHead>
       {drillCamp && (
@@ -2865,7 +2922,7 @@ function AdGroups() {
 
 /* ============================ TARGETING (Keywords) ============================ */
 function Targeting() {
-  const { range } = useApp()
+  const { rangeResolved } = useApp()
   const base = useProfileFilter(keywords)
   const [tab, setTab] = useState('Keywords')
   const [sel, setSel] = useState(new Set())
@@ -2873,7 +2930,7 @@ function Targeting() {
   const [modal, setModal] = useState(null) // 'set' | 'inc' | 'dec'
   const [filters, setFilters] = useState(() => loadFilterModel('ads-targeting'))
   const withEdits = base.map((k) => (overrides[k.id] ? { ...k, ...overrides[k.id] } : k))
-  const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, range), [withEdits, range])
+  const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, rangeResolved), [withEdits, rangeResolved])
   const filtered = applyFilters(data, filters, TARGETING_FIELDS)
   const byId = Object.fromEntries(data.map((k) => [k.id, k]))
   const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
@@ -2901,7 +2958,7 @@ function Targeting() {
   ]
   return (
     <>
-      <AdsHead title="Targeting" sub={`Keywords & product targets · ${range}`}><ExportMenu name="targeting" fields={TARGETING_FIELDS} rows={filtered} /><Btn icon="plus" primary>Add Keywords</Btn></AdsHead>
+      <AdsHead title="Targeting" sub={`Keywords & product targets · ${rangeResolved.label}`}><ExportMenu name="targeting" fields={TARGETING_FIELDS} rows={filtered} /><Btn icon="plus" primary>Add Keywords</Btn></AdsHead>
       <div className="viewtabs" style={{ maxWidth: 360 }}>
         {['Keywords', 'Product Targets', 'Negatives'].map((t) => <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</div>)}
       </div>
@@ -2939,9 +2996,9 @@ function Targeting() {
 
 /* ============================ SEARCH TERMS (harvesting) ============================ */
 function SearchTerms() {
-  const { range } = useApp()
+  const { rangeResolved } = useApp()
   const baseRaw = useProfileFilter(searchTerms)
-  const base = useMemo(() => scaleForRange(baseRaw, range).rows, [baseRaw, range])
+  const base = useMemo(() => scaleForRange(baseRaw, rangeResolved).rows, [baseRaw, rangeResolved])
   const [filter, setFilter] = useState('All')
   const [harvested, setHarvested] = useState(new Set())
   const [filters, setFilters] = useState(() => loadFilterModel('ads-searchterms'))
