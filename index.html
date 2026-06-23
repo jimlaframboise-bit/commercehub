@@ -1943,7 +1943,7 @@ function ExportMenu({ name = 'export', fields, rows }) {
    current-period rows for the selected range plus a deterministic prior-period
    map so the grid/KPIs can show genuine vs-prev deltas.
    ========================================================================== */
-const RANGE_DAYS = { 'Today': 1, 'Yesterday': 1, 'Last 7 days': 7, 'Last 30 days': 30, 'This month': 30, 'Last month': 30, 'Custom…': 30 }
+const RANGE_DAYS = { 'Today': 1, 'Yesterday': 1, 'Last 7 days': 7, 'Last 30 days': 30, 'This month': 30, 'Last month': 30, 'All time': 365, 'Custom…': 30 }
 function rangeDays(label) { return RANGE_DAYS[label] != null ? RANGE_DAYS[label] : 30 }
 
 // Resolve a range label (+ optional custom {start,end}) into { label, days, key }.
@@ -2087,7 +2087,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.5.2</span>
+        <span className="app-version" title="CommerceHub build">v0.5.3</span>
       </div>
     </aside>
   )
@@ -2131,7 +2131,7 @@ function Topbar() {
   const crumb = CRUMBS[loc.pathname] || ''
   const [main, sub] = crumb.includes('·') ? crumb.split('·').map((s) => s.trim()) : [crumb, null]
   const selProfile = profileId === 'all' ? 'All Profiles' : profiles.find((p) => p.id === profileId)?.market
-  const ranges = ['Today', 'Yesterday', 'Last 7 days', 'Last 30 days', 'This month', 'Last month', 'Custom…']
+  const ranges = ['Today', 'Yesterday', 'Last 7 days', 'Last 30 days', 'This month', 'Last month', 'All time', 'Custom…']
   return (
     <div className="topbar">
       <div className="crumb">
