@@ -1086,6 +1086,9 @@ const P = {
   target: 'M12 12m-9 0a9 9 0 1018 0a9 9 0 10-18 0M12 12m-5 0a5 5 0 1010 0a5 5 0 10-10 0M12 12m-1 0a1 1 0 102 0a1 1 0 10-2 0',
   layers: 'M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  'trend-down': 'M23 18l-9.5-9.5-5 5L1 6M17 18h6v-6',
+  doc: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M9 13h6M9 17h6',
+  budget: 'M21 12V7H5a2 2 0 010-4h14v4M3 5v14a2 2 0 002 2h16v-5M18 12a2 2 0 000 4h4v-4z',
   tag: 'M20.6 13.4L13.4 20.6a2 2 0 01-2.8 0l-7.2-7.2A2 2 0 012.8 12V4.8A2 2 0 014.8 2.8H12a2 2 0 011.4.6l7.2 7.2a2 2 0 010 2.8zM7.5 7.5h.01',
   search: 'M11 11m-7 0a7 7 0 1014 0a7 7 0 10-14 0M21 21l-4.3-4.3',
   bars: 'M12 20V10M18 20V4M6 20v-4',
@@ -1197,58 +1200,7 @@ function Check({ on, onClick }) {
 /* ---------------- DataTable ----------------
    columns: [{ key, label, num?, sticky?, render?(row), width? }]
 */
-function DataTable({ columns, rows, selectable, selected, onToggle, onToggleAll, rowKey = 'id', empty = 'No data' }) {
-  const allOn = selectable && rows.length > 0 && rows.every((r) => selected?.has(r[rowKey]))
-  return (
-    <div className="tablewrap">
-      <table className="dt">
-        <thead>
-          <tr>
-            {selectable && (
-              <th className="sticky-l" style={{ width: 36 }}>
-                <Check on={allOn} onClick={onToggleAll} />
-              </th>
-            )}
-            {columns.map((c) => (
-              <th key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l' : ''}`} style={c.width ? { minWidth: c.width } : undefined}>{c.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 && <tr><td colSpan={columns.length + (selectable ? 1 : 0)} className="empty">{empty}</td></tr>}
-          {rows.map((r) => (
-            <tr key={r[rowKey]}>
-              {selectable && (
-                <td className="sticky-l"><Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} /></td>
-              )}
-              {columns.map((c) => (
-                <td key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l cellname' : ''}`}>
-                  {c.render ? c.render(r) : r[c.key]}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-/* sorting hook for tables */
-function useSort(rows, initial) {
-  const [sort, setSort] = useState(initial || { key: null, dir: 'desc' })
-  const sorted = useMemo(() => {
-    if (!sort.key) return rows
-    const r = [...rows].sort((a, b) => {
-      const x = a[sort.key], y = b[sort.key]
-      if (typeof x === 'number') return sort.dir === 'asc' ? x - y : y - x
-      return sort.dir === 'asc' ? String(x).localeCompare(String(y)) : String(y).localeCompare(String(x))
-    })
-    return r
-  }, [rows, sort])
-  const toggle = (key) => setSort((s) => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }))
-  return { sorted, sort, toggle }
-}
+/* DataTable + useSort were removed in Phase 9 — every page now uses DataGrid. */
 
 /* ---------------- Charts ---------------- */
 const AXIS = { fontSize: 11, fill: '#8a94a6' }
@@ -2060,11 +2012,16 @@ function scaleFields(rows, range, fields, idKey = 'id') {
 
 /* ===================== src/state.jsx ===================== */
 
+// Persist the selected date range across reloads (key: chrange).
+const loadRange = () => { try { return JSON.parse(localStorage.getItem('chrange')) || {} } catch (e) { return {} } }
+
 const Ctx = createContext(null)
 function AppProvider({ children }) {
+  const saved = loadRange()
   const [profileId, setProfileId] = useState('all')
-  const [range, setRange] = useState('Last 30 days')
-  const [customRange, setCustomRange] = useState(null) // { start:'YYYY-MM-DD', end:'YYYY-MM-DD' }
+  const [range, setRange] = useState(saved.range || 'Last 30 days')
+  const [customRange, setCustomRange] = useState(saved.customRange || null) // { start:'YYYY-MM-DD', end:'YYYY-MM-DD' }
+  useEffect(() => { try { localStorage.setItem('chrange', JSON.stringify({ range, customRange })) } catch (e) { /* ignore */ } }, [range, customRange])
   const rangeResolved = useMemo(() => resolveRange(range, customRange), [range, customRange])
   const value = { profileId, setProfileId, range, setRange, customRange, setCustomRange, rangeResolved, profiles }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
@@ -2145,7 +2102,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.8.0</span>
+        <span className="app-version" title="CommerceHub build">v0.8.1</span>
       </div>
     </aside>
   )
@@ -2763,6 +2720,36 @@ function CreateCampaignWizard({ products, profileId, currency = '$', onClose, on
   )
 }
 
+/* ---- Edit a user-created campaign (lightweight; the wizard is for creation) ---- */
+const EC_TYPES = ['SP-Auto', 'SP-Manual', 'PAT', 'SB', 'SBV', 'SD-Product', 'SD-Audience']
+const EC_BIDSTRAT = ['Dynamic - down only', 'Dynamic - up & down', 'Fixed bids']
+function EditCampaignModal({ camp, currency = '$', onClose, onSave }) {
+  const [f, setF] = useState({
+    name: camp.name, dailyBudget: String(camp.dailyBudget ?? ''), state: camp.state || 'Enabled',
+    campaignType: camp.campaignType || 'SP-Auto', bidStrategy: camp.bidStrategy || 'Dynamic - down only',
+  })
+  const upd = (patch) => setF((x) => ({ ...x, ...patch }))
+  const canSave = f.name.trim() && Number(f.dailyBudget) > 0
+  const save = () => onSave({
+    id: camp.id, name: f.name.trim(), dailyBudget: Number(f.dailyBudget),
+    state: f.state, status: f.state, campaignType: f.campaignType, bidStrategy: f.bidStrategy,
+  })
+  return (
+    <Modal width={520} title="Edit Campaign" sub="Update settings for this campaign" onClose={onClose}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><div style={{ flex: 1 }} /><Btn primary disabled={!canSave} icon="check" onClick={save}>Save changes</Btn></>}>
+      <label className="fld">Campaign name<input autoFocus value={f.name} onChange={(e) => upd({ name: e.target.value })} /></label>
+      <div className="rb-grid2">
+        <label className="fld">Daily budget ({currency})<input type="number" value={f.dailyBudget} onChange={(e) => upd({ dailyBudget: e.target.value })} /></label>
+        <label className="fld">State<select value={f.state} onChange={(e) => upd({ state: e.target.value })}>{['Enabled', 'Paused', 'Archived'].map((s) => <option key={s}>{s}</option>)}</select></label>
+      </div>
+      <div className="rb-grid2">
+        <label className="fld">Type<select value={f.campaignType} onChange={(e) => upd({ campaignType: e.target.value })}>{EC_TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
+        <label className="fld">Bid strategy<select value={f.bidStrategy} onChange={(e) => upd({ bidStrategy: e.target.value })}>{EC_BIDSTRAT.map((b) => <option key={b}>{b}</option>)}</select></label>
+      </div>
+    </Modal>
+  )
+}
+
 function KpiRow({ rows, prev }) {
   const a = aggregate(rows)
   const p = prev && prev.length ? aggregate(prev) : null
@@ -2794,7 +2781,20 @@ function Campaigns() {
 
   const [modal, setModal] = useState(null) // 'bid' | 'budget' | 'tag'
   const [wizard, setWizard] = useState(false)
+  const [editCamp, setEditCamp] = useState(null)
   const onLaunch = (camps) => { const next = [...camps, ...created]; createdStore.set('campaigns', next); setCreated(next); setWizard(false); toast(`Launched ${camps.length} campaign${camps.length === 1 ? '' : 's'} — added to the grid`) }
+  const saveCampaign = (upd) => {
+    const next = created.map((c) => c.id === upd.id ? { ...c, ...upd } : c)
+    createdStore.set('campaigns', next); setCreated(next)
+    setOverrides((o) => { const n = { ...o }; delete n[upd.id]; return n }) // edited values win over any inline override
+    setEditCamp(null); toast(`Campaign “${upd.name}” updated`)
+  }
+  const duplicateCampaign = (c) => {
+    const copy = { ...c, id: 'CNEW' + Date.now().toString().slice(-7), name: c.name + ' (copy)', state: 'Paused', status: 'Paused', tag: 'NEW' }
+    const next = [copy, ...created]; createdStore.set('campaigns', next); setCreated(next)
+    toast(`Duplicated “${c.name}”`)
+  }
+  const createdById = Object.fromEntries(created.map((c) => [c.id, c]))
 
   const withEdits = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
   const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, rangeResolved), [withEdits, rangeResolved])
@@ -2841,12 +2841,15 @@ function Campaigns() {
     { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
     { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
     { key: 'ntb', label: 'NTB Orders', num: true, foot: (rs) => int(sumKey('ntb')(rs)), render: (r) => int(r.ntb) },
+    { key: 'act', label: '', sort: false, render: (r) => createdById[r.id]
+      ? <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}><Btn sm ghost icon="edit" onClick={() => setEditCamp(createdById[r.id])} /><Btn sm ghost icon="copy" onClick={() => duplicateCampaign(createdById[r.id])} /></span>
+      : <span className="muted" style={{ fontSize: 11 }}>—</span> },
   ]
 
   const presets = {
-    Default: ['name', 'state', 'status', 'campaignType', 'adGroups', 'dailyBudget', 'bid', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'ntb'],
-    Performance: ['name', 'state', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas'],
-    'Target ACOS': ['name', 'state', 'dailyBudget', 'spend', 'sales', 'acos', 'roas', 'cpc', 'orders'],
+    Default: ['name', 'state', 'status', 'campaignType', 'adGroups', 'dailyBudget', 'bid', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'ntb', 'act'],
+    Performance: ['name', 'state', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'act'],
+    'Target ACOS': ['name', 'state', 'dailyBudget', 'spend', 'sales', 'acos', 'roas', 'cpc', 'orders', 'act'],
   }
   const dims = [
     { key: 'campaignType', label: 'Campaign Type' },
@@ -2882,6 +2885,7 @@ function Campaigns() {
       {modal === 'budget' && <BulkBudgetModal count={sel.size} currency="$" onApply={applyBulkBudget} onClose={() => setModal(null)} />}
       {modal === 'tag' && <BulkTagModal count={sel.size} onApply={applyBulkTag} onClose={() => setModal(null)} />}
       {wizard && <CreateCampaignWizard products={getProductList()} profileId={profileId === 'all' ? 'us' : profileId} onClose={() => setWizard(false)} onLaunch={onLaunch} />}
+      {editCamp && <EditCampaignModal camp={editCamp} currency={symA(editCamp.profileId)} onClose={() => setEditCamp(null)} onSave={saveCampaign} />}
 
       <DataGrid
         id="ads-campaigns"
@@ -2942,14 +2946,17 @@ function AdGroups() {
     campaign: c.name, campaignId: c.id, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
     targets: 4 + (i % 9), impr: c.impr, clk: c.clk, spend: c.spend, sales: c.sales, orders: c.orders, acos: c.acos, roas: c.roas, ctr: c.ctr,
   }))
-  const { rows, prev } = useMemo(() => scaleForRange(rawRows, rangeResolved), [rawRows, rangeResolved])
+  const [overrides, setOverrides] = usePersistentOverrides('ads-adgroups')
+  const rawEdited = rawRows.map((r) => (overrides[r.id] ? { ...r, ...overrides[r.id] } : r))
+  const { rows, prev } = useMemo(() => scaleForRange(rawEdited, rangeResolved), [rawEdited, rangeResolved])
   const [filters, setFilters] = useState(() => loadFilterModel('ads-adgroups'))
   const filtered = applyFilters(rows, filters, ADGROUP_FIELDS)
   const prevFiltered = filtered.map((r) => prev[r.id])
+  const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
   const columns = [
     { key: 'name', label: 'Ad Group', sticky: true, width: 300, render: (r) => <div>{r.name}<small>{r.campaign}</small></div> },
-    { key: 'state', label: 'State', render: (r) => <Pill>{r.state === 'Enabled' ? 'Enabled' : 'Paused'}</Pill> },
-    { key: 'defaultBid', label: 'Default Bid', num: true, render: (r) => cur(r.defaultBid, symA(r.profileId), 2) },
+    { key: 'state', label: 'State', render: (r) => <StateSelect value={r.state === 'Enabled' ? 'Enabled' : 'Paused'} options={['Enabled', 'Paused']} onChange={(st) => { merge(r.id, { state: st }); toast(`Ad group ${st.toLowerCase()}`) }} /> },
+    { key: 'defaultBid', label: 'Default Bid', num: true, render: (r) => <EditableNum value={r.defaultBid} prefix={symA(r.profileId)} dec={2} onCommit={(v) => { merge(r.id, { defaultBid: v }); toast(`Default bid set to ${cur(v, symA(r.profileId), 2)}`) }} /> },
     { key: 'targets', label: 'Targets', num: true, foot: (rs) => int(sumKey('targets')(rs)) },
     { key: 'impr', label: 'Impr.', num: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
     { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
@@ -3067,7 +3074,9 @@ function SearchTerms() {
   const baseRaw = useProfileFilter(searchTerms)
   const base = useMemo(() => scaleForRange(baseRaw, rangeResolved).rows, [baseRaw, rangeResolved])
   const [filter, setFilter] = useState('All')
-  const [harvested, setHarvested] = useState(new Set())
+  const [acts, setActs] = usePersistentOverrides('ads-searchterms-acts')
+  const harvest = (id) => { setActs((o) => ({ ...o, [id]: 'harvest' })); toast('Harvested to manual campaign') }
+  const negate = (id) => { setActs((o) => ({ ...o, [id]: 'negate' })); toast('Added as negative exact') }
   const [filters, setFilters] = useState(() => loadFilterModel('ads-searchterms'))
   const recTone = { harvest: 'green', negate: 'red', monitor: 'gray' }
   const chipFiltered = base.filter((r) => filter === 'All' || r.recommend === filter.toLowerCase())
@@ -3084,8 +3093,10 @@ function SearchTerms() {
     { key: 'acos', label: 'ACoS', num: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => pct(r.acos) },
     { key: 'recommend', label: 'Recommendation', render: (r) => <Pill tone={recTone[r.recommend]}>{r.recommend}</Pill> },
     { key: 'act', label: '', sort: false, render: (r) => (r.recommend === 'harvest'
-      ? <Btn sm primary icon={harvested.has(r.id) ? 'check' : 'plus'} onClick={() => setHarvested((s) => new Set(s).add(r.id))}>{harvested.has(r.id) ? 'Harvested' : 'Harvest'}</Btn>
-      : r.recommend === 'negate' ? <Btn sm icon="x">Negate</Btn> : <span className="muted">—</span>) },
+      ? <Btn sm primary icon={acts[r.id] === 'harvest' ? 'check' : 'plus'} onClick={() => harvest(r.id)}>{acts[r.id] === 'harvest' ? 'Harvested' : 'Harvest'}</Btn>
+      : r.recommend === 'negate'
+        ? <Btn sm icon={acts[r.id] === 'negate' ? 'check' : 'x'} onClick={() => negate(r.id)}>{acts[r.id] === 'negate' ? 'Negated' : 'Negate'}</Btn>
+        : <span className="muted">—</span>) },
   ]
   return (
     <>
