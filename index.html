@@ -486,6 +486,10 @@ table.dt tr.grow td.sticky-l { background: var(--brand-soft); }
 .rb-sec { border-top:1px solid var(--border); margin-top:12px; padding-top:12px; }
 .rb-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .rb-check { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--text-2); cursor:pointer; }
+.dot-unread { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--brand); margin-left:7px; vertical-align:middle; }
+.bm-pace { display:inline-flex; align-items:center; gap:8px; justify-content:flex-end; }
+.bm-pace .miniprog { width:64px; }
+.rm-clip { max-width:240px; font-size:11.5px; line-height:1.35; white-space:normal; color:var(--text-2); }
 
 #boot { position:fixed; inset:0; display:grid; place-items:center; font-family:sans-serif; color:#5b6577; }
 </style>
@@ -1081,6 +1085,7 @@ const P = {
   ads: 'M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 11-5.8-1.6',
   target: 'M12 12m-9 0a9 9 0 1018 0a9 9 0 10-18 0M12 12m-5 0a5 5 0 1010 0a5 5 0 10-10 0M12 12m-1 0a1 1 0 102 0a1 1 0 10-2 0',
   layers: 'M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5',
+  copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   tag: 'M20.6 13.4L13.4 20.6a2 2 0 01-2.8 0l-7.2-7.2A2 2 0 012.8 12V4.8A2 2 0 014.8 2.8H12a2 2 0 011.4.6l7.2 7.2a2 2 0 010 2.8zM7.5 7.5h.01',
   search: 'M11 11m-7 0a7 7 0 1014 0a7 7 0 10-14 0M21 21l-4.3-4.3',
   bars: 'M12 20V10M18 20V4M6 20v-4',
@@ -2140,7 +2145,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.7.0</span>
+        <span className="app-version" title="CommerceHub build">v0.8.0</span>
       </div>
     </aside>
   )
@@ -3764,26 +3769,35 @@ const buildAction = (f) => {
   }[f.action] || f.action
 }
 
-function RuleBuilder({ onClose, onSave }) {
-  const [f, setF] = useState({
-    name: '', type: 'Bid', scope: 'All SP campaigns',
-    conditions: [{ id: rid(), metric: 'ACoS', op: 'gt', value: '', value2: '' }],
-    join: 'AND', lookback: '14', excludeLatest: true, minClicks: '', minSpend: '',
-    action: 'dec_bid', actionValue: '', frequency: 'Every 6 hours',
-  })
+const blankForm = () => ({
+  name: '', type: 'Bid', scope: 'All SP campaigns',
+  conditions: [{ id: rid(), metric: 'ACoS', op: 'gt', value: '', value2: '' }],
+  join: 'AND', lookback: '14', excludeLatest: true, minClicks: '', minSpend: '',
+  action: 'dec_bid', actionValue: '', frequency: 'Every 6 hours',
+})
+function RuleBuilder({ onClose, onSave, initial }) {
+  const editing = !!(initial && initial._id)
+  const { _id, _status, _affected, ...presetForm } = initial || {}
+  const [f, setF] = useState(initial ? { ...blankForm(), ...presetForm } : blankForm())
   const upd = (patch) => setF((x) => ({ ...x, ...patch }))
   const setCond = (i, patch) => setF((x) => ({ ...x, conditions: x.conditions.map((c, j) => (j === i ? { ...c, ...patch } : c)) }))
   const addCond = () => setF((x) => ({ ...x, conditions: [...x.conditions, { id: rid(), metric: 'ROAS', op: 'gt', value: '', value2: '' }] }))
   const delCond = (i) => setF((x) => ({ ...x, conditions: x.conditions.filter((c, j) => j !== i) }))
   const needsVal = RB_NEEDS_VAL.has(f.action)
   const canSave = f.name.trim() && f.conditions.some((c) => c.value !== '') && (!needsVal || f.actionValue !== '')
-  const save = () => onSave({
-    id: 'RNEW' + Date.now().toString().slice(-5), name: f.name.trim(), type: f.type, scope: f.scope,
-    status: 'Active', trigger: buildTrigger(f), action: buildAction(f), runs: f.frequency, lastRun: 'just now', affected: 0,
-  })
+  const save = () => {
+    const { name, type, scope, conditions, join, lookback, excludeLatest, minClicks, minSpend, action, actionValue, frequency } = f
+    const cleanForm = { name: name.trim(), type, scope, conditions, join, lookback, excludeLatest, minClicks, minSpend, action, actionValue, frequency }
+    onSave({
+      id: editing ? _id : 'RNEW' + Date.now().toString().slice(-5), name: name.trim(), type, scope,
+      status: editing ? _status : 'Active', trigger: buildTrigger(f), action: buildAction(f),
+      runs: frequency, lastRun: editing ? 'just now (edited)' : 'just now', affected: editing ? _affected : 0,
+      created: true, _f: cleanForm,
+    })
+  }
   return (
-    <Modal width={600} title="Create Rule" sub="IF conditions are met, THEN apply an action — on a schedule" onClose={onClose}
-      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><div style={{ flex: 1 }} /><Btn primary disabled={!canSave} icon="check" onClick={save}>Create rule</Btn></>}>
+    <Modal width={600} title={editing ? 'Edit Rule' : 'Create Rule'} sub="IF conditions are met, THEN apply an action — on a schedule" onClose={onClose}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><div style={{ flex: 1 }} /><Btn primary disabled={!canSave} icon="check" onClick={save}>{editing ? 'Save changes' : 'Create rule'}</Btn></>}>
       <label className="fld">Rule name<input autoFocus value={f.name} placeholder="e.g. Defend Target ACoS ≤ 28%" onChange={(e) => upd({ name: e.target.value })} /></label>
       <div className="rb-grid2">
         <label className="fld">Rule type<select value={f.type} onChange={(e) => upd({ type: e.target.value })}>{RB_TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
@@ -3829,19 +3843,83 @@ function RuleBuilder({ onClose, onSave }) {
 }
 
 /* ============================ RULE MANAGER ============================ */
+const RM_FIELDS = [
+  { key: 'name', label: 'Rule', type: 'text' },
+  { key: 'type', label: 'Type', type: 'enum', options: RB_TYPES },
+  { key: 'scope', label: 'Scope', type: 'text' },
+  { key: 'status', label: 'Status', type: 'enum', options: ['Active', 'Paused'] },
+  { key: 'trigger', label: 'Trigger (IF)', type: 'text' },
+  { key: 'action', label: 'Action (THEN)', type: 'text' },
+  { key: 'runs', label: 'Schedule', type: 'text' },
+  { key: 'lastRun', label: 'Last run', type: 'text' },
+  { key: 'affected', label: 'Affected', type: 'number' },
+]
+const fallbackForm = (r) => ({
+  ...blankForm(), name: r.name, type: RB_TYPES.includes(r.type) ? r.type : 'Bid',
+  scope: RB_SCOPES.includes(r.scope) ? r.scope : 'All SP campaigns',
+  frequency: RB_FREQ.includes(r.runs) ? r.runs : 'Every 6 hours',
+})
 function Rules() {
   const [rules, setRules] = useState(() => [...createdStore.get('rules'), ...RULES])
-  const [filter, setFilter] = useState('All')
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('auto-rules'))
   const [builder, setBuilder] = useState(false)
-  const onSave = (rule) => { const next = [rule, ...createdStore.get('rules')]; createdStore.set('rules', next); setRules((rs) => [rule, ...rs]); setBuilder(false); toast(`Rule “${rule.name}” created`) }
-  const toggle = (id) => setRules((rs) => rs.map((r) => r.id === id ? { ...r, status: r.status === 'Active' ? 'Paused' : 'Active' } : r))
-  const types = ['All', 'Bid', 'Harvest', 'Negative', 'Retail', 'Dayparting', 'Budget']
-  const shown = rules.filter((r) => filter === 'All' || r.type === filter)
+  const [edit, setEdit] = useState(null)
+  const onSave = (rule) => {
+    const created = createdStore.get('rules')
+    const isEdit = created.some((x) => x.id === rule.id)
+    if (isEdit) {
+      createdStore.set('rules', created.map((x) => x.id === rule.id ? rule : x))
+      setRules((rs) => rs.map((x) => x.id === rule.id ? rule : x))
+      toast(`Rule “${rule.name}” updated`)
+    } else {
+      createdStore.set('rules', [rule, ...created])
+      setRules((rs) => [rule, ...rs])
+      toast(`Rule “${rule.name}” created`)
+    }
+    setBuilder(false); setEdit(null)
+  }
+  const toggle = (id) => {
+    setRules((rs) => rs.map((r) => r.id === id ? { ...r, status: r.status === 'Active' ? 'Paused' : 'Active' } : r))
+    const created = createdStore.get('rules')
+    if (created.some((x) => x.id === id)) createdStore.set('rules', created.map((x) => x.id === id ? { ...x, status: x.status === 'Active' ? 'Paused' : 'Active' } : x))
+  }
+  const openEdit = (r) => setEdit({ ...(r._f || fallbackForm(r)), _id: r.id, _status: r.status, _affected: r.affected })
+  const duplicate = (r) => {
+    const copy = { ...r, id: 'RNEW' + Date.now().toString().slice(-5), name: r.name + ' (copy)', status: 'Paused', lastRun: 'just now', affected: 0, created: true, _f: r._f || fallbackForm(r) }
+    createdStore.set('rules', [copy, ...createdStore.get('rules')])
+    setRules((rs) => [copy, ...rs])
+    toast(`Duplicated “${r.name}”`)
+  }
+  const searched = rules.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, RM_FIELDS)
   const active = rules.filter((r) => r.status === 'Active').length
   const affected = rules.reduce((s, r) => s + r.affected, 0)
+  const columns = [
+    { key: 'name', label: 'Rule', sticky: true, width: 240, sortVal: (r) => r.name, render: (r) => (
+      <div className="flex items-center gap-8">
+        <div className="icobox" style={{ background: RULE_COLOR[r.type] + '1a', color: RULE_COLOR[r.type], width: 30, height: 30, flex: '0 0 auto' }}><Icon name={RULE_ICON[r.type]} size={15} /></div>
+        <div className="title">{r.name}{r.created && <span className="tag" style={{ marginLeft: 6 }}>custom</span>}</div>
+      </div>
+    ) },
+    { key: 'type', label: 'Type', sortVal: (r) => r.type, render: (r) => <span className="tag">{r.type}</span> },
+    { key: 'trigger', label: 'Trigger (IF)', sortVal: (r) => r.trigger, render: (r) => <div className="rm-clip" title={r.trigger}>{r.trigger}</div> },
+    { key: 'action', label: 'Action (THEN)', sortVal: (r) => r.action, render: (r) => <div className="rm-clip" title={r.action}>{r.action}</div> },
+    { key: 'scope', label: 'Scope', sortVal: (r) => r.scope, render: (r) => <span className="muted">{r.scope}</span> },
+    { key: 'runs', label: 'Schedule', sortVal: (r) => r.runs, render: (r) => <span className="muted">{r.runs}</span> },
+    { key: 'lastRun', label: 'Last run', sortVal: (r) => r.lastRun, render: (r) => <span className="muted">{r.lastRun}</span> },
+    { key: 'affected', label: 'Affected', num: true, foot: (rs) => int(rs.reduce((s, r) => s + r.affected, 0)), render: (r) => int(r.affected) },
+    { key: 'status', label: 'Status', sortVal: (r) => r.status, render: (r) => (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}><Pill>{r.status}</Pill><Toggle on={r.status === 'Active'} onClick={() => toggle(r.id)} /></span>
+    ) },
+    { key: 'act', label: '', sort: false, render: (r) => (
+      <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}><Btn sm ghost icon="edit" onClick={() => openEdit(r)} /><Btn sm ghost icon="copy" onClick={() => duplicate(r)} /></span>
+    ) },
+  ]
+  const dims = [{ key: 'type', label: 'Type' }, { key: 'status', label: 'Status' }, { key: 'scope', label: 'Scope' }]
   return (
     <>
-      <AutoHead title="Rule Manager" sub="Rules-based automation for bids, budgets, harvesting, negatives, dayparting & retail signals"><Btn icon="bulb" ghost>Templates</Btn><Btn icon="plus" primary onClick={() => setBuilder(true)}>Create Rule</Btn></AutoHead>
+      <AutoHead title="Rule Manager" sub="Rules-based automation for bids, budgets, harvesting, negatives, dayparting & retail signals"><ExportMenu name="rule-manager" fields={RM_FIELDS} rows={filtered} /><Btn icon="bulb" ghost>Templates</Btn><Btn icon="plus" primary onClick={() => setBuilder(true)}>Create Rule</Btn></AutoHead>
       <KpiGrid>
         <Kpi label="Active Rules" value={active} />
         <Kpi label="Total Rules" value={rules.length} />
@@ -3849,37 +3927,61 @@ function Rules() {
         <Kpi label="Actions (24h)" value="1,284" />
         <Kpi label="Est. Spend Saved (30d)" value="$8.4K" delta={6.2} />
       </KpiGrid>
-      <div className="toolbar">
-        {types.map((t) => <span key={t} className={`chip ${filter === t ? 'on' : ''}`} onClick={() => setFilter(t)}>{t}</span>)}
-      </div>
-      <Card pad={false}>
-        {shown.map((r) => (
-          <div key={r.id} className="lrow">
-            <div className="icobox" style={{ background: RULE_COLOR[r.type] + '1a', color: RULE_COLOR[r.type] }}><Icon name={RULE_ICON[r.type]} size={18} /></div>
-            <div className="grow">
-              <div className="flex items-center gap-8"><span className="title">{r.name}</span><span className="tag">{r.type}</span></div>
-              <div className="desc"><b>IF</b> {r.trigger} · <b>THEN</b> {r.action}</div>
-              <div className="desc" style={{ color: 'var(--text-3)' }}>Scope: {r.scope} · Runs {r.runs} · Last run {r.lastRun} · {r.affected} affected</div>
-            </div>
-            <Pill>{r.status}</Pill>
-            <Toggle on={r.status === 'Active'} onClick={() => toggle(r.id)} />
-            <Btn sm ghost icon="edit" />
-          </div>
-        ))}
-      </Card>
-      <div className="footnote">Rules evaluate on a schedule and auto-apply actions. Combine with Campaign AI for hands-off budget, keyword and bid management.</div>
-      {builder && <RuleBuilder onClose={() => setBuilder(false)} onSave={onSave} />}
+      <DataGrid
+        id="auto-rules"
+        columns={columns}
+        rows={filtered}
+        initialSort={{ key: 'affected', dir: 'desc' }}
+        dimensions={dims}
+        totals
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search rules…" />
+          <FilterBar id="auto-rules" fields={RM_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Rules evaluate on a schedule and auto-apply actions. Edit or duplicate any rule, filter by type/status/scope, and export the current view. Combine with Campaign AI for hands-off budget, keyword and bid management.</div>
+      {(builder || edit) && <RuleBuilder initial={edit} onClose={() => { setBuilder(false); setEdit(null) }} onSave={onSave} />}
     </>
   )
 }
 
 /* ============================ BUDGET MANAGER ============================ */
+const paceColor = (s) => (s === 'Over pace' ? 'var(--red)' : s === 'Under pace' ? 'var(--amber)' : 'var(--green)')
+const BM_FIELDS = [
+  { key: 'profile', label: 'Marketplace', type: 'enum', options: ['Amazon USA', 'Amazon Canada', 'Amazon UK'] },
+  { key: 'currency', label: 'Currency', type: 'enum', options: ['USD', 'CAD', 'GBP'] },
+  { key: 'status', label: 'Pace status', type: 'enum', options: ['Over pace', 'On pace', 'Under pace'] },
+  { key: 'monthlyCap', label: 'Monthly Cap', type: 'number' },
+  { key: 'spent', label: 'Spent MTD', type: 'number' },
+  { key: 'remaining', label: 'Remaining', type: 'number' },
+  { key: 'forecast', label: 'Forecast EOM', type: 'number' },
+  { key: 'pacePct', label: 'Pace %', type: 'number' },
+]
 function Budgets() {
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('auto-budgets'))
+  const searched = budgets.filter((b) => b.profile.toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, BM_FIELDS)
   const totalCap = budgets.reduce((s, b) => s + b.monthlyCap, 0)
   const totalSpent = budgets.reduce((s, b) => s + b.spent, 0)
+  const bSum = (k) => (rs) => rs.reduce((a, b) => a + (b[k] || 0), 0)
+  const capPct = (b) => Math.min(100, (b.spent / b.monthlyCap) * 100)
+  const columns = [
+    { key: 'profile', label: 'Marketplace', sticky: true, width: 200, sortVal: (r) => r.profile, render: (b) => <div>{b.profile}<small>{b.currency} budget</small></div> },
+    { key: 'monthlyCap', label: 'Monthly Cap', num: true, foot: (rs) => money(bSum('monthlyCap')(rs)), render: (b) => cur(b.monthlyCap, b.currency) },
+    { key: 'spent', label: 'Spent / Cap', num: true, sortVal: (r) => r.spent, foot: (rs) => money(bSum('spent')(rs)), render: (b) => (
+      <span className="bm-pace"><div className="miniprog"><span style={{ width: capPct(b) + '%', background: paceColor(b.status) }} /></div><b>{cur(b.spent, b.currency)}</b></span>
+    ) },
+    { key: 'capUsed', label: '% of Cap', num: true, sortVal: (r) => capPct(r), render: (b) => pct(capPct(b)) },
+    { key: 'remaining', label: 'Remaining', num: true, foot: (rs) => money(bSum('remaining')(rs)), render: (b) => cur(b.remaining, b.currency) },
+    { key: 'forecast', label: 'Forecast EOM', num: true, foot: (rs) => money(bSum('forecast')(rs)), render: (b) => <span style={{ color: b.forecast > b.monthlyCap ? 'var(--red)' : 'var(--text)', fontWeight: b.forecast > b.monthlyCap ? 700 : 500 }}>{cur(b.forecast, b.currency)}</span> },
+    { key: 'pacePct', label: 'Pace %', num: true, sortVal: (r) => r.pacePct, render: (b) => <span style={{ color: paceColor(b.status), fontWeight: 700 }}>{pct(b.pacePct)}</span> },
+    { key: 'status', label: 'Status', sortVal: (r) => r.status, render: (b) => <Pill tone={b.status === 'Over pace' ? 'red' : b.status === 'Under pace' ? 'amber' : 'green'}>{b.status}</Pill> },
+  ]
+  const dims = [{ key: 'status', label: 'Pace status' }, { key: 'currency', label: 'Currency' }]
   return (
     <>
-      <AutoHead title="Budget Manager" sub="Monthly caps, pacing & forecast with auto-pause on cap"><Btn icon="download">Export</Btn><Btn icon="plus" primary>Set Budget Cap</Btn></AutoHead>
+      <AutoHead title="Budget Manager" sub="Monthly caps, pacing & forecast with auto-pause on cap"><ExportMenu name="budget-manager" fields={BM_FIELDS} rows={filtered} /><Btn icon="plus" primary>Set Budget Cap</Btn></AutoHead>
       <KpiGrid>
         <Kpi label="Total Monthly Cap" value={money(totalCap)} />
         <Kpi label="Spent MTD" value={money(totalSpent)} />
@@ -3891,27 +3993,22 @@ function Budgets() {
         <Icon name="wallet" size={16} />
         <div>Upload monthly caps for the fiscal year. When a cap is reached, campaigns auto-pause until the budget refreshes next month. Pacing guard (Rule R7) throttles bids if daily pace runs hot.</div>
       </div>
-      <div className="grid-3">
-        {budgets.map((b) => (
-          <Card key={b.profileId} title={b.profile} sub={`${b.type === '3P' ? 'Seller' : 'Vendor'} · ${b.currency} budget`} actions={<Pill>{b.status}</Pill>}>
-            <div style={{ fontSize: 26, fontWeight: 750, letterSpacing: '-.5px' }}>{cur(b.spent, b.currency)}</div>
-            <div className="muted" style={{ marginBottom: 12 }}>of {cur(b.monthlyCap, b.currency)} cap</div>
-            <div className="pace"><span style={{ width: Math.min(100, (b.spent / b.monthlyCap) * 100) + '%', background: paceColor(b.status) }} /></div>
-            <div className="pacelabel"><span>{pct((b.spent / b.monthlyCap) * 100)} of cap</span><span>{pct(b.pacePct)} of target pace</span></div>
-            <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Mini label="Forecast EOM" value={cur(b.forecast, b.currency)} warn={b.forecast > b.monthlyCap} />
-              <Mini label="Remaining" value={cur(b.remaining, b.currency)} />
-            </div>
-          </Card>
-        ))}
-      </div>
+      <DataGrid
+        id="auto-budgets"
+        columns={columns}
+        rows={filtered}
+        initialSort={{ key: 'pacePct', dir: 'desc' }}
+        dimensions={dims}
+        totals
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search marketplaces…" />
+          <FilterBar id="auto-budgets" fields={BM_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Each marketplace shows spend vs. cap with a live pacing bar; rows over forecast are flagged red. Filter by pace status, group by currency, and export the current view.</div>
     </>
   )
 }
-function Mini({ label, value, warn }) {
-  return <div><div className="muted" style={{ fontSize: 11 }}>{label}</div><div style={{ fontWeight: 700, color: warn ? 'var(--red)' : 'var(--text)' }}>{value}</div></div>
-}
-const paceColor = (s) => (s === 'Over pace' ? 'var(--red)' : s === 'Under pace' ? 'var(--amber)' : 'var(--green)')
 
 
 /* ===================== src/pages/Insights.jsx ===================== */
@@ -3921,20 +4018,36 @@ function InsHead({ title, sub, children }) {
 }
 
 /* ============================ REPORT CENTER ============================ */
+const RP_TYPES = ['Dashboard', 'Campaign', 'Search Term', 'Share of Voice', 'Commerce', 'DSP']
+const RP_FORMATS = ['PDF', 'XLSX', 'CSV', 'PDF + XLSX']
+const RP_OWNERS = ['You', 'A. Rivera', 'M. Chen']
+const RP_FIELDS = [
+  { key: 'name', label: 'Report', type: 'text' },
+  { key: 'type', label: 'Type', type: 'enum', options: RP_TYPES },
+  { key: 'cadence', label: 'Schedule', type: 'text' },
+  { key: 'format', label: 'Format', type: 'enum', options: RP_FORMATS },
+  { key: 'recipients', label: 'Recipients', type: 'number' },
+  { key: 'owner', label: 'Owner', type: 'enum', options: RP_OWNERS },
+  { key: 'updated', label: 'Updated', type: 'text' },
+]
 function Reports() {
-  const { sorted } = useSort(reports, { key: 'name', dir: 'asc' })
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('ins-reports'))
+  const searched = reports.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()) || r.type.toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, RP_FIELDS)
   const columns = [
-    { key: 'name', label: 'Report', sticky: true, width: 280, render: (r) => <div>{r.name}<small>{r.type}</small></div> },
-    { key: 'cadence', label: 'Schedule', render: (r) => <span className="tag">{r.cadence}</span> },
-    { key: 'format', label: 'Format' },
-    { key: 'recipients', label: 'Recipients', num: true, render: (r) => `${r.recipients}` },
-    { key: 'owner', label: 'Owner' },
-    { key: 'updated', label: 'Updated', render: (r) => <span className="muted">{r.updated}</span> },
-    { key: 'act', label: '', render: () => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><Btn sm ghost icon="play">Run</Btn><Btn sm ghost icon="download" /></span> },
+    { key: 'name', label: 'Report', sticky: true, width: 300, sortVal: (r) => r.name, render: (r) => <div>{r.name}<small>{r.type}</small></div> },
+    { key: 'cadence', label: 'Schedule', sortVal: (r) => r.cadence, render: (r) => <span className="tag">{r.cadence}</span> },
+    { key: 'format', label: 'Format', sortVal: (r) => r.format },
+    { key: 'recipients', label: 'Recipients', num: true, foot: (rs) => rs.reduce((s, r) => s + r.recipients, 0), render: (r) => `${r.recipients}` },
+    { key: 'owner', label: 'Owner', sortVal: (r) => r.owner },
+    { key: 'updated', label: 'Updated', sortVal: (r) => r.updated, render: (r) => <span className="muted">{r.updated}</span> },
+    { key: 'act', label: '', sort: false, render: () => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><Btn sm ghost icon="play">Run</Btn><Btn sm ghost icon="download" /></span> },
   ]
+  const dims = [{ key: 'type', label: 'Type' }, { key: 'owner', label: 'Owner' }, { key: 'format', label: 'Format' }]
   return (
     <>
-      <InsHead title="Report Center" sub="Custom & scheduled reports, dashboards and exports"><Btn icon="file" ghost>Templates</Btn><Btn icon="plus" primary>Build Report</Btn></InsHead>
+      <InsHead title="Report Center" sub="Custom & scheduled reports, dashboards and exports"><ExportMenu name="report-center" fields={RP_FIELDS} rows={filtered} /><Btn icon="file" ghost>Templates</Btn><Btn icon="plus" primary>Build Report</Btn></InsHead>
       <KpiGrid>
         <Kpi label="Saved Reports" value={reports.length} />
         <Kpi label="Scheduled" value={reports.filter(r => /·/.test(r.cadence)).length} />
@@ -3953,44 +4066,75 @@ function Reports() {
         </div>
       </Card>
       <div style={{ height: 16 }} />
-      <DataTable columns={columns} rows={sorted} />
+      <DataGrid
+        id="ins-reports"
+        columns={columns}
+        rows={filtered}
+        initialSort={{ key: 'name', dir: 'asc' }}
+        dimensions={dims}
+        totals
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search reports…" />
+          <FilterBar id="ins-reports" fields={RP_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Filter saved & scheduled reports, group by type or owner, and export the current list. Build new reports from the data-source widgets above.</div>
     </>
   )
 }
 
 /* ============================ ALERTS ============================ */
+const sevTone = { high: 'red', med: 'amber', low: 'gray' }
+const AL_FIELDS = [
+  { key: 'title', label: 'Alert', type: 'text' },
+  { key: 'body', label: 'Detail', type: 'text' },
+  { key: 'sevLabel', label: 'Severity', type: 'enum', options: ['High', 'Med', 'Low'] },
+  { key: 'status', label: 'Status', type: 'enum', options: ['Unread', 'Read'] },
+  { key: 'time', label: 'Time', type: 'text' },
+]
+const sevRank = { high: 3, med: 2, low: 1 }
 function Alerts() {
   const [alerts, setAlerts] = useState(ALERTS)
-  const [filter, setFilter] = useState('All')
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('ins-alerts'))
   const markRead = (id) => setAlerts((a) => a.map((x) => x.id === id ? { ...x, read: true } : x))
   const markAll = () => setAlerts((a) => a.map((x) => ({ ...x, read: true })))
-  const sevTone = { high: 'red', med: 'amber', low: 'gray' }
-  const shown = alerts.filter((a) => filter === 'All' || (filter === 'Unread' ? !a.read : a.sev === filter.toLowerCase()))
+  const decorated = alerts.map((a) => ({ ...a, sevLabel: { high: 'High', med: 'Med', low: 'Low' }[a.sev], status: a.read ? 'Read' : 'Unread' }))
+  const searched = decorated.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()) || a.body.toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, AL_FIELDS)
+  const columns = [
+    { key: 'title', label: 'Alert', sticky: true, width: 360, sortVal: (r) => r.title, render: (a) => (
+      <div className="flex items-center gap-8">
+        <div className="icobox" style={{ background: insSevBg(a.sev), color: insSevColor(a.sev), width: 30, height: 30, flex: '0 0 auto' }}><Icon name={a.icon} size={15} /></div>
+        <div><div className="title" style={{ fontWeight: a.read ? 600 : 750 }}>{a.title}{!a.read && <span className="dot-unread" />}</div><small>{a.body}</small></div>
+      </div>
+    ) },
+    { key: 'sevLabel', label: 'Severity', sortVal: (r) => sevRank[r.sev], render: (a) => <Pill tone={sevTone[a.sev]}>{a.sevLabel}</Pill> },
+    { key: 'status', label: 'Status', sortVal: (r) => r.status, render: (a) => a.read ? <span className="muted">Read</span> : <Pill tone="blue">Unread</Pill> },
+    { key: 'time', label: 'Time', sortVal: (r) => r.time, render: (a) => <span className="muted">{a.time}</span> },
+    { key: 'act', label: '', sort: false, render: (a) => !a.read ? <Btn sm ghost icon="check" onClick={() => markRead(a.id)}>Mark read</Btn> : <span className="muted" style={{ fontSize: 11 }}>—</span> },
+  ]
+  const dims = [{ key: 'sevLabel', label: 'Severity' }, { key: 'status', label: 'Status' }]
   return (
     <>
-      <InsHead title="Alerts" sub="Real-time notifications across ads, budget & retail signals"><Btn icon="check" ghost onClick={markAll}>Mark all read</Btn><Btn icon="gear" primary>Alert Settings</Btn></InsHead>
+      <InsHead title="Alerts" sub="Real-time notifications across ads, budget & retail signals"><ExportMenu name="alerts" fields={AL_FIELDS} rows={filtered} /><Btn icon="check" ghost onClick={markAll}>Mark all read</Btn><Btn icon="gear" primary>Alert Settings</Btn></InsHead>
       <KpiGrid>
         <Kpi label="Unread" value={alerts.filter(a => !a.read).length} />
         <Kpi label="High Severity" value={alerts.filter(a => a.sev === 'high').length} />
         <Kpi label="Today" value={alerts.length} />
       </KpiGrid>
-      <div className="toolbar">
-        {['All', 'Unread', 'High', 'Med', 'Low'].map((t) => <span key={t} className={`chip ${filter === t ? 'on' : ''}`} onClick={() => setFilter(t)}>{t}</span>)}
-      </div>
-      <Card pad={false}>
-        {shown.map((a) => (
-          <div key={a.id} className="lrow" style={{ background: a.read ? 'transparent' : 'var(--brand-soft)' }}>
-            <div className="icobox" style={{ background: insSevBg(a.sev), color: insSevColor(a.sev) }}><Icon name={a.icon} size={18} /></div>
-            <div className="grow">
-              <div className="flex items-center gap-8"><span className="title">{a.title}</span><Pill tone={sevTone[a.sev]}>{a.sev}</Pill></div>
-              <div className="desc">{a.body}</div>
-            </div>
-            <div className="muted" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{a.time}</div>
-            {!a.read && <Btn sm ghost icon="check" onClick={() => markRead(a.id)} />}
-          </div>
-        ))}
-        {shown.length === 0 && <div className="empty">No alerts match this filter</div>}
-      </Card>
+      <DataGrid
+        id="ins-alerts"
+        columns={columns}
+        rows={filtered}
+        initialSort={{ key: 'sevLabel', dir: 'desc' }}
+        dimensions={dims}
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search alerts…" />
+          <FilterBar id="ins-alerts" fields={AL_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Filter by severity or read status, sort by time, and export. High-severity retail signals (out-of-stock, Buy Box loss) trigger ad auto-pause via the rule engine.</div>
     </>
   )
 }
