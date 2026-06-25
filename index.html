@@ -2756,6 +2756,63 @@ function EditCampaignModal({ camp, currency = '$', onClose, onSave }) {
   )
 }
 
+const ZERO_METRICS = { impr: 0, clk: 0, ctr: 0, spend: 0, sales: 0, orders: 0, acos: 0, roas: 0 }
+const MATCH_TYPES = ['Broad', 'Phrase', 'Exact']
+
+function NewAdGroupModal({ camps, defaultCampId, currency = '$', onClose, onCreate }) {
+  const [f, setF] = useState({ name: '', campaignId: defaultCampId || (camps[0] && camps[0].id) || '', defaultBid: '0.75', state: 'Enabled' })
+  const upd = (patch) => setF((x) => ({ ...x, ...patch }))
+  const canSave = f.name.trim() && f.campaignId && Number(f.defaultBid) > 0
+  const save = () => { const c = camps.find((x) => x.id === f.campaignId) || {}; onCreate({ name: f.name.trim(), campaignId: f.campaignId, campaign: c.name || '', profileId: c.profileId, defaultBid: Number(f.defaultBid), state: f.state }) }
+  return (
+    <Modal width={520} title="New Ad Group" sub="Add an ad group to a campaign" onClose={onClose}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><div style={{ flex: 1 }} /><Btn primary disabled={!canSave} icon="plus" onClick={save}>Create ad group</Btn></>}>
+      <label className="fld">Ad group name<input autoFocus value={f.name} onChange={(e) => upd({ name: e.target.value })} placeholder="e.g. Brand Defense · Exact" /></label>
+      <label className="fld">Campaign<select value={f.campaignId} onChange={(e) => upd({ campaignId: e.target.value })}>{camps.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+      <div className="rb-grid2">
+        <label className="fld">Default bid ({currency})<input type="number" step="0.05" value={f.defaultBid} onChange={(e) => upd({ defaultBid: e.target.value })} /></label>
+        <label className="fld">State<select value={f.state} onChange={(e) => upd({ state: e.target.value })}>{['Enabled', 'Paused'].map((s) => <option key={s}>{s}</option>)}</select></label>
+      </div>
+    </Modal>
+  )
+}
+
+function AddKeywordsModal({ camps, currency = '$', onClose, onCreate }) {
+  const [f, setF] = useState({ text: '', matchType: 'Exact', bid: '0.85', campaignId: (camps[0] && camps[0].id) || '' })
+  const upd = (patch) => setF((x) => ({ ...x, ...patch }))
+  const parsed = f.text.split('\n').map((s) => s.trim()).filter(Boolean)
+  const canSave = parsed.length > 0 && f.campaignId && Number(f.bid) > 0
+  const save = () => { const c = camps.find((x) => x.id === f.campaignId) || {}; onCreate(parsed.map((kw) => ({ keyword: kw, matchType: f.matchType, bid: Number(f.bid), campaignId: f.campaignId, campaign: c.name || '', profileId: c.profileId }))) }
+  return (
+    <Modal width={540} title="Add Keywords" sub="Add one or more keyword targets" onClose={onClose}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><span className="muted" style={{ fontSize: 12 }}>{parsed.length} keyword{parsed.length === 1 ? '' : 's'}</span><div style={{ flex: 1 }} /><Btn primary disabled={!canSave} icon="plus" onClick={save}>Add keyword{parsed.length === 1 ? '' : 's'}</Btn></>}>
+      <label className="fld">Keywords (one per line)<textarea autoFocus rows={5} value={f.text} onChange={(e) => upd({ text: e.target.value })} placeholder={'grain free dog food\nlarge breed puppy food'} style={{ resize: 'vertical', font: 'inherit' }} /></label>
+      <label className="fld">Campaign<select value={f.campaignId} onChange={(e) => upd({ campaignId: e.target.value })}>{camps.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+      <div className="rb-grid2">
+        <label className="fld">Match type<select value={f.matchType} onChange={(e) => upd({ matchType: e.target.value })}>{MATCH_TYPES.map((m) => <option key={m}>{m}</option>)}</select></label>
+        <label className="fld">Bid ({currency})<input type="number" step="0.05" value={f.bid} onChange={(e) => upd({ bid: e.target.value })} /></label>
+      </div>
+    </Modal>
+  )
+}
+
+function TrackKeywordModal({ onClose, onCreate }) {
+  const [f, setF] = useState({ keyword: '', searchVolume: '', topCompetitor: '' })
+  const upd = (patch) => setF((x) => ({ ...x, ...patch }))
+  const canSave = f.keyword.trim()
+  const save = () => onCreate({ keyword: f.keyword.trim(), searchVolume: Number(f.searchVolume) || 0, topCompetitor: f.topCompetitor.trim() || '—' })
+  return (
+    <Modal width={500} title="Track Keyword" sub="Monitor paid + organic share of voice" onClose={onClose}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><div style={{ flex: 1 }} /><Btn primary disabled={!canSave} icon="plus" onClick={save}>Track keyword</Btn></>}>
+      <label className="fld">Keyword<input autoFocus value={f.keyword} onChange={(e) => upd({ keyword: e.target.value })} placeholder="e.g. grain free dog food" /></label>
+      <div className="rb-grid2">
+        <label className="fld">Est. monthly search volume<input type="number" value={f.searchVolume} onChange={(e) => upd({ searchVolume: e.target.value })} placeholder="optional" /></label>
+        <label className="fld">Top competitor<input value={f.topCompetitor} onChange={(e) => upd({ topCompetitor: e.target.value })} placeholder="optional" /></label>
+      </div>
+    </Modal>
+  )
+}
+
 function KpiRow({ rows, prev }) {
   const a = aggregate(rows)
   const p = prev && prev.length ? aggregate(prev) : null
@@ -2947,11 +3004,18 @@ function AdGroups() {
   const allCamps = useMemo(() => [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS], [])
   const drillCamp = campId ? allCamps.find((c) => c.id === campId) : null
   const base = useProfileFilter(ALL_CAMPAIGNS)
-  const rawRows = drillCamp ? adGroupsForCampaign(drillCamp) : base.slice(0, 30).map((c, i) => ({
+  const [created, setCreated] = useState(() => createdStore.get('adgroups'))
+  const [showNew, setShowNew] = useState(false)
+  const createdRows = useMemo(() => created
+    .filter((g) => !campId || g.campaignId === campId)
+    .map((g) => ({ ...ZERO_METRICS, id: g.id, name: g.name, campaign: g.campaign, campaignId: g.campaignId, profileId: g.profileId, state: g.state, defaultBid: g.defaultBid, targets: 0 })), [created, campId])
+  const seedRows = drillCamp ? adGroupsForCampaign(drillCamp) : base.slice(0, 30).map((c, i) => ({
     id: c.id + '-ag', name: c.name.split('-').slice(0, 2).join('-') + ' · Ad Group ' + (1 + (i % 3)),
     campaign: c.name, campaignId: c.id, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
     targets: 4 + (i % 9), impr: c.impr, clk: c.clk, spend: c.spend, sales: c.sales, orders: c.orders, acos: c.acos, roas: c.roas, ctr: c.ctr,
   }))
+  const rawRows = [...createdRows, ...seedRows]
+  const createNewGroup = (g) => { const row = { id: 'AGNEW' + Date.now().toString().slice(-7), ...g }; const next = [row, ...created]; createdStore.set('adgroups', next); setCreated(next); setShowNew(false); toast(`Ad group "${g.name}" created`) }
   const [overrides, setOverrides] = usePersistentOverrides('ads-adgroups')
   const rawEdited = rawRows.map((r) => (overrides[r.id] ? { ...r, ...overrides[r.id] } : r))
   const { rows, prev } = useMemo(() => scaleForRange(rawEdited, rangeResolved), [rawEdited, rangeResolved])
@@ -2976,8 +3040,9 @@ function AdGroups() {
   return (
     <>
       <AdsHead title="Ad Groups" sub={drillCamp ? `${filtered.length} ad groups in this campaign` : `${filtered.length} ad groups · ${rangeResolved.label}`}>
-        <ExportMenu name="ad-groups" fields={ADGROUP_FIELDS} rows={filtered} /><Btn icon="plus" primary>New Ad Group</Btn>
+        <ExportMenu name="ad-groups" fields={ADGROUP_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setShowNew(true)}>New Ad Group</Btn>
       </AdsHead>
+      {showNew && <NewAdGroupModal camps={allCamps} defaultCampId={campId} currency={drillCamp ? symA(drillCamp.profileId) : '$'} onClose={() => setShowNew(false)} onCreate={createNewGroup} />}
       {drillCamp && (
         <div className="drillbar">
           <Link className="celllink" to="/ads/campaigns"><Icon name="chevDown" size={13} style={{ transform: 'rotate(90deg)' }} /> Back to Campaigns</Link>
@@ -3002,7 +3067,15 @@ function AdGroups() {
 /* ============================ TARGETING (Keywords) ============================ */
 function Targeting() {
   const { rangeResolved } = useApp()
-  const base = useProfileFilter(keywords)
+  const [created, setCreated] = useState(() => createdStore.get('keywords'))
+  const [showAdd, setShowAdd] = useState(false)
+  const allCamps = useMemo(() => [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS], [])
+  const allKeywords = useMemo(() => [...created, ...keywords], [created])
+  const base = useProfileFilter(allKeywords)
+  const addKeywords = (rows) => {
+    const stamped = rows.map((r, i) => ({ ...ZERO_METRICS, id: 'KNEW' + (Date.now() + i).toString().slice(-7), keyword: r.keyword, campaignId: r.campaignId, campaign: r.campaign, profileId: r.profileId, matchType: r.matchType, state: 'Enabled', bid: r.bid, sugBid: r.bid, topOfSearchIS: 0 }))
+    const next = [...stamped, ...created]; createdStore.set('keywords', next); setCreated(next); setShowAdd(false); toast(`Added ${rows.length} keyword${rows.length === 1 ? '' : 's'} — added to the grid`)
+  }
   const [tab, setTab] = useState('Keywords')
   const [sel, setSel] = useState(new Set())
   const [overrides, setOverrides] = usePersistentOverrides('ads-targeting')
@@ -3037,7 +3110,8 @@ function Targeting() {
   ]
   return (
     <>
-      <AdsHead title="Targeting" sub={`Keywords & product targets · ${rangeResolved.label}`}><ExportMenu name="targeting" fields={TARGETING_FIELDS} rows={filtered} /><Btn icon="plus" primary>Add Keywords</Btn></AdsHead>
+      <AdsHead title="Targeting" sub={`Keywords & product targets · ${rangeResolved.label}`}><ExportMenu name="targeting" fields={TARGETING_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setShowAdd(true)}>Add Keywords</Btn></AdsHead>
+      {showAdd && <AddKeywordsModal camps={allCamps} onClose={() => setShowAdd(false)} onCreate={addKeywords} />}
       <div className="viewtabs" style={{ maxWidth: 360 }}>
         {['Keywords', 'Product Targets', 'Negatives'].map((t) => <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</div>)}
       </div>
@@ -3137,18 +3211,26 @@ function ShareOfVoice() {
     { key: 'paidShare', label: 'Paid SOV', num: true, render: (r) => <ShareBar v={r.paidShare} color="#1a4fd6" /> },
     { key: 'organicShare', label: 'Organic SOV', num: true, render: (r) => <ShareBar v={r.organicShare} color="#1aa260" /> },
     { key: 'totalShare', label: 'Total SOV', num: true, render: (r) => <b>{pct(r.totalShare)}</b> },
-    { key: 'yourRank', label: 'Your Avg Rank', num: true, render: (r) => `#${r.yourRank}` },
+    { key: 'yourRank', label: 'Your Avg Rank', num: true, render: (r) => (r.yourRank ? `#${r.yourRank}` : '—') },
     { key: 'topCompetitor', label: 'Top Competitor', render: (r) => <span>{r.topCompetitor} <span className="muted">({pct(r.competitorShare)})</span></span> },
     { key: 'trend', label: '7d Trend', num: true, render: (r) => <span style={{ color: r.trend >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}><Icon name={r.trend >= 0 ? 'trendUp' : 'trendDown'} size={12} /> {Math.abs(r.trend).toFixed(1)}pt</span> },
   ]
+  const [created, setCreated] = useState(() => createdStore.get('sov'))
+  const [showTrack, setShowTrack] = useState(false)
+  const trackKeyword = (k) => {
+    const row = { id: 'SOVNEW' + Date.now().toString().slice(-7), keyword: k.keyword, searchVolume: k.searchVolume, paidShare: 0, organicShare: 0, totalShare: 0, yourRank: 0, topCompetitor: k.topCompetitor, competitorShare: 0, trend: 0 }
+    const next = [row, ...created]; createdStore.set('sov', next); setCreated(next); setShowTrack(false); toast(`Now tracking "${k.keyword}"`)
+  }
+  const allSov = useMemo(() => [...created, ...shareOfVoice], [created])
   const [filters, setFilters] = useState(() => loadFilterModel('ads-sov'))
-  const filtered = applyFilters(shareOfVoice, filters, SOV_FIELDS)
+  const filtered = applyFilters(allSov, filters, SOV_FIELDS)
   const n = filtered.length || 1
   const avgPaid = filtered.reduce((s, r) => s + r.paidShare, 0) / n
   const avgOrg = filtered.reduce((s, r) => s + r.organicShare, 0) / n
   return (
     <>
-      <AdsHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><ExportMenu name="share-of-voice" fields={SOV_FIELDS} rows={filtered} /><Btn icon="plus" primary>Track Keyword</Btn></AdsHead>
+      <AdsHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><ExportMenu name="share-of-voice" fields={SOV_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setShowTrack(true)}>Track Keyword</Btn></AdsHead>
+      {showTrack && <TrackKeywordModal onClose={() => setShowTrack(false)} onCreate={trackKeyword} />}
       <KpiGrid>
         <Kpi label="Avg Paid SOV" value={pct(avgPaid)} delta={3.2} />
         <Kpi label="Avg Organic SOV" value={pct(avgOrg)} delta={-1.1} deltaGood={false} />
