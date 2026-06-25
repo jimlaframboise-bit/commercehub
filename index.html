@@ -4343,9 +4343,9 @@ function Reports() {
   const [created, setCreated] = useState(() => createdStore.get('reports'))
   const [picker, setPicker] = useState(false)
   const [builder, setBuilder] = useState(null) // null | {} | template-form
-  const reports = [...created, ...MOCK_REPORTS]
+  const allReports = [...created, ...reports]
   const createReport = (r) => { const row = { id: 'RPNEW' + Date.now().toString().slice(-7), owner: 'You', updated: 'just now', ...r }; const next = [row, ...created]; createdStore.set('reports', next); setCreated(next); setBuilder(null); toast(`Report "${r.name}" created`) }
-  const searched = reports.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()) || r.type.toLowerCase().includes(q.toLowerCase()))
+  const searched = allReports.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()) || r.type.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, RP_FIELDS)
   const columns = [
     { key: 'name', label: 'Report', sticky: true, width: 300, sortVal: (r) => r.name, render: (r) => <div>{r.name}<small>{r.type}</small></div> },
@@ -4363,9 +4363,9 @@ function Reports() {
       {picker && <ReportTemplatePicker onClose={() => setPicker(false)} onPick={(form) => { setPicker(false); setBuilder(form) }} />}
       {builder && <BuildReportModal initial={builder.name ? builder : null} onClose={() => setBuilder(null)} onCreate={createReport} />}
       <KpiGrid>
-        <Kpi label="Saved Reports" value={reports.length} />
-        <Kpi label="Scheduled" value={reports.filter(r => /·/.test(r.cadence)).length} />
-        <Kpi label="Recipients" value={reports.reduce((s, r) => s + r.recipients, 0)} />
+        <Kpi label="Saved Reports" value={allReports.length} />
+        <Kpi label="Scheduled" value={allReports.filter(r => /·/.test(r.cadence)).length} />
+        <Kpi label="Recipients" value={allReports.reduce((s, r) => s + r.recipients, 0)} />
         <Kpi label="Widgets Available" value={reportTemplates.length} />
       </KpiGrid>
       <Card title="Report builder — data sources" sub="Drag widgets onto a custom dashboard" >
