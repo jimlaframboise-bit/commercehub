@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Vite build output
+dist/
+
+# Intermediate single-file build (index.html is the tracked, deployed artifact)
+CommerceHub.html
+
+# Source snapshot zips (superseded by git history)
+*.zip
+
+# OS / editor cruft
+.DS_Store
+*.log
