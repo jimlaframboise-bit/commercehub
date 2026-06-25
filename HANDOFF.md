@@ -288,20 +288,24 @@ the live Vercel site, not just static-checked). Use a `?v=<n>` cache-buster when
 ## 3. Live deployment
 
 - **Live URL:** https://commercehub-five.vercel.app  (public, mock data only)
-- **GitHub repo:** `jimlaframboise-bit/commercehub` (public). Historically held just `index.html` + `README.md` + a
-  zip snapshot. Pushes to `main` auto-redeploy on Vercel.
-- **Source / version control (NEW — session 7):** the project folder is now a **real local git repo** (branch `main`,
-  initial commit `d63a418` = full `src/` tree + `tools/` + configs + docs + the deployed `index.html`; `.gitignore`
-  excludes `node_modules/`, `dist/`, `CommerceHub.html`, `*.zip`). Zip snapshots are **retired** in favour of git
-  history. **Pending one-time step (Jim, on his Mac — sandbox has NO GitHub network, 403):**
-  `git remote add origin https://github.com/jimlaframboise-bit/commercehub.git` then
-  `git push --force -u origin main` (force needed: local history is unrelated to the old index-only remote; the
-  committed `index.html` is byte-identical to what's live, so the force-push won't change the site).
-  - **⚠ Sync caveat for future sessions:** Claude (in the sandbox) **cannot `git push`** (no GitHub auth/network), so
-    Claude's deploys still go via the **browser index.html upload**. That updates the repo's `index.html` but NOT the
-    `src/` tree on the remote → the committed source will drift from the deployed build. To stay in sync, Claude makes
-    a **local git commit** of source + rebuilt `index.html` each session, and **Jim pushes from his Mac**
-    (`git push`). (Or Jim does all deploys via `git push`, which also triggers Vercel — but only from his machine.)
+- **GitHub repo:** `jimlaframboise-bit/commercehub` (public). Now holds the **full diffable source** — `src/` tree,
+  `tools/`, configs, docs, and the deployed `index.html` (seeded via the browser in session 7; the old zip snapshot was
+  deleted). Pushes to `main` auto-redeploy on Vercel.
+- **Source / version control (set up session 7):** the project folder is a **real local git repo** (branch `main`;
+  `.gitignore` excludes `node_modules/`, `dist/`, `CommerceHub.html`, `*.zip`). The remote already has the complete
+  source (no Jim push required — Claude seeded it file-by-file through the GitHub web UI). Zip snapshots are **retired**
+  in favour of git history.
+  - **Sandbox limit:** Claude **cannot `git push`** (no GitHub network from the sandbox — `git ls-remote` → 403). So
+    Claude commits to GitHub the same way it deploys: **through the browser (Claude-in-Chrome) web-UI commits.**
+  - **Deploy + source-sync workflow (Claude owns both — confirmed by Jim session 7):** each release Claude (1) builds
+    `index.html` + uploads it via the browser (Vercel auto-deploys), AND (2) uploads the changed **source** files via
+    the browser to keep the repo's `src/` tree in step with the build. To commit into an existing subfolder, navigate
+    to `https://github.com/<repo>/upload/main/<path>` (e.g. `/upload/main/src/pages`) — GitHub creates the path on
+    commit; the file-input upload flattens to the page's path, so do one folder per commit. Also keep a **local git
+    commit** each session for in-sandbox history/diffs.
+  - *(Optional, Jim only)* to connect his local working copy for terminal pushes:
+    `git remote add origin https://github.com/jimlaframboise-bit/commercehub.git` then `git pull --rebase` (the remote
+    already has content, so don't force).
 - **Vercel:** project `commercehub` under team `jimlaframboise-7150s-projects` (Hobby plan),
   preset "Other" (static). GitHub↔Vercel already connected.
 - **Deploy method today:** the single-file `index.html` is uploaded to the repo via GitHub web UI;
