@@ -490,6 +490,12 @@ table.dt tr.grow td.sticky-l { background: var(--brand-soft); }
 .bm-pace { display:inline-flex; align-items:center; gap:8px; justify-content:flex-end; }
 .bm-pace .miniprog { width:64px; }
 .rm-clip { max-width:240px; font-size:11.5px; line-height:1.35; white-space:normal; color:var(--text-2); }
+.dp-brushes { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:14px; }
+.dp-swatch { border:2px solid transparent; border-radius:6px; padding:4px 9px; font-size:11px; font-weight:700; cursor:pointer; box-shadow:0 1px 2px rgba(16,24,40,.08); }
+.dp-swatch.on { border-color:var(--text); box-shadow:0 0 0 2px var(--brand-soft); }
+.tmpl-list { display:flex; flex-direction:column; gap:8px; }
+.tmpl-card { display:flex; align-items:center; gap:11px; border:1px solid var(--border); border-radius:10px; padding:11px 13px; cursor:pointer; transition:border-color .12s, background .12s; }
+.tmpl-card:hover { border-color:var(--brand); background:var(--brand-soft); }
 
 #boot { position:fixed; inset:0; display:grid; place-items:center; font-family:sans-serif; color:#5b6577; }
 </style>
@@ -2102,7 +2108,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.8.1</span>
+        <span className="app-version" title="CommerceHub build">v0.9.0</span>
       </div>
     </aside>
   )
@@ -3172,50 +3178,82 @@ function ShareBar({ v, color }) {
 }
 
 /* ============================ DAYPARTING ============================ */
+const DP_KEY = 'chdaypart'
+const DP_BRUSHES = [0.4, 0.6, 0.8, 1.0, 1.2, 1.35, 1.5]
+const dpColor = (v) => {
+  const t = Math.max(0, Math.min(1, (v - 0.4) / 1.1))
+  const r = Math.round(234 - t * (234 - 26))
+  const g = Math.round(241 - t * (241 - 79))
+  const b = Math.round(255 - t * (255 - 214))
+  return `rgb(${r},${g},${b})`
+}
+const dpRound = (n) => Math.round(n * 100) / 100
+const dpLoad = (fallback) => { try { const v = JSON.parse(localStorage.getItem(DP_KEY)); return Array.isArray(v) && v.length === 7 ? v : fallback } catch (e) { return fallback } }
+const dpSave = (g) => { try { localStorage.setItem(DP_KEY, JSON.stringify(g)) } catch (e) { /* ignore */ } }
+// Heuristic "optimized" schedule — trim overnight harder, lift peak windows, weekend bump.
+const dpSuggest = () => DAYS.map((d, di) => Array.from({ length: 24 }, (_, h) => {
+  let b = 0.35
+  if (h >= 7 && h <= 11) b = 1.1
+  if (h >= 12 && h <= 14) b = 1.3
+  if (h >= 18 && h <= 22) b = 1.5
+  if (di >= 5) b = b * 1.1
+  return dpRound(Math.min(1.6, b))
+}))
+
 function Dayparting() {
-  const [grid] = useState(dayparting)
+  const [grid, setGrid] = useState(() => dpLoad(dayparting))
+  const [brush, setBrush] = useState(1.2)
+  const painting = useRef(false)
   const hours = Array.from({ length: 24 }, (_, h) => h)
-  const color = (v) => {
-    const t = Math.max(0, Math.min(1, (v - 0.4) / 1.1))
-    const r = Math.round(234 - t * (234 - 26))
-    const g = Math.round(241 - t * (241 - 79))
-    const b = Math.round(255 - t * (255 - 214))
-    return `rgb(${r},${g},${b})`
-  }
+  useEffect(() => { const up = () => { painting.current = false }; window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up) }, [])
+  const paint = (di, h) => setGrid((g) => { const n = g.map((r) => r.slice()); n[di][h] = brush; dpSave(n); return n })
+  const reset = () => { setGrid(dayparting); dpSave(dayparting); toast('Schedule reset to default') }
+  const suggest = () => { const s = dpSuggest(); setGrid(s); dpSave(s); toast('Applied suggested schedule') }
+  const apply = () => toast('Dayparting schedule applied to 40 campaigns')
+  const avg = grid.flat().reduce((a, b) => a + b, 0) / 168
+  const peak = Math.max(...grid.flat())
   return (
     <>
-      <AdsHead title="Dayparting" sub="Hour-of-day & day-of-week bid multipliers"><Btn icon="refresh" ghost>Reset</Btn><Btn icon="bulb">Suggest Schedule</Btn><Btn icon="check" primary>Apply to Campaigns</Btn></AdsHead>
+      <AdsHead title="Dayparting" sub="Hour-of-day & day-of-week bid multipliers"><Btn icon="refresh" ghost onClick={reset}>Reset</Btn><Btn icon="bulb" onClick={suggest}>Suggest Schedule</Btn><Btn icon="check" primary onClick={apply}>Apply to Campaigns</Btn></AdsHead>
       <div className="hint" style={{ marginBottom: 14 }}>
         <Icon name="bulb" size={16} />
-        <div>Multipliers scale bids up during high-converting hours and down during low-traffic windows. Darker = higher multiplier. Apply to selected campaigns or portfolios.</div>
+        <div>Pick a multiplier below, then <b>click or drag across cells</b> to paint the schedule. Bids scale up in high-converting hours and down in low-traffic windows. Changes save automatically; <b>Apply to Campaigns</b> pushes the schedule live.</div>
       </div>
-      <Card title="Bid multiplier schedule" sub="Local account time · 168 hourly slots">
+      <Card title="Bid multiplier schedule" sub={`Local account time · 168 hourly slots · avg ${avg.toFixed(2)}× · peak ${peak.toFixed(2)}×`}>
+        <div className="dp-brushes">
+          <span className="muted" style={{ fontWeight: 600 }}>Brush:</span>
+          {DP_BRUSHES.map((v) => (
+            <button key={v} className={`dp-swatch ${brush === v ? 'on' : ''}`} style={{ background: dpColor(v), color: v > 1.0 ? '#fff' : 'var(--text-2)' }} onClick={() => setBrush(v)}>{v.toFixed(2)}×</button>
+          ))}
+        </div>
         <div style={{ overflowX: 'auto' }}>
-          <div className="heat" style={{ minWidth: 760 }}>
+          <div className="heat" style={{ minWidth: 760, userSelect: 'none' }}>
             <div />
             {hours.map((h) => <div key={h} className="hh">{h}</div>)}
             {grid.map((row, di) => (
-              <Row key={di} day={DAYS[di]} row={row} color={color} />
+              <Row key={di} day={DAYS[di]} row={row} di={di} color={dpColor} painting={painting} onPaint={paint} />
             ))}
           </div>
         </div>
         <div className="legend" style={{ marginTop: 16, justifyContent: 'center' }}>
-          <span><i style={{ background: color(0.4) }} /> 0.4× (overnight)</span>
-          <span><i style={{ background: color(0.8) }} /> 0.8×</span>
-          <span><i style={{ background: color(1.1) }} /> 1.1×</span>
-          <span><i style={{ background: color(1.45) }} /> 1.45× (peak)</span>
+          <span><i style={{ background: dpColor(0.4) }} /> 0.4× (overnight)</span>
+          <span><i style={{ background: dpColor(0.8) }} /> 0.8×</span>
+          <span><i style={{ background: dpColor(1.1) }} /> 1.1×</span>
+          <span><i style={{ background: dpColor(1.45) }} /> 1.45× (peak)</span>
         </div>
       </Card>
       <div className="footnote">For shopping events (e.g. Prime Day) apply an event-window override via Rule R6 to boost peak hours automatically.</div>
     </>
   )
 }
-function Row({ day, row, color }) {
+function Row({ day, row, di, color, painting, onPaint }) {
   return (
     <>
       <div className="rl">{day}</div>
       {row.map((v, h) => (
-        <div key={h} className="cell" style={{ background: color(v), color: v > 1.0 ? '#fff' : 'var(--text-2)' }} title={`${day} ${h}:00 → ${v}×`}>{v.toFixed(1)}</div>
+        <div key={h} className="cell" style={{ background: color(v), color: v > 1.0 ? '#fff' : 'var(--text-2)' }} title={`${day} ${h}:00 → ${v}×`}
+          onMouseDown={() => { painting.current = true; onPaint(di, h) }}
+          onMouseEnter={() => { if (painting.current) onPaint(di, h) }}>{v.toFixed(1)}</div>
       ))}
     </>
   )
@@ -3853,6 +3891,32 @@ function RuleBuilder({ onClose, onSave, initial }) {
   )
 }
 
+/* ---- Rule templates (start-from-proven) ---- */
+const RULE_TEMPLATES = [
+  { key: 'acos', title: 'Defend Target ACoS', desc: 'Lower bids when ACoS runs above target.', form: { name: 'Defend Target ACoS ≤ 28%', type: 'Bid', scope: 'All SP campaigns', conditions: [{ id: 't1', metric: 'ACoS', op: 'gt', value: '28', value2: '' }], join: 'AND', lookback: '14', excludeLatest: true, action: 'dec_bid', actionValue: '12', frequency: 'Every 6 hours' } },
+  { key: 'scale', title: 'Scale Winners', desc: 'Raise bids on high-ROAS, high-order targets.', form: { name: 'Scale Winners (ROAS ≥ 4)', type: 'Bid', scope: 'Selected campaigns', conditions: [{ id: 't1', metric: 'ROAS', op: 'gte', value: '4', value2: '' }, { id: 't2', metric: 'Orders', op: 'gte', value: '10', value2: '' }], join: 'AND', lookback: '7', excludeLatest: true, action: 'inc_bid', actionValue: '8', frequency: 'Every 6 hours' } },
+  { key: 'harvest', title: 'Harvest Search Terms', desc: 'Promote converting search terms to manual exact.', form: { name: 'Harvest winning search terms', type: 'Harvest', scope: 'All SP campaigns', conditions: [{ id: 't1', metric: 'Orders', op: 'gte', value: '6', value2: '' }], join: 'AND', lookback: '30', excludeLatest: true, action: 'harvest', actionValue: '', frequency: 'Daily' } },
+  { key: 'negate', title: 'Negate Wasted Spend', desc: 'Add zero-order, high-click terms as negatives.', form: { name: 'Negate wasted spend', type: 'Negative', scope: 'All SP campaigns', conditions: [{ id: 't1', metric: 'Clicks', op: 'gte', value: '15', value2: '' }, { id: 't2', metric: 'Orders', op: 'lte', value: '0', value2: '' }], join: 'AND', lookback: '30', excludeLatest: true, action: 'negative', actionValue: '', frequency: 'Daily' } },
+  { key: 'budget', title: 'Budget Pacing Guard', desc: 'Throttle bids when daily pace runs hot.', form: { name: 'Budget pacing guard', type: 'Budget', scope: 'All profiles', conditions: [{ id: 't1', metric: 'Spend', op: 'gt', value: '115', value2: '' }], join: 'AND', lookback: '7', excludeLatest: false, action: 'adj_budget', actionValue: '-10', frequency: 'Every 6 hours' } },
+]
+function TemplatePicker({ onClose, onPick }) {
+  return (
+    <Modal width={560} title="Rule Templates" sub="Start from a proven automation — tweak it before saving" onClose={onClose}
+      footer={<Btn ghost onClick={onClose}>Cancel</Btn>}>
+      <div className="tmpl-list">
+        {RULE_TEMPLATES.map((t) => (
+          <div key={t.key} className="tmpl-card" onClick={() => onPick(t.form)}>
+            <div className="icobox" style={{ background: RULE_COLOR[t.form.type] + '1a', color: RULE_COLOR[t.form.type] }}><Icon name={RULE_ICON[t.form.type]} size={16} /></div>
+            <div className="grow"><div className="title">{t.title}</div><div className="desc">{t.desc}</div></div>
+            <span className="tag">{t.form.type}</span>
+            <Icon name="chevRight" size={15} className="muted" />
+          </div>
+        ))}
+      </div>
+    </Modal>
+  )
+}
+
 /* ============================ RULE MANAGER ============================ */
 const RM_FIELDS = [
   { key: 'name', label: 'Rule', type: 'text' },
@@ -3875,7 +3939,8 @@ function Rules() {
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('auto-rules'))
   const [builder, setBuilder] = useState(false)
-  const [edit, setEdit] = useState(null)
+  const [edit, setEdit] = useState(null) // carries an existing rule's form (edit) OR a template form (create, no _id)
+  const [picker, setPicker] = useState(false)
   const onSave = (rule) => {
     const created = createdStore.get('rules')
     const isEdit = created.some((x) => x.id === rule.id)
@@ -3930,7 +3995,7 @@ function Rules() {
   const dims = [{ key: 'type', label: 'Type' }, { key: 'status', label: 'Status' }, { key: 'scope', label: 'Scope' }]
   return (
     <>
-      <AutoHead title="Rule Manager" sub="Rules-based automation for bids, budgets, harvesting, negatives, dayparting & retail signals"><ExportMenu name="rule-manager" fields={RM_FIELDS} rows={filtered} /><Btn icon="bulb" ghost>Templates</Btn><Btn icon="plus" primary onClick={() => setBuilder(true)}>Create Rule</Btn></AutoHead>
+      <AutoHead title="Rule Manager" sub="Rules-based automation for bids, budgets, harvesting, negatives, dayparting & retail signals"><ExportMenu name="rule-manager" fields={RM_FIELDS} rows={filtered} /><Btn icon="bulb" ghost onClick={() => setPicker(true)}>Templates</Btn><Btn icon="plus" primary onClick={() => setBuilder(true)}>Create Rule</Btn></AutoHead>
       <KpiGrid>
         <Kpi label="Active Rules" value={active} />
         <Kpi label="Total Rules" value={rules.length} />
@@ -3951,6 +4016,7 @@ function Rules() {
         </>}
       />
       <div className="footnote">Rules evaluate on a schedule and auto-apply actions. Edit or duplicate any rule, filter by type/status/scope, and export the current view. Combine with Campaign AI for hands-off budget, keyword and bid management.</div>
+      {picker && <TemplatePicker onClose={() => setPicker(false)} onPick={(form) => { setPicker(false); setEdit(form) }} />}
       {(builder || edit) && <RuleBuilder initial={edit} onClose={() => { setBuilder(false); setEdit(null) }} onSave={onSave} />}
     </>
   )
@@ -3968,13 +4034,73 @@ const BM_FIELDS = [
   { key: 'forecast', label: 'Forecast EOM', type: 'number' },
   { key: 'pacePct', label: 'Pace %', type: 'number' },
 ]
+const BM_DAY = 20, BM_DAYS = 30
+const capStore = {
+  get() { try { return JSON.parse(localStorage.getItem('chbudgetcaps')) || {} } catch (e) { return {} } },
+  set(v) { try { localStorage.setItem('chbudgetcaps', JSON.stringify(v)) } catch (e) { /* ignore */ } },
+}
+// Re-derive pacing fields when a cap is overridden (forecast is spend-based, so it doesn't change).
+const withCap = (b, caps) => {
+  const cap = caps[b.profileId] != null ? caps[b.profileId] : b.monthlyCap
+  if (cap === b.monthlyCap) return b
+  const targetPace = cap * (BM_DAY / BM_DAYS)
+  return {
+    ...b, monthlyCap: cap, targetPace, remaining: cap - b.spent,
+    pacePct: (b.spent / targetPace) * 100,
+    status: b.spent > targetPace * 1.05 ? 'Over pace' : b.spent < targetPace * 0.9 ? 'Under pace' : 'On pace',
+  }
+}
+
+function PacingChart({ cap, spent, forecast, day = BM_DAY, days = BM_DAYS }) {
+  const W = 680, H = 150, padL = 8, padR = 8, padT = 14, padB = 22
+  const maxY = (Math.max(cap, forecast) * 1.06) || 1
+  const x = (d) => padL + (d / days) * (W - padL - padR)
+  const y = (v) => H - padB - (v / maxY) * (H - padT - padB)
+  const over = forecast > cap
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+      <line x1={x(0)} y1={y(cap)} x2={x(days)} y2={y(cap)} stroke="var(--red)" strokeDasharray="4 4" strokeWidth="1.5" opacity="0.7" />
+      <text x={x(days)} y={y(cap) - 5} textAnchor="end" fontSize="10" fill="var(--red)">Cap {money(cap)}</text>
+      <line x1={x(0)} y1={y(0)} x2={x(days)} y2={y(cap)} stroke="var(--border)" strokeWidth="1.5" />
+      <path d={`M ${x(0)} ${y(0)} L ${x(day)} ${y(spent)}`} fill="none" stroke="var(--brand)" strokeWidth="2.5" />
+      <path d={`M ${x(day)} ${y(spent)} L ${x(days)} ${y(forecast)}`} fill="none" stroke={over ? 'var(--red)' : 'var(--brand)'} strokeWidth="2" strokeDasharray="5 4" />
+      <line x1={x(day)} y1={padT} x2={x(day)} y2={H - padB} stroke="var(--text-3)" strokeDasharray="2 3" strokeWidth="1" />
+      <circle cx={x(day)} cy={y(spent)} r="3.5" fill="var(--brand)" />
+      <text x={x(0)} y={H - 6} textAnchor="start" fontSize="10" fill="var(--text-3)">Day 1</text>
+      <text x={x(day)} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--text-3)">Today (day {day})</text>
+      <text x={x(days)} y={H - 6} textAnchor="end" fontSize="10" fill="var(--text-3)">Day {days}</text>
+    </svg>
+  )
+}
+
+function SetBudgetCapModal({ rows, onClose, onSave }) {
+  const [pid, setPid] = useState(rows[0]?.profileId)
+  const current = rows.find((b) => b.profileId === pid) || rows[0]
+  const [cap, setCap] = useState(String(current?.monthlyCap ?? ''))
+  const onPick = (id) => { setPid(id); const b = rows.find((r) => r.profileId === id); setCap(String(b?.monthlyCap ?? '')) }
+  const canSave = Number(cap) > 0
+  return (
+    <Modal width={460} title="Set Budget Cap" sub="Adjust the monthly cap — pacing & forecast recompute live" onClose={onClose}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><div style={{ flex: 1 }} /><Btn primary disabled={!canSave} icon="check" onClick={() => onSave(pid, Number(cap))}>Save cap</Btn></>}>
+      <label className="fld">Marketplace<select value={pid} onChange={(e) => onPick(e.target.value)}>{rows.map((b) => <option key={b.profileId} value={b.profileId}>{b.profile} ({b.currency})</option>)}</select></label>
+      <label className="fld">Monthly cap ({current?.currency})<input type="number" autoFocus value={cap} onChange={(e) => setCap(e.target.value)} /></label>
+      <div className="modal-note"><Icon name="wallet" size={14} />Spent MTD {cur(current?.spent || 0, current?.currency)} · when the cap is hit, campaigns auto-pause until next month.</div>
+    </Modal>
+  )
+}
+
 function Budgets() {
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('auto-budgets'))
-  const searched = budgets.filter((b) => b.profile.toLowerCase().includes(q.toLowerCase()))
+  const [caps, setCaps] = useState(() => capStore.get())
+  const [capModal, setCapModal] = useState(false)
+  const data = useMemo(() => budgets.map((b) => withCap(b, caps)), [caps])
+  const saveCap = (pid, cap) => { const next = { ...caps, [pid]: cap }; capStore.set(next); setCaps(next); setCapModal(false); const b = budgets.find((x) => x.profileId === pid); toast(`${b?.profile} cap set to ${cur(cap, b?.currency)}`) }
+  const searched = data.filter((b) => b.profile.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, BM_FIELDS)
-  const totalCap = budgets.reduce((s, b) => s + b.monthlyCap, 0)
-  const totalSpent = budgets.reduce((s, b) => s + b.spent, 0)
+  const totalCap = data.reduce((s, b) => s + b.monthlyCap, 0)
+  const totalSpent = data.reduce((s, b) => s + b.spent, 0)
+  const totalForecast = data.reduce((s, b) => s + b.forecast, 0)
   const bSum = (k) => (rs) => rs.reduce((a, b) => a + (b[k] || 0), 0)
   const capPct = (b) => Math.min(100, (b.spent / b.monthlyCap) * 100)
   const columns = [
@@ -3992,18 +4118,27 @@ function Budgets() {
   const dims = [{ key: 'status', label: 'Pace status' }, { key: 'currency', label: 'Currency' }]
   return (
     <>
-      <AutoHead title="Budget Manager" sub="Monthly caps, pacing & forecast with auto-pause on cap"><ExportMenu name="budget-manager" fields={BM_FIELDS} rows={filtered} /><Btn icon="plus" primary>Set Budget Cap</Btn></AutoHead>
+      <AutoHead title="Budget Manager" sub="Monthly caps, pacing & forecast with auto-pause on cap"><ExportMenu name="budget-manager" fields={BM_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setCapModal(true)}>Set Budget Cap</Btn></AutoHead>
       <KpiGrid>
         <Kpi label="Total Monthly Cap" value={money(totalCap)} />
         <Kpi label="Spent MTD" value={money(totalSpent)} />
         <Kpi label="Remaining" value={money(totalCap - totalSpent)} />
-        <Kpi label="Forecast EOM" value={money(budgets.reduce((s, b) => s + b.forecast, 0))} />
-        <Kpi label="Avg Pace" value={pct(budgets.reduce((s, b) => s + b.pacePct, 0) / budgets.length)} />
+        <Kpi label="Forecast EOM" value={money(totalForecast)} />
+        <Kpi label="Avg Pace" value={pct(data.reduce((s, b) => s + b.pacePct, 0) / data.length)} />
       </KpiGrid>
-      <div className="hint" style={{ marginBottom: 14 }}>
+      <Card title="Month pacing — blended" sub={`Actual vs. target pace · projected EOM ${money(totalForecast)} of ${money(totalCap)} cap`}>
+        <PacingChart cap={totalCap} spent={totalSpent} forecast={totalForecast} />
+        <div className="legend" style={{ marginTop: 6, justifyContent: 'center' }}>
+          <span><i style={{ background: 'var(--brand)' }} /> Actual / projected spend</span>
+          <span><i style={{ background: 'var(--border)' }} /> Target pace</span>
+          <span><i style={{ background: 'var(--red)' }} /> Monthly cap</span>
+        </div>
+      </Card>
+      <div className="hint" style={{ margin: '14px 0' }}>
         <Icon name="wallet" size={16} />
-        <div>Upload monthly caps for the fiscal year. When a cap is reached, campaigns auto-pause until the budget refreshes next month. Pacing guard (Rule R7) throttles bids if daily pace runs hot.</div>
+        <div>Set monthly caps per marketplace with <b>Set Budget Cap</b>. When a cap is reached, campaigns auto-pause until the budget refreshes next month. Pacing guard (Rule R7) throttles bids if daily pace runs hot.</div>
       </div>
+      {capModal && <SetBudgetCapModal rows={data} onClose={() => setCapModal(false)} onSave={saveCap} />}
       <DataGrid
         id="auto-budgets"
         columns={columns}
