@@ -12,6 +12,10 @@
 > persist Ad Groups/Search Terms edits, edit+duplicate campaigns, persist date range. Phase 8 (v0.8.0): Automation +
 > Insights on the DataGrid. Prior: Phase 5 date-scaling/picker; Phase 6 Commerce; Phase 7 DSP.)
 >
+> **Also this session — real version control (see §3):** the project folder is now a git repo and the **full source
+> tree is on GitHub** (seeded via the browser; old zip snapshot deleted). Going forward Claude owns BOTH deployment
+> and source-sync via browser commits (the sandbox can't `git push` — 403). No Jim action required.
+>
 > **⚠ Build gotcha hit & fixed this session:** introducing a NEW `import { x as Y }` alias **breaks the single-file
 > build** — `tools/build-singlefile.mjs` strips imports and only injects the 3 known aliases (`ALL_CAMPAIGNS`,
 > `RULES`, `ALERTS`) at line 157. A new alias (`reports as MOCK_REPORTS`) compiled fine under `tsc` but was
