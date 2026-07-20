@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Kpi, KpiGrid, Card, Pill, Toggle, Check, DataGrid, FilterBar, applyFilters, loadFilterModel, Btn, SearchBox, EditableNum, StateSelect, Modal, toast, createdStore, usePersistentOverrides, ExportMenu, scaleForRange } from '../components/ui.jsx'
+import { Kpi, KpiGrid, Card, Pill, Toggle, Check, DataGrid, FilterBar, applyFilters, loadFilterModel, Btn, SearchBox, EditableNum, StateSelect, Modal, toast, createdStore, usePersistentOverrides, ExportMenu, exportCSV, scaleForRange } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
 import {
   campaigns as ALL_CAMPAIGNS, keywords, searchTerms, shareOfVoice, dayparting, DAYS,
@@ -398,8 +398,217 @@ function CreateCampaignWizard({ products, profileId, currency = '$', onClose, on
   )
 }
 
+/* ---- Choose Campaign Type modal + single 5-step Create flow (live parity — §9.3) ---- */
+const CC_TYPES = [
+  { v: 'SP', t: 'Sponsored Products', s: 'Promote individual listings in shopping results and product pages.' },
+  { v: 'SB', t: 'Sponsored Brands', s: 'Showcase your brand and product portfolio with custom creative.' },
+  { v: 'SD', t: 'Sponsored Display', s: 'Reach audiences on and off Amazon with display placements.' },
+  { v: 'STV', t: 'Sponsored TV', s: 'Streaming-TV ads that put your brand on the biggest screen.' },
+]
+const CC_SITES = ['Amazon and beyond', 'Amazon Business']
+
+function ChooseCampaignType({ onClose, onContinue }) {
+  const [sel, setSel] = useState(null) // 'SP'|'SB'|'SD'|'STV'|'super'
+  const [sites, setSites] = useState(CC_SITES[0])
+  return (
+    <Modal width={620} title="Create Campaign" sub="Choose Campaign Type" onClose={onClose}
+      footer={<>
+        <div style={{ flex: 1 }} />
+        <Btn ghost onClick={onClose}>Cancel</Btn>
+        <Btn primary disabled={!sel} onClick={() => onContinue(sel, sites)}>Continue</Btn>
+      </>}>
+      <div className="opt-grid">
+        {CC_TYPES.map((o) => (
+          <div key={o.v} className={`opt-card ${sel === o.v ? 'on' : ''}`} onClick={() => setSel(o.v)}>
+            <span className="opt-radio" /><div><div className="oc-title">{o.t}</div><div className="oc-sub">{o.s}</div></div>
+          </div>
+        ))}
+        <div className={`opt-card ${sel === 'super' ? 'on' : ''}`} onClick={() => setSel('super')}>
+          <span className="opt-radio" />
+          <div style={{ flex: 1 }}>
+            <div className="oc-title">Sponsored Products Super Wizard</div>
+            <div className="oc-sub">Build one or many SP campaigns from a product list in a single pass.</div>
+            {sel === 'super' && (
+              <div className="chip-pick" style={{ marginTop: 8 }} onClick={(e) => e.stopPropagation()}>
+                {CC_SITES.map((s) => <span key={s} className={`chip ${sites === s ? 'on' : ''}`} onClick={() => setSites(s)}>{s}</span>)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+const AUTO_GROUPS = ['Close match', 'Loose match', 'Substitutes', 'Complements']
+function SingleCampaignFlow({ type, products, profiles, profileId, currency = '$', onClose, onLaunch }) {
+  const [step, setStep] = useState(0)
+  const today = new Date().toISOString().slice(0, 10)
+  const typeLabel = CC_TYPES.find((t) => t.v === type)?.t || type
+  const [f, setF] = useState({
+    profile: profileId, name: '', state: 'Enabled', dateMode: 'Any Date Range', startDate: today, endDate: '',
+    dailyBudget: '50', sites: CC_SITES[0], targeting: 'Automatic',
+    adgroupName: 'Ad Group 1', defaultBid: '1.20', ads: [],
+    autoGroups: { 'Close match': true, 'Loose match': true, 'Substitutes': true, 'Complements': true },
+    autoBids: { 'Close match': '1.20', 'Loose match': '0.95', 'Substitutes': '0.85', 'Complements': '0.75' },
+    keywords: [], kwInput: '', kwMatch: 'Exact', kwBid: '1.20',
+    negatives: [], negInput: '', negMatch: 'Negative Exact',
+  })
+  const set = (patch) => setF((x) => ({ ...x, ...patch }))
+  const steps = ['Campaign', 'Adgroup and Ads', 'Targeting', 'Negative Targeting', 'Complete']
+  const last = steps.length - 1
+  const canNext = () => {
+    if (step === 0) return f.name.trim().length > 0 && f.name.length <= 128 && Number(f.dailyBudget) > 0 && (f.dateMode === 'Any Date Range' || !!f.startDate)
+    if (step === 1) return f.adgroupName.trim().length > 0 && f.ads.length > 0
+    if (step === 2) return f.targeting === 'Automatic' ? AUTO_GROUPS.some((g) => f.autoGroups[g]) : f.keywords.length > 0
+    return true
+  }
+  const addKw = () => { const t = f.kwInput.trim(); if (!t) return; set({ keywords: [...f.keywords, { text: t, match: f.kwMatch, bid: f.kwBid }], kwInput: '' }) }
+  const addNeg = () => { const t = f.negInput.trim(); if (!t) return; set({ negatives: [...f.negatives, { text: t, match: f.negMatch }], negInput: '' }) }
+  const launch = () => {
+    const zero = { impr: 0, clk: 0, ctr: 0, cpc: 0, spend: 0, cvr: 0, orders: 0, asp: 0, aov: 0, sales: 0, units: 0, ntb: 0, atc: 0, acos: 0, roas: 0, cpa: 0 }
+    const campaignType = type === 'SP' ? (f.targeting === 'Automatic' ? 'SP-Auto' : 'SP-Manual') : type === 'SD' ? 'SD-Product' : type
+    const targetingType = type === 'SP' ? f.targeting : type === 'SD' ? 'Product' : 'Manual'
+    const firstAd = products.find((p) => p.asin === f.ads[0]) || {}
+    onLaunch([{
+      id: 'CNEW' + Date.now().toString().slice(-7),
+      name: f.name.trim(), asin: f.ads[0], product: firstAd.title || f.ads[0], profileId: f.profile === 'all' ? 'us' : f.profile,
+      state: f.state, status: f.state, campaignType, targetingType,
+      adGroups: { active: 1, total: 1 }, dailyBudget: Number(f.dailyBudget),
+      actlBid: Number(f.defaultBid) || 1, avlBid: round2((Number(f.defaultBid) || 1) * 1.3),
+      portfolio: 'New Launch', bidStrategy: 'Dynamic - down only', tag: 'NEW',
+      startDate: f.dateMode === 'Any Date Range' ? today : f.startDate,
+      endDate: f.dateMode === 'Any Date Range' ? '' : f.endDate, ...zero,
+    }])
+  }
+  const renderStep = () => {
+    if (step === 0) return (
+      <>
+        <div className="rb-grid2">
+          <label className="fld">Profile<select value={f.profile} onChange={(e) => set({ profile: e.target.value })}>{profiles.map((p) => <option key={p.id} value={p.id}>{p.market}</option>)}</select></label>
+          <label className="fld">Campaign State<select value={f.state} onChange={(e) => set({ state: e.target.value })}><option>Enabled</option><option>Paused</option></select></label>
+        </div>
+        <label className="fld">Campaign Name<input autoFocus maxLength={128} value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder={`${typeLabel} campaign name (max 128 characters)`} /></label>
+        <div className="rb-grid2">
+          <label className="fld">Date Range<select value={f.dateMode} onChange={(e) => set({ dateMode: e.target.value })}><option>Any Date Range</option><option>Select a Date Range</option></select></label>
+          <label className="fld">Daily Budget ({currency})<input type="number" value={f.dailyBudget} onChange={(e) => set({ dailyBudget: e.target.value })} /></label>
+        </div>
+        {f.dateMode === 'Select a Date Range' && (
+          <div className="rb-grid2">
+            <label className="fld">Start date<input type="date" value={f.startDate} onChange={(e) => set({ startDate: e.target.value })} /></label>
+            <label className="fld">End date (optional)<input type="date" value={f.endDate} onChange={(e) => set({ endDate: e.target.value })} /></label>
+          </div>
+        )}
+        <div className="rb-grid2">
+          <label className="fld">Sites<select value={f.sites} onChange={(e) => set({ sites: e.target.value })}>{CC_SITES.map((s) => <option key={s}>{s}</option>)}</select></label>
+          {type === 'SP' && <label className="fld">Targeting<select value={f.targeting} onChange={(e) => set({ targeting: e.target.value })}><option>Automatic</option><option>Manual</option></select></label>}
+        </div>
+      </>
+    )
+    if (step === 1) return (
+      <>
+        <div className="rb-grid2">
+          <label className="fld">Adgroup Name<input value={f.adgroupName} onChange={(e) => set({ adgroupName: e.target.value })} /></label>
+          <label className="fld">Default Bid ({currency})<input type="number" value={f.defaultBid} onChange={(e) => set({ defaultBid: e.target.value })} /></label>
+        </div>
+        <div className="wiz-hint">Ads — choose the products to advertise in this adgroup.</div>
+        <div className="prodlist">
+          {products.map((p) => {
+            const on = f.ads.includes(p.asin)
+            return (
+              <div key={p.asin} className="prodrow" onClick={() => set({ ads: on ? f.ads.filter((a) => a !== p.asin) : [...f.ads, p.asin] })}>
+                <Check on={on} onClick={() => {}} />
+                <div style={{ flex: 1 }}>{p.title}<div className="pr-asin">{p.asin} · {p.brand}</div></div>
+              </div>
+            )
+          })}
+        </div>
+      </>
+    )
+    if (step === 2) return f.targeting === 'Automatic' && type === 'SP' ? (
+      <>
+        <div className="wiz-hint">Automatic targeting groups — enable and bid per match group.</div>
+        {AUTO_GROUPS.map((g) => (
+          <div key={g} className="rb-grid2" style={{ alignItems: 'center', marginBottom: 6 }}>
+            <label className="rb-check"><Toggle on={f.autoGroups[g]} onClick={() => set({ autoGroups: { ...f.autoGroups, [g]: !f.autoGroups[g] } })} /> {g}</label>
+            <label className="fld">Bid ({currency})<input type="number" disabled={!f.autoGroups[g]} value={f.autoBids[g]} onChange={(e) => set({ autoBids: { ...f.autoBids, [g]: e.target.value } })} /></label>
+          </div>
+        ))}
+      </>
+    ) : (
+      <>
+        <div className="wiz-hint">{type === 'SP' ? 'Add keywords with match type and bid.' : `Add ${typeLabel} targets (keywords) with bid.`}</div>
+        <div className="rb-grid2" style={{ gridTemplateColumns: '2fr 1fr 1fr auto', display: 'grid', gap: 8 }}>
+          <input placeholder="keyword" value={f.kwInput} onChange={(e) => set({ kwInput: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addKw()} />
+          <select value={f.kwMatch} onChange={(e) => set({ kwMatch: e.target.value })}><option>Exact</option><option>Phrase</option><option>Broad</option></select>
+          <input type="number" value={f.kwBid} onChange={(e) => set({ kwBid: e.target.value })} />
+          <Btn onClick={addKw}>Add</Btn>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          {f.keywords.map((k, i) => (
+            <span key={i} className="chip on" style={{ marginRight: 6, marginBottom: 6 }} onClick={() => set({ keywords: f.keywords.filter((_, j) => j !== i) })}>
+              {k.text} · {k.match} · {currency}{k.bid} ✕
+            </span>
+          ))}
+          {!f.keywords.length && <div className="modal-note"><Icon name="bulb" size={14} />No keywords yet — add at least one to continue.</div>}
+        </div>
+      </>
+    )
+    if (step === 3) return (
+      <>
+        <div className="wiz-hint">Negative targeting (optional) — block irrelevant queries.</div>
+        <div className="rb-grid2" style={{ gridTemplateColumns: '2fr 1fr auto', display: 'grid', gap: 8 }}>
+          <input placeholder="negative keyword" value={f.negInput} onChange={(e) => set({ negInput: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addNeg()} />
+          <select value={f.negMatch} onChange={(e) => set({ negMatch: e.target.value })}><option>Negative Exact</option><option>Negative Phrase</option></select>
+          <Btn onClick={addNeg}>Add</Btn>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          {f.negatives.map((k, i) => (
+            <span key={i} className="chip on" style={{ marginRight: 6, marginBottom: 6 }} onClick={() => set({ negatives: f.negatives.filter((_, j) => j !== i) })}>
+              {k.text} · {k.match} ✕
+            </span>
+          ))}
+          {!f.negatives.length && <div className="modal-note"><Icon name="bulb" size={14} />None added — you can skip this step.</div>}
+        </div>
+      </>
+    )
+    return (
+      <table className="review-tbl"><tbody>
+        <tr><td>Type</td><td>{typeLabel}</td></tr>
+        <tr><td>Campaign</td><td>{f.name} · {f.state}</td></tr>
+        <tr><td>Profile</td><td>{profiles.find((p) => p.id === f.profile)?.market || f.profile}</td></tr>
+        <tr><td>Schedule</td><td>{f.dateMode === 'Any Date Range' ? 'Any date range' : `${f.startDate}${f.endDate ? ` → ${f.endDate}` : ' → no end date'}`}</td></tr>
+        <tr><td>Daily Budget</td><td>{currency}{f.dailyBudget}</td></tr>
+        <tr><td>Sites</td><td>{f.sites}</td></tr>
+        <tr><td>Adgroup</td><td>{f.adgroupName} · default bid {currency}{f.defaultBid} · {f.ads.length} ad{f.ads.length === 1 ? '' : 's'}</td></tr>
+        <tr><td>Targeting</td><td>{type === 'SP' && f.targeting === 'Automatic' ? AUTO_GROUPS.filter((g) => f.autoGroups[g]).join(', ') : `${f.keywords.length} keyword${f.keywords.length === 1 ? '' : 's'}`}</td></tr>
+        <tr><td>Negatives</td><td>{f.negatives.length ? f.negatives.map((n) => n.text).join(', ') : 'None'}</td></tr>
+      </tbody></table>
+    )
+  }
+  return (
+    <Modal width={640} title={`Create Campaign — ${typeLabel}`} sub="Single campaign flow" onClose={onClose}
+      footer={<>
+        {step > 0 && <Btn ghost onClick={() => setStep(step - 1)}>Previous</Btn>}
+        <div style={{ flex: 1 }} />
+        <span className="muted" style={{ fontSize: 11 }}>Step {step + 1} of {steps.length}</span>
+        {step < last
+          ? <Btn primary disabled={!canNext()} onClick={() => setStep(step + 1)}>Next</Btn>
+          : <Btn primary icon="check" onClick={launch}>Launch campaign</Btn>}
+      </>}>
+      <div className="wiz-steps">
+        {steps.map((s, i) => (
+          <span key={s} className={`wiz-step ${i === step ? 'on' : i < step ? 'done' : ''}`}><span className="num">{i < step ? '✓' : i + 1}</span>{s}</span>
+        ))}
+      </div>
+      <div className="wiz-progress"><span style={{ width: ((step + 1) / steps.length * 100) + '%' }} /></div>
+      <div className="wiz-body"><div className="wiz-title">{steps[step]}</div>{renderStep()}</div>
+    </Modal>
+  )
+}
+
 /* ---- Edit a user-created campaign (lightweight; the wizard is for creation) ---- */
-const EC_TYPES = ['SP-Auto', 'SP-Manual', 'PAT', 'SB', 'SBV', 'SD-Product', 'SD-Audience']
+const EC_TYPES = ['SP-Auto', 'SP-Manual', 'PAT', 'SB', 'SBV', 'SD-Product', 'SD-Audience', 'STV']
 const EC_BIDSTRAT = ['Dynamic - down only', 'Dynamic - up & down', 'Fixed bids']
 function EditCampaignModal({ camp, currency = '$', onClose, onSave }) {
   const [f, setF] = useState({
@@ -505,7 +714,7 @@ function KpiRow({ rows, prev }) {
 
 /* ============================ CAMPAIGNS ============================ */
 export function Campaigns() {
-  const { profileId, rangeResolved } = useApp()
+  const { profileId, rangeResolved, profiles } = useApp()
   const [created, setCreated] = useState(() => createdStore.get('campaigns'))
   const allCampaigns = useMemo(() => [...created, ...ALL_CAMPAIGNS], [created])
   const base = useProfileFilter(allCampaigns)
@@ -516,9 +725,12 @@ export function Campaigns() {
 
   const [modal, setModal] = useState(null) // 'bid' | 'budget' | 'tag' | 'daypart' | 'rule'
   const [wizard, setWizard] = useState(false)
+  const [chooser, setChooser] = useState(false)
+  const [singleType, setSingleType] = useState(null) // 'SP' | 'SB' | 'SD' | 'STV'
   const [editCamp, setEditCamp] = useState(null)
   const allRules = useMemo(() => [...createdStore.get('rules'), ...RULES], [])
-  const onLaunch = (camps) => { const next = [...camps, ...created]; createdStore.set('campaigns', next); setCreated(next); setWizard(false); toast(`Launched ${camps.length} campaign${camps.length === 1 ? '' : 's'} — added to the grid`) }
+  const onLaunch = (camps) => { const next = [...camps, ...created]; createdStore.set('campaigns', next); setCreated(next); setWizard(false); setSingleType(null); toast(`Launched ${camps.length} campaign${camps.length === 1 ? '' : 's'} — added to the grid`) }
+  const onChooseType = (sel) => { setChooser(false); if (sel === 'super') setWizard(true); else setSingleType(sel) }
   const saveCampaign = (upd) => {
     const next = created.map((c) => c.id === upd.id ? { ...c, ...upd } : c)
     createdStore.set('campaigns', next); setCreated(next)
@@ -532,7 +744,10 @@ export function Campaigns() {
   }
   const createdById = Object.fromEntries(created.map((c) => [c.id, c]))
 
-  const withEdits = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
+  // Deterministic mock placement per campaign (live Pacvue "Placement" dimension — §9.5)
+  const PLACEMENTS = ['Top of Search', 'Product Pages', 'Rest of Search']
+  const placementOf = (id) => { let h = 0; const s = String(id); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return PLACEMENTS[h % 3] }
+  const withEdits = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id], placement: placementOf(c.id) } : { ...c, placement: placementOf(c.id) }))
   const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, rangeResolved), [withEdits, rangeResolved])
   const searched = data.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, CAMPAIGN_FIELDS)
@@ -583,13 +798,18 @@ export function Campaigns() {
       : <span className="muted" style={{ fontSize: 11 }}>—</span> },
   ]
 
+  // Preset names match live Pacvue (§9.1): Target ACOS View · Performance · Default Plan · Custom Columns
   const presets = {
-    Default: ['name', 'state', 'status', 'campaignType', 'adGroups', 'dailyBudget', 'bid', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'ntb', 'act'],
+    'Target ACOS View': ['name', 'state', 'dailyBudget', 'spend', 'sales', 'acos', 'roas', 'cpc', 'orders', 'act'],
     Performance: ['name', 'state', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'act'],
-    'Target ACOS': ['name', 'state', 'dailyBudget', 'spend', 'sales', 'acos', 'roas', 'cpc', 'orders', 'act'],
+    'Default Plan': ['name', 'state', 'status', 'campaignType', 'adGroups', 'dailyBudget', 'bid', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'ntb', 'act'],
+    'Custom Columns': ['name', 'state', 'campaignType', 'dailyBudget', 'spend', 'sales', 'acos', 'roas', 'act'],
   }
+  // Live Pacvue dimensions (§9.5): Placement · Campaign Type · Campaign Type (Drill-down)
   const dims = [
+    { key: 'placement', label: 'Placement' },
     { key: 'campaignType', label: 'Campaign Type' },
+    { key: 'campaignType:drill', field: 'campaignType', label: 'Campaign Type (Drill-down)', drill: true },
     { key: 'portfolio', label: 'Portfolio' },
     { key: 'targetingType', label: 'Targeting' },
     { key: 'profileId', label: 'Profile' },
@@ -599,7 +819,7 @@ export function Campaigns() {
     <>
       <AdsHead title="Campaigns" sub={`${filtered.length} campaigns · ${rangeResolved.label} · Sponsored Products, Brands & Display`}>
         <ExportMenu name="campaigns" fields={CAMPAIGN_FIELDS} rows={filtered} />
-        <Btn icon="plus" primary onClick={() => setWizard(true)}>Create Campaign</Btn>
+        <Btn icon="plus" primary onClick={() => setChooser(true)}>Create Campaign</Btn>
       </AdsHead>
       <KpiRow rows={filtered} prev={prevFiltered} />
 
@@ -623,7 +843,9 @@ export function Campaigns() {
       {modal === 'tag' && <BulkTagModal count={sel.size} onApply={applyBulkTag} onClose={() => setModal(null)} />}
       {modal === 'daypart' && <BulkDaypartModal count={sel.size} onApply={applyBulkDaypart} onClose={() => setModal(null)} />}
       {modal === 'rule' && <ApplyRuleModal count={sel.size} rules={allRules} onApply={applyBulkRule} onClose={() => setModal(null)} />}
+      {chooser && <ChooseCampaignType onClose={() => setChooser(false)} onContinue={onChooseType} />}
       {wizard && <CreateCampaignWizard products={getProductList()} profileId={profileId === 'all' ? 'us' : profileId} onClose={() => setWizard(false)} onLaunch={onLaunch} />}
+      {singleType && <SingleCampaignFlow type={singleType} products={getProductList()} profiles={profiles} profileId={profileId} onClose={() => setSingleType(null)} onLaunch={onLaunch} />}
       {editCamp && <EditCampaignModal camp={editCamp} currency={symA(editCamp.profileId)} onClose={() => setEditCamp(null)} onSave={saveCampaign} />}
 
       <DataGrid
@@ -632,7 +854,7 @@ export function Campaigns() {
         rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }}
         presets={presets}
-        defaultPreset="Default"
+        defaultPreset="Default Plan"
         dimensions={dims}
         totals
         compare
@@ -1013,6 +1235,97 @@ function Row({ day, row, di, color, painting, onPaint }) {
           onMouseDown={() => { painting.current = true; onPaint(di, h) }}
           onMouseEnter={() => { if (painting.current) onPaint(di, h) }}>{v.toFixed(1)}</div>
       ))}
+    </>
+  )
+}
+
+/* ============================ BULK OPERATIONS ("Pacvue XL" — §9.2) ============================ */
+const XL_TABS = ['Create / Update Campaign', 'Quick Campaign Edits', 'Campaign Target Setting', 'Create Tag', 'Campaign Tag Target Setting', 'Upload Campaign Mapping']
+const XL_QUICK = ['Change Campaign Name', 'Change Campaign Budget', 'Change Campaign State', 'Change Targeting Bid', 'Change Targeting State', 'Add Targeting', 'Add Negative Targeting']
+const XL_CTYPES = ['Sponsored Products', 'Sponsored Brands', 'Sponsored Display', 'Sponsored TV']
+const XL_FIELDS = {
+  'Create / Update Campaign': [
+    { key: 'name', label: 'Campaign Name' }, { key: 'campaignType', label: 'Campaign Type' }, { key: 'state', label: 'State' },
+    { key: 'dailyBudget', label: 'Daily Budget' }, { key: 'startDate', label: 'Start Date' }, { key: 'endDate', label: 'End Date' },
+    { key: 'targetingType', label: 'Targeting Type' }, { key: 'actlBid', label: 'Default Bid' },
+  ],
+  'Quick Campaign Edits': [
+    { key: 'name', label: 'Campaign Name' }, { key: 'setting', label: 'Setting To Modify' }, { key: 'newValue', label: 'New Value' },
+  ],
+  'Campaign Target Setting': [
+    { key: 'name', label: 'Campaign Name' }, { key: 'adGroup', label: 'Ad Group' }, { key: 'target', label: 'Target (keyword / ASIN)' },
+    { key: 'matchType', label: 'Match Type' }, { key: 'bid', label: 'Bid' }, { key: 'state', label: 'State' },
+  ],
+  'Create Tag': [{ key: 'tag', label: 'Tag Name' }, { key: 'name', label: 'Campaign Name' }],
+  'Campaign Tag Target Setting': [{ key: 'tag', label: 'Tag Name' }, { key: 'target', label: 'Target' }, { key: 'bid', label: 'Bid' }],
+  'Upload Campaign Mapping': [{ key: 'name', label: 'Campaign Name' }, { key: 'group', label: 'Mapping Group' }],
+}
+
+export function BulkOperations() {
+  const { profiles } = useApp()
+  const [tab, setTab] = useState(XL_TABS[0])
+  const [profile, setProfile] = useState(profiles[0]?.id)
+  const [ctype, setCtype] = useState(XL_CTYPES[0])
+  const [fmt, setFmt] = useState('Pacvue')
+  const [quick, setQuick] = useState(XL_QUICK[0])
+  const [history, setHistory] = useState(() => createdStore.get('bulkops'))
+  const fileRef = useRef(null)
+  const fields = XL_FIELDS[tab]
+  const stamp = new Date().toISOString().slice(0, 10)
+  const fname = (kind) => `${fmt.toLowerCase()}-${tab.toLowerCase().replace(/[^a-z]+/g, '-')}-${kind}-${stamp}.csv`
+  const downloadTemplate = () => { exportCSV(fname('template'), fields, []); toast(`${fmt} template downloaded — fill it in, then Upload`) }
+  const downloadExisting = () => {
+    const rows = ALL_CAMPAIGNS.filter((c) => c.profileId === profile || profile === 'all').map((c) => ({ ...c, setting: quick, newValue: '', adGroup: '', target: '', matchType: '', bid: c.actlBid, tag: c.tag || '', group: '' }))
+    exportCSV(fname('existing-data'), fields, rows); toast(`Exported ${rows.length} rows for editing`)
+  }
+  const onUpload = (e) => {
+    const file = e.target.files?.[0]; if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const lines = String(reader.result).split(/\r?\n/).filter((l) => l.trim())
+      const n = Math.max(0, lines.length - 1)
+      const rec = { id: 'BO' + Date.now().toString().slice(-6), tab, setting: tab === 'Quick Campaign Edits' ? quick : '—', file: file.name, rows: n, format: fmt, status: n > 10000 ? 'Rejected — over 10,000 row limit' : 'Processed', when: new Date().toLocaleString() }
+      const next = [rec, ...createdStore.get('bulkops')]; createdStore.set('bulkops', next); setHistory(next)
+      toast(rec.status === 'Processed' ? `Processed ${n} row${n === 1 ? '' : 's'} from ${file.name}` : rec.status)
+    }
+    reader.readAsText(file); e.target.value = ''
+  }
+  return (
+    <>
+      <AdsHead title="Bulk Operations" sub="Spreadsheet round-trip for campaigns, targets, tags & mappings — up to 10,000 campaigns / 1,000 keywords per file" />
+      <div className="seg" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
+        {XL_TABS.map((t) => <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{t}</button>)}
+      </div>
+      <Card title={tab} sub="1 — Choose scope · 2 — Download a template or your existing data · 3 — Edit in a spreadsheet · 4 — Upload">
+        <div className="rb-grid2" style={{ maxWidth: 560 }}>
+          <label className="fld">Profile<select value={profile} onChange={(e) => setProfile(e.target.value)}>{profiles.map((p) => <option key={p.id} value={p.id}>{p.market}</option>)}</select></label>
+          <label className="fld">Campaign Type<select value={ctype} onChange={(e) => setCtype(e.target.value)}>{XL_CTYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
+        </div>
+        {tab === 'Quick Campaign Edits' && (
+          <label className="fld" style={{ maxWidth: 560 }}>Setting to modify<select value={quick} onChange={(e) => setQuick(e.target.value)}>{XL_QUICK.map((s) => <option key={s}>{s}</option>)}</select></label>
+        )}
+        <div className="fld" style={{ maxWidth: 560 }}><span>Template format</span>
+          <div className="seg" style={{ marginTop: 4 }}>
+            {['Pacvue', 'Amazon'].map((m) => <button key={m} className={fmt === m ? 'on' : ''} onClick={() => setFmt(m)}>{m}</button>)}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+          <Btn icon="download" onClick={downloadTemplate}>Download template (create)</Btn>
+          <Btn icon="download" ghost onClick={downloadExisting}>Download existing data (edit)</Btn>
+          <Btn icon="plus" primary onClick={() => fileRef.current?.click()}>Upload completed file</Btn>
+          <input ref={fileRef} type="file" accept=".csv,.xls,.xlsx" style={{ display: 'none' }} onChange={onUpload} />
+        </div>
+      </Card>
+      <Card title="Upload history" sub={history.length ? `${history.length} upload${history.length === 1 ? '' : 's'}` : 'No uploads yet — processed files appear here'}>
+        {history.length > 0 && (
+          <table className="review-tbl"><tbody>
+            {history.map((h) => (
+              <tr key={h.id}><td>{h.when}</td><td>{h.tab}{h.setting !== '—' ? ` · ${h.setting}` : ''} · <b>{h.file}</b> · {h.rows} rows · {h.format} format · <span style={{ color: h.status === 'Processed' ? 'var(--green)' : 'var(--red)' }}>{h.status}</span></td></tr>
+            ))}
+          </tbody></table>
+        )}
+      </Card>
+      <div className="footnote">Pick a tab per operation type. Quick Campaign Edits supports: {XL_QUICK.join(' · ')}. Files over 10,000 campaign rows are rejected, matching live limits.</div>
     </>
   )
 }
