@@ -77,7 +77,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.12.0</span>
+        <span className="app-version" title="CommerceHub build">v0.12.1</span>
       </div>
     </aside>
   )
@@ -113,12 +113,12 @@ function CustomRangePanel({ initial, onApply, onClose }) {
   )
 }
 function Topbar() {
-  const { profileId, setProfileId, profiles, range, setRange, customRange, setCustomRange, rangeResolved } = useApp()
+  const { profileId, setProfileId, profiles, range, setRange, customRange, setCustomRange, rangeResolved, alertReads } = useApp()
   const loc = useLocation()
   const [pOpen, setPOpen] = useState(false)
   const [rOpen, setROpen] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
-  const unread = alerts.filter((a) => !a.read).length
+  const unread = alerts.filter((a) => !a.read && !alertReads.includes(a.id)).length
   const crumb = CRUMBS[loc.pathname] || ''
   const [main, sub] = crumb.includes('·') ? crumb.split('·').map((s) => s.trim()) : [crumb, null]
   const selProfile = profileId === 'all' ? 'All Profiles' : profiles.find((p) => p.id === profileId)?.market
