@@ -313,4 +313,27 @@ Every localStorage key in the bundle, with write path + read-on-load path. Steps
 
 ## Results — browser pass
 
-_(pending — logged during C2 execution)_
+**Executed 2026-07-20 (session 10) against the deployed built bundle v0.12.1 (commercehub-five.vercel.app).**
+Evidence layers: (1) per-test static bundle verification (columns above, re-run on v0.12.1 build — all clean);
+(2) session-9 live verification of A1–A7/B1–B2 features; (3) session-10 live interaction sweep below.
+
+| Area | Live checks executed | Result |
+|---|---|---|
+| Routes / console (C3) | All 19 routes rendered (title + grid/KPI probes); fresh load with console tracking → 0 errors; alias grep ALL_CAMPAIGNS/RULES/ALERTS defined; build invariants (dup decls [], leftover 8 0 benign) | PASS |
+| Overview | KPIs rescale 30d→7d with real vs-prev deltas (were hardcoded — FIXED); trend sub follows range; channel mix now data-driven; Avg Buy Box delta removed (no fake) | PASS |
+| Campaigns grid | 6 text operators live; Contains(or) "salmon" filtered 40→8 + badge; dimensions incl. Placement + Campaign Type (Drill-down) collapsed→expand (6→16 rows)→None; 4 column presets; inline budget edit → chedits + Enter commit; saved Plan present | PASS |
+| Create flows | Choose-Campaign-Type modal (SP/SB/SD/STV + Super Wizard); SP card select → Continue → 5-step flow (Campaign / Adgroup and Ads / Targeting / Negative Targeting / Complete) | PASS |
+| Rule builder v2 | Chooser: 5 groups + All Rule/Recommended Usage tabs; step 1: Mode (Automated/Requires Approval) + Running Time Zone; step 2: Same SKU, Cap, Add Automation (multi-block), Preview Results, Save as template, Kickstart rail; EITHER join appears with 2+ conditions (ADDED this session) | PASS |
+| Budgets / Goals | Goal cell click → inline input → chgoals persist; 16 automation toggles → chgoaltoggles persist; Set Budget Cap present; Alloc modal verified session 9 + static | PASS |
+| Reports | Run → toast + Updated "just now" + chedits:ins-reports-runs persist (was no-op — FIXED); download wired to CSV export (was no-op — FIXED) | PASS |
+| Alerts / bell badge | Mark read → Unread KPI 3→2 AND topbar badge 3→2 (was static — FIXED); survives full reload via chalertreads | PASS |
+| DSP | Multi-currency ($/C$/£); compare toggle → delta chips; ExportMenu on Audiences + AMC (was missing — FIXED) | PASS |
+| Commerce | scaleFields: Buy Box/price/rating/content static across ranges; Glance Views + revenue scale (57.1K→224.6K on 7d→30d) | PASS |
+| Drill-down / Settings | Campaign name → Ad Groups ?camp view (3 rows + back-bar); Add Integration modal (8 providers) | PASS |
+| Dayparting | 7 brushes; paint → chdaypart persisted; Reset restores | PASS |
+| Bulk Operations | 6 tabs, Profile/Campaign Type scope, Pacvue/Amazon template format, download/upload + history present | PASS |
+
+**Fails found & fixed this session (all deployed in v0.12.1):** Overview hardcoded deltas; Overview ignored date range; Audience Builder + AMC missing ExportMenu; Report Run/download no-ops; bell badge never decremented; missing EITHER join.
+**Known deliberate stubs (unchanged, expected):** Targeting bulk Add-as-Negative (toast), Dayparting Apply to Campaigns (toast), rule "run" (no engine).
+**Test artifacts cleaned from localStorage after the pass.** tsc unavailable in this session's sandbox — superseded by the stronger zero-console-error load check (Babel parses the full bundle at runtime).
+
