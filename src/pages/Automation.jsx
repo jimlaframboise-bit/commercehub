@@ -222,7 +222,7 @@ function RuleBuilder({ onClose, onSave, onSaveTemplate, initial }) {
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
               <Btn sm ghost icon="plus" onClick={() => addCond(bi)}>Add condition</Btn>
               {b.conditions.length > 1 && (
-                <div className="seg">{['AND', 'OR'].map((j) => <button key={j} className={b.join === j ? 'on' : ''} onClick={() => updBlock(bi, { join: j })}>{j}</button>)}</div>
+                <div className="seg">{['AND', 'OR', 'EITHER'].map((j) => <button key={j} className={b.join === j ? 'on' : ''} onClick={() => updBlock(bi, { join: j })}>{j}</button>)}</div>
               )}
             </div>
             <div className="cm-head" style={{ padding: '10px 0 8px' }}>THEN — action</div>

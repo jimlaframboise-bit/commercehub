@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Kpi, KpiGrid, Card, Pill, Btn, Toggle, SearchBox, DataGrid, FilterBar, applyFilters, loadFilterModel, ExportMenu, Modal, toast, createdStore } from '../components/ui.jsx'
+import { Kpi, KpiGrid, Card, Pill, Btn, Toggle, SearchBox, DataGrid, FilterBar, applyFilters, loadFilterModel, ExportMenu, Modal, toast, createdStore, exportCSV, usePersistentOverrides } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
 import { reports, reportTemplates, alerts as ALERTS } from '../data/mock.js'
+import { useApp } from '../state.jsx'
 
 function InsHead({ title, sub, children }) {
   return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
@@ -72,7 +73,10 @@ export function Reports() {
   const [created, setCreated] = useState(() => createdStore.get('reports'))
   const [picker, setPicker] = useState(false)
   const [builder, setBuilder] = useState(null) // null | {} | template-form
-  const allReports = [...created, ...reports]
+  const [runs, setRuns] = usePersistentOverrides('ins-reports-runs')
+  const allReports = [...created, ...reports].map((r) => (runs[r.id] ? { ...r, ...runs[r.id] } : r))
+  const runReport = (r) => { setRuns({ ...runs, [r.id]: { updated: 'just now' } }); toast(`Running "${r.name}" — data refreshed`) }
+  const downloadReport = (r) => { exportCSV(`${String(r.name).replace(/[^\w -]+/g, '')}.csv`, RP_FIELDS, [r]); toast(`Downloaded "${r.name}" (CSV)`) }
   const createReport = (r) => { const row = { id: 'RPNEW' + Date.now().toString().slice(-7), owner: 'You', updated: 'just now', ...r }; const next = [row, ...created]; createdStore.set('reports', next); setCreated(next); setBuilder(null); toast(`Report "${r.name}" created`) }
   const searched = allReports.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()) || r.type.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, RP_FIELDS)
@@ -83,7 +87,7 @@ export function Reports() {
     { key: 'recipients', label: 'Recipients', num: true, foot: (rs) => rs.reduce((s, r) => s + r.recipients, 0), render: (r) => `${r.recipients}` },
     { key: 'owner', label: 'Owner', sortVal: (r) => r.owner },
     { key: 'updated', label: 'Updated', sortVal: (r) => r.updated, render: (r) => <span className="muted">{r.updated}</span> },
-    { key: 'act', label: '', sort: false, render: () => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><Btn sm ghost icon="play">Run</Btn><Btn sm ghost icon="download" /></span> },
+    { key: 'act', label: '', sort: false, render: (r) => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><Btn sm ghost icon="play" onClick={() => runReport(r)}>Run</Btn><Btn sm ghost icon="download" onClick={() => downloadReport(r)} /></span> },
   ]
   const dims = [{ key: 'type', label: 'Type' }, { key: 'owner', label: 'Owner' }, { key: 'format', label: 'Format' }]
   return (
@@ -172,11 +176,12 @@ function AlertSettingsModal({ onClose }) {
 }
 export function Alerts() {
   const [showSettings, setShowSettings] = useState(false)
-  const [alerts, setAlerts] = useState(ALERTS)
+  const { alertReads, markAlertRead, markAlertsRead } = useApp()
+  const alerts = ALERTS.map((x) => (alertReads.includes(x.id) ? { ...x, read: true } : x))
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ins-alerts'))
-  const markRead = (id) => setAlerts((a) => a.map((x) => x.id === id ? { ...x, read: true } : x))
-  const markAll = () => setAlerts((a) => a.map((x) => ({ ...x, read: true })))
+  const markRead = (id) => markAlertRead(id)
+  const markAll = () => markAlertsRead(ALERTS.map((x) => x.id))
   const decorated = alerts.map((a) => ({ ...a, sevLabel: { high: 'High', med: 'Med', low: 'Low' }[a.sev], status: a.read ? 'Read' : 'Unread' }))
   const searched = decorated.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()) || a.body.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, AL_FIELDS)

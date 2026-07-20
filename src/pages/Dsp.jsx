@@ -136,7 +136,7 @@ export function Audiences() {
   ]
   return (
     <>
-      <DspHead title="Audience Builder" sub="Create custom audiences from ASINs or keywords · prebuilt segments & AMC-modeled lookalikes"><Btn icon="plus" primary>Create Audience</Btn></DspHead>
+      <DspHead title="Audience Builder" sub="Create custom audiences from ASINs or keywords · prebuilt segments & AMC-modeled lookalikes"><ExportMenu name="dsp-audiences" fields={AUDIENCE_FIELDS} rows={filtered} /><Btn icon="plus" primary>Create Audience</Btn></DspHead>
       <div className="grid-3" style={{ marginBottom: 16 }}>
         <Card title="Build from seeds" sub="Deep Intelligence audience creation">
           <div className="viewtabs" style={{ marginBottom: 12 }}>
@@ -211,7 +211,7 @@ export function Amc() {
   ]
   return (
     <>
-      <DspHead title="Amazon Marketing Cloud" sub="Run instructional queries, schedule refreshes, and activate AMC audiences into DSP"><Btn icon="refresh" ghost>Refresh All</Btn><Btn icon="plus" primary>New Query</Btn></DspHead>
+      <DspHead title="Amazon Marketing Cloud" sub="Run instructional queries, schedule refreshes, and activate AMC audiences into DSP"><ExportMenu name="dsp-amc" fields={AMC_FIELDS} rows={filtered} /><Btn icon="refresh" ghost>Refresh All</Btn><Btn icon="plus" primary>New Query</Btn></DspHead>
       <KpiGrid>
         <Kpi label="Saved Queries" value={amcQueries.length} />
         <Kpi label="AMC Audiences" value={2} />

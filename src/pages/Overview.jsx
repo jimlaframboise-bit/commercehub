@@ -1,4 +1,5 @@
-import { Kpi, KpiGrid, Card, PerfChart, Pill, Btn, DualBar } from '../components/ui.jsx'
+import { useMemo } from 'react'
+import { Kpi, KpiGrid, Card, PerfChart, Pill, Btn, DualBar, scaleForRange } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
 import { Link } from 'react-router-dom'
 import { campaigns, aggregate, timeseries, alerts, budgets, shareOfVoice, digitalShelf, dspOrders } from '../data/mock.js'
@@ -6,21 +7,40 @@ import { compact, money, pct, dec2, cur } from '../lib/format.js'
 import { useApp } from '../state.jsx'
 
 export default function Overview() {
-  const { profileId } = useApp()
-  const camps = profileId === 'all' ? campaigns : campaigns.filter((c) => c.profileId === profileId)
+  const { profileId, rangeResolved } = useApp()
+  const campsRaw = profileId === 'all' ? campaigns : campaigns.filter((c) => c.profileId === profileId)
+  const { rows: camps, prev } = useMemo(() => scaleForRange(campsRaw, rangeResolved), [campsRaw, rangeResolved])
+  const prevRows = useMemo(() => camps.map((r) => prev[r.id]).filter(Boolean), [camps, prev])
   const a = aggregate(camps)
-  const dspSpend = dspOrders.reduce((s, d) => s + d.spend, 0)
-  const dspSales = dspOrders.reduce((s, d) => s + d.sales, 0)
-  const oosCount = digitalShelf.filter((d) => !d.inStock).length
-  const buyBoxAvg = digitalShelf.reduce((s, d) => s + d.buyBox, 0) / digitalShelf.length
-  const tacos = ((a.spend + dspSpend) / (a.sales + dspSales + 380000)) * 100
+  const p = prevRows.length ? aggregate(prevRows) : null
+  const dl = (curV, prvV) => (p && prvV ? ((curV - prvV) / Math.abs(prvV)) * 100 : undefined)
 
+  const dspRaw = profileId === 'all' ? dspOrders : dspOrders.filter((d) => d.profileId === profileId)
+  const dspScaled = useMemo(() => scaleForRange(dspRaw, rangeResolved).rows, [dspRaw, rangeResolved])
+  const dspSpend = dspScaled.reduce((s, d) => s + d.spend, 0)
+  const dspSales = dspScaled.reduce((s, d) => s + d.sales, 0)
+  const shelf = profileId === 'all' ? digitalShelf : digitalShelf.filter((d) => d.profileId === profileId)
+  const shelfRows = shelf.length ? shelf : digitalShelf
+  const oosCount = shelfRows.filter((d) => !d.inStock).length
+  const buyBoxAvg = shelfRows.reduce((s, d) => s + d.buyBox, 0) / shelfRows.length
+  const organicBase = 380000 * (rangeResolved.days / 30)
+  const tacos = ((a.spend + dspSpend) / (a.sales + dspSales + organicBase)) * 100
+  const pTacos = p ? ((p.spend + dspSpend) / (p.sales + dspSales + organicBase)) * 100 : null
+
+  const chanSum = (match) => {
+    const rows = camps.filter((c) => match(c.type || ''))
+    return { spend: rows.reduce((s, c) => s + c.spend, 0), sales: rows.reduce((s, c) => s + c.sales, 0) }
+  }
+  const sp = chanSum((t) => t.startsWith('SP') || t === 'PAT')
+  const sb = chanSum((t) => t.startsWith('SB'))
+  const sd = chanSum((t) => t.startsWith('SD'))
   const channelData = [
-    { label: 'Sponsored Products', spend: 38200, sales: 119000, color: '#1a4fd6' },
-    { label: 'Sponsored Brands', spend: 14800, sales: 41200, color: '#1a73e8' },
-    { label: 'Sponsored Display', spend: 7400, sales: 18900, color: '#6b3fd6' },
+    { label: 'Sponsored Products', spend: Math.round(sp.spend), sales: Math.round(sp.sales), color: '#1a4fd6' },
+    { label: 'Sponsored Brands', spend: Math.round(sb.spend), sales: Math.round(sb.sales), color: '#1a73e8' },
+    { label: 'Sponsored Display', spend: Math.round(sd.spend), sales: Math.round(sd.sales), color: '#6b3fd6' },
     { label: 'DSP', spend: Math.round(dspSpend / 100) * 100, sales: Math.round(dspSales / 100) * 100, color: '#1aa260' },
   ]
+  const trendData = useMemo(() => timeseries.slice(-Math.max(2, Math.min(30, rangeResolved.days))), [rangeResolved])
 
   return (
     <>
@@ -37,20 +57,20 @@ export default function Overview() {
       </div>
 
       <KpiGrid>
-        <Kpi label="Ad Spend" value={money(a.spend)} delta={8.2} deltaGood={false} />
-        <Kpi label="Ad Sales" value={money(a.sales)} delta={12.6} />
-        <Kpi label="ACoS" value={pct(a.acos)} delta={-3.1} deltaGood />
-        <Kpi label="ROAS" value={dec2(a.roas)} delta={4.4} />
-        <Kpi label="TACoS" value={pct(tacos)} delta={-1.2} deltaGood />
-        <Kpi label="Impressions" value={compact(a.impr)} delta={6.7} />
-        <Kpi label="Orders" value={compact(a.orders)} delta={9.1} />
-        <Kpi label="Avg Buy Box" value={pct(buyBoxAvg)} delta={-2.4} deltaGood={false} />
+        <Kpi label="Ad Spend" value={money(a.spend)} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
+        <Kpi label="Ad Sales" value={money(a.sales)} delta={dl(a.sales, p?.sales)} />
+        <Kpi label="ACoS" value={pct(a.acos)} delta={dl(a.acos, p?.acos)} deltaGood={(dl(a.acos, p?.acos) || 0) <= 0} />
+        <Kpi label="ROAS" value={dec2(a.roas)} delta={dl(a.roas, p?.roas)} />
+        <Kpi label="TACoS" value={pct(tacos)} delta={pTacos ? ((tacos - pTacos) / Math.abs(pTacos)) * 100 : undefined} deltaGood={pTacos ? tacos <= pTacos : undefined} />
+        <Kpi label="Impressions" value={compact(a.impr)} delta={dl(a.impr, p?.impr)} />
+        <Kpi label="Orders" value={compact(a.orders)} delta={dl(a.orders, p?.orders)} />
+        <Kpi label="Avg Buy Box" value={pct(buyBoxAvg)} />
       </KpiGrid>
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
-        <Card title="Performance trend" sub="Spend vs Sales · last 30 days"
+        <Card title="Performance trend" sub={`Spend vs Sales · ${rangeResolved.label}`}
           actions={<Btn sm ghost icon="download">CSV</Btn>}>
-          <PerfChart data={timeseries} />
+          <PerfChart data={trendData} />
         </Card>
         <Card title="Spend & sales by channel" sub="Full-funnel media mix">
           <DualBar data={channelData} keys={[{ key: 'spend', label: 'Spend', color: '#1a4fd6' }, { key: 'sales', label: 'Sales', color: '#1aa260' }]} />
