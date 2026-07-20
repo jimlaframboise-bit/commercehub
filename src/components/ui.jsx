@@ -263,6 +263,14 @@ export function DataGrid({
   const [dense, setDense] = useState(false)
   const [groupKey, setGroupKey] = useState(null)
   const grouped = !!groupKey
+  // Dimension defs may carry { field, drill }: `field` = row field to group on (defaults to key);
+  // `drill` = start collapsed, click group header to drill down (Pacvue "Campaign Type (Drill-down)").
+  const dimDef = grouped ? (dimensions || []).find((d) => d.key === groupKey) : null
+  const groupField = dimDef?.field || groupKey
+  const [toggledGroups, setToggledGroups] = useState(() => new Set())
+  useEffect(() => { setToggledGroups(new Set()) }, [groupKey])
+  const groupOpen = (g) => (dimDef?.drill ? toggledGroups.has(g) : !toggledGroups.has(g))
+  const toggleGroup = (g) => setToggledGroups((s) => { const n = new Set(s); n.has(g) ? n.delete(g) : n.add(g); return n })
 
   const [pageSize, setPageSize] = useState(pageSizes[0])
   const [page, setPage] = useState(1)
@@ -275,9 +283,9 @@ export function DataGrid({
   const groups = useMemo(() => {
     if (!grouped) return null
     const map = new Map()
-    for (const r of sortedAll) { const g = r[groupKey] ?? '—'; if (!map.has(g)) map.set(g, []); map.get(g).push(r) }
+    for (const r of sortedAll) { const g = r[groupField] ?? '—'; if (!map.has(g)) map.set(g, []); map.get(g).push(r) }
     return [...map.entries()].map(([k, rs]) => ({ key: k, rows: rs }))
-  }, [grouped, groupKey, sortedAll])
+  }, [grouped, groupField, sortedAll])
 
   const colSpan = visibleCols.length + (selectable ? 1 : 0)
   const allOn = selectable && pageRows.length > 0 && pageRows.every((r) => selected?.has(r[rowKey]))
@@ -371,11 +379,14 @@ export function DataGrid({
             ))}
             {grouped && groups.map((g) => (
               <Fragment key={g.key}>
-                <tr className="grow">
-                  <td className="sticky-l" colSpan={1 + (selectable ? 1 : 0)}><Icon name="chevDown" size={12} /> {String(g.key)} <span className="muted">({g.rows.length})</span></td>
+                <tr className="grow" onClick={() => toggleGroup(g.key)} style={{ cursor: 'pointer' }}>
+                  <td className="sticky-l" colSpan={1 + (selectable ? 1 : 0)}>
+                    <span style={{ display: 'inline-flex', transform: groupOpen(g.key) ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }}><Icon name="chevDown" size={12} /></span>
+                    {' '}{String(g.key)} <span className="muted">({g.rows.length})</span>
+                  </td>
                   {visibleCols.slice(1).map((c) => <td key={c.key} className={c.num ? 'num' : ''}>{c.foot ? c.foot(g.rows) : ''}</td>)}
                 </tr>
-                {g.rows.map((r) => (
+                {groupOpen(g.key) && g.rows.map((r) => (
                   <tr key={r[rowKey]}>
                     {selectable && <td className="sticky-l"><Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} /></td>}
                     {visibleCols.map((c) => cell(c, r))}
@@ -445,12 +456,12 @@ const planStore = {
 export function loadFilterModel(id) { return filterStore.get(id) || { join: 'AND', conditions: [] } }
 
 const OPS = {
-  text: [{ op: 'contains', label: 'contains' }, { op: 'notcontains', label: 'does not contain' }, { op: 'equals', label: 'equals' }, { op: 'startswith', label: 'starts with' }],
+  text: [{ op: 'contains', label: 'Contains(or)' }, { op: 'containsand', label: 'Contains(and)' }, { op: 'notcontains', label: 'Not Contains' }, { op: 'equals', label: 'Is' }, { op: 'isnot', label: 'Is Not' }, { op: 'startswith', label: 'Start with' }],
   enum: [{ op: 'in', label: 'is any of' }, { op: 'notin', label: 'is not' }],
   number: [{ op: 'gt', label: '>' }, { op: 'gte', label: '≥' }, { op: 'lt', label: '<' }, { op: 'lte', label: '≤' }, { op: 'eq', label: '=' }, { op: 'between', label: 'between' }],
 }
 const opsFor = (type) => OPS[type] || OPS.text
-const opShort = { contains: '∋', notcontains: '∌', equals: '=', startswith: '^', in: ':', notin: '≠', gt: '>', gte: '≥', lt: '<', lte: '≤', eq: '=', between: '' }
+const opShort = { contains: '∋', containsand: '∋&', notcontains: '∌', equals: '=', isnot: '≠', startswith: '^', in: ':', notin: '≠', gt: '>', gte: '≥', lt: '<', lte: '≤', eq: '=', between: '' }
 const normOpts = (f) => (f.options || []).map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) }))
 const uid = () => Math.random().toString(36).slice(2, 8)
 const clone = (v) => JSON.parse(JSON.stringify(v))
@@ -490,10 +501,14 @@ function condMatch(row, c, field) {
   // text
   const s = String(v ?? '').toLowerCase(); const q = String(c.value ?? '').toLowerCase()
   if (!q) return true
-  if (c.op === 'notcontains') return !s.includes(q)
+  // comma-separated multi-term support (Pacvue: Contains(or) / Contains(and) / Not Contains)
+  const terms = q.split(',').map((t) => t.trim()).filter(Boolean)
+  if (c.op === 'containsand') return terms.every((t) => s.includes(t))
+  if (c.op === 'notcontains') return !terms.some((t) => s.includes(t))
   if (c.op === 'equals') return s === q
+  if (c.op === 'isnot') return s !== q
   if (c.op === 'startswith') return s.startsWith(q)
-  return s.includes(q)
+  return terms.some((t) => s.includes(t)) // contains = Contains(or)
 }
 export function applyFilters(rows, model, fields) {
   const byKey = Object.fromEntries(fields.map((f) => [f.key, f]))
@@ -793,7 +808,13 @@ export function ExportMenu({ name = 'export', fields, rows }) {
    current-period rows for the selected range plus a deterministic prior-period
    map so the grid/KPIs can show genuine vs-prev deltas.
    ========================================================================== */
-export const RANGE_DAYS = { 'Today': 1, 'Yesterday': 1, 'Last 7 days': 7, 'Last 30 days': 30, 'This month': 30, 'Last month': 30, 'All time': 365, 'Custom…': 30 }
+export const RANGE_DAYS = {
+  'Today': 1, 'Yesterday': 1,
+  'Last 7 days': 7, 'Last 7 days (Exclude latest 2 days)': 7,
+  'Last 14 days': 14, 'Last 14 days (Exclude latest 2 days)': 14,
+  'Last 30 days': 30, 'Last 30 days (Exclude latest 2 days)': 30,
+  'This month': 30, 'Last month': 30, 'All time': 365, 'Custom…': 30,
+}
 export function rangeDays(label) { return RANGE_DAYS[label] != null ? RANGE_DAYS[label] : 30 }
 
 // Resolve a range label (+ optional custom {start,end}) into { label, days, key }.

@@ -16,6 +16,7 @@ const NAV = [
       { to: '/ads/search-terms', label: 'Search Terms', icon: 'search' },
       { to: '/ads/sov', label: 'Share of Voice', icon: 'bars' },
       { to: '/ads/dayparting', label: 'Dayparting', icon: 'clock' },
+      { to: '/ads/bulk', label: 'Bulk Operations', icon: 'file' },
     ],
   },
   {
@@ -76,7 +77,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.11.0</span>
+        <span className="app-version" title="CommerceHub build">v0.12.0</span>
       </div>
     </aside>
   )
@@ -86,6 +87,7 @@ const CRUMBS = {
   '/': 'Overview', '/ads/campaigns': 'Sponsored Ads · Campaigns', '/ads/adgroups': 'Sponsored Ads · Ad Groups',
   '/ads/targeting': 'Sponsored Ads · Targeting', '/ads/search-terms': 'Sponsored Ads · Search Terms',
   '/ads/sov': 'Sponsored Ads · Share of Voice', '/ads/dayparting': 'Sponsored Ads · Dayparting',
+  '/ads/bulk': 'Sponsored Ads · Bulk Operations',
   '/dsp': 'DSP · Campaigns', '/dsp/audiences': 'DSP · Audience Builder', '/dsp/amc': 'DSP · Amazon Marketing Cloud',
   '/commerce/shelf': 'Commerce · Digital Shelf', '/commerce/buybox': 'Commerce · Buy Box & Inventory',
   '/commerce/products': 'Commerce · Product Center', '/rules': 'Automation · Rule Manager',
@@ -120,7 +122,7 @@ function Topbar() {
   const crumb = CRUMBS[loc.pathname] || ''
   const [main, sub] = crumb.includes('·') ? crumb.split('·').map((s) => s.trim()) : [crumb, null]
   const selProfile = profileId === 'all' ? 'All Profiles' : profiles.find((p) => p.id === profileId)?.market
-  const ranges = ['Today', 'Yesterday', 'Last 7 days', 'Last 30 days', 'This month', 'Last month', 'All time', 'Custom…']
+  const ranges = ['Today', 'Yesterday', 'Last 7 days', 'Last 7 days (Exclude latest 2 days)', 'Last 14 days', 'Last 14 days (Exclude latest 2 days)', 'Last 30 days', 'Last 30 days (Exclude latest 2 days)', 'This month', 'Last month', 'All time', 'Custom…']
   return (
     <div className="topbar">
       <div className="crumb">
