@@ -16,11 +16,7 @@
 > built: profile→tag hierarchy grid, monthly Budget-goal cells (click to set, 'chgoals' localStorage), Auto
 > Pacing / Stop Over-Spend / Auto Re-enable / Flight Control toggles ('chgoaltoggles'), Edit Daily Budget
 > Allocation modal (3 modes + Budget Insight charts). **v0.12.0 built to CommerceHub.html + copied to
-> index.html + committed locally.** ⚠ **Deploy blocked:** GitHub was signed out in Chrome ("Uploads are
-> disabled") — Jim signs in, then upload index.html (+ changed source: src/pages/Ads.jsx, Automation.jsx,
-> src/components/ui.jsx, Layout.jsx, src/App.jsx, FUNCTIONALITY-SPEC.md, GOALS.md, HANDOFF.md, CommerceHub.html)
-> via github.com/jimlaframboise-bit/commercehub/upload/main. Then eyeball-test live (GOALS.md C2): the 8 new
-> surfaces above, esp. create-flow chooser, rule builder step 2, /ads/bulk, Budgets goal grid.
+> index.html + committed locally.** **Deployed + verified live** same session (Jim signed in to GitHub mid-session; index.html + CommerceHub.html + docs + all changed src committed via browser, 4 commits). Live checks passed: v0.12.0 badge, create-type chooser + 5-step SP flow, rule builder v2 both steps, /ads/bulk, Budget goals grid. **Next session: GOALS.md C1 scripted full-feature sweep + C3, then D2/D3 (Jim review).** Note: sandbox git hit a stuck .git/index.lock (mounted-FS perms) — docs committed via browser instead; clear the lock from Finder/Terminal if local commits needed.
 > — Prior session 8 summary below.
 >
 > **(session 8, 2026-06-26) — **live re-audit of product.pacvue.com**, no code shipped; still
