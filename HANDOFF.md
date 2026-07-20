@@ -2,7 +2,41 @@
 
 > **Purpose of this file:** a single source of truth so any session can pick up exactly where we left off.
 > Claude maintains this file — update it at the end of each working session (status, decisions, next steps).
-> **Last updated:** 2026-06-25 (session 7 — live at **v0.11.0**. Phase 12 (wire remaining stubbed buttons): Insights
+> **Last updated:** 2026-07-20 (session 9 — **GOALS.md goal established + ALL Phase-13 gaps built + Goals/Budget
+> Manager v1 → v0.12.0, deploy pending GitHub sign-in**). Jim set a formal completion goal → see **GOALS.md**
+> (definition of done; work it every session). Built this session: (1) all 7 Phase-13 gaps — Choose-Campaign-Type
+> modal + single 5-step SP flow (§9.3), Rule builder v2 (grouped type-chooser, Mode Automated/Requires-Approval,
+> Running Time Zone, Cap/ceiling, Same SKU, multiple Automation blocks, Preview Results, Save-as-template,
+> Kickstart rail — legacy _f shapes normalize via normForm), live filter operators (Contains(or)/(and)/Not
+> Contains/Is/Is Not/Start with — comma multi-term), Placement + Campaign Type (Drill-down) dimensions
+> (dims now support {field, drill} — drill groups start collapsed, all group rows toggle), live column-preset
+> names, "Exclude latest 2 days" date presets, **Bulk Operations page** at /ads/bulk (6 tabs, Pacvue/Amazon
+> template CSVs, upload history in createdStore('bulkops')); (2) **live-audited Goals** — no standalone Goal
+> Center exists; Goals = Budget Manager (/Budget/BudgetDashboard) → spec'd as **FUNCTIONALITY-SPEC §10** and
+> built: profile→tag hierarchy grid, monthly Budget-goal cells (click to set, 'chgoals' localStorage), Auto
+> Pacing / Stop Over-Spend / Auto Re-enable / Flight Control toggles ('chgoaltoggles'), Edit Daily Budget
+> Allocation modal (3 modes + Budget Insight charts). **v0.12.0 built to CommerceHub.html + copied to
+> index.html + committed locally.** ⚠ **Deploy blocked:** GitHub was signed out in Chrome ("Uploads are
+> disabled") — Jim signs in, then upload index.html (+ changed source: src/pages/Ads.jsx, Automation.jsx,
+> src/components/ui.jsx, Layout.jsx, src/App.jsx, FUNCTIONALITY-SPEC.md, GOALS.md, HANDOFF.md, CommerceHub.html)
+> via github.com/jimlaframboise-bit/commercehub/upload/main. Then eyeball-test live (GOALS.md C2): the 8 new
+> surfaces above, esp. create-flow chooser, rule builder step 2, /ads/bulk, Budgets goal grid.
+> — Prior session 8 summary below.
+>
+> **(session 8, 2026-06-26) — **live re-audit of product.pacvue.com**, no code shipped; still
+> v0.11.0). Verified all 5 FUNCTIONALITY-SPEC §9 open items live on the Crump account and rewrote §9 with the
+> findings + a 7-item Phase-13 gap list. Key catches: Create-Campaign has a **type chooser (SP/SB/SD/STV) +
+> single 5-step flow** the clone lacks (clone only has Super Wizard); the **Rule builder** is much deeper than
+> the clone (grouped Rule-Type modal, Automated-vs-Requires-Approval mode, action **Cap/ceiling**, "Same SKU",
+> **multiple Automation blocks**, **Preview Results**, **Save as template**, Rule-Kickstart templates); live
+> filter operators are **Contains(or)/Contains(and)/Not Contains/Is/Is Not/Start with**; Dimensions =
+> **Placement / Campaign Type / Campaign Type (Drill-down)**; column presets = **Target ACOS View / Performance
+> / Default Plan / Custom Columns**; there's a dedicated **Bulk Operations spreadsheet page** ("Pacvue XL") with
+> 6 tabs. **Gotcha:** the live **Campaign grid body never finishes loading** on this account (perpetual spinner
+> blocks row-clicks even by element-ref) — capture the inline bulk bar on the **Adgroup grid** instead, and use
+> a recent range (Last 30 Days). Full detail: FUNCTIONALITY-SPEC.md §9. — Prior session 7 below.
+>
+> **(session 7)** live at **v0.11.0**. Phase 12 (wire remaining stubbed buttons): Insights
 > **Build Report** + **Templates** (createdStore('reports')), **Alert Settings** (persisted toggles/severity/channel),
 > **Add Integration** (createdStore('integrations')); Campaigns bulk **Dayparting** + **Apply Rule** (persist as
 > campaign overrides + clock/sliders badges). Also **fixed a name-column overlap** on Ad Groups/Targeting/Search Terms
@@ -447,7 +481,9 @@ button now opens a real modal / persists; see §2.)
   (these last two have no campaign engine behind them). Low priority / cosmetic.
 - **Infra (bigger)** — point Vercel at the full Vite project for proper builds; add access protection; wire real
   Amazon Ads/SP-API data behind the mock layer.
-- Re-verify remaining live-only items (FUNCTIONALITY-SPEC §9) at `product.pacvue.com` with a recent date range.
+- ✅ **DONE (session 8):** re-verified all FUNCTIONALITY-SPEC §9 live-only items at `product.pacvue.com`. §9 now
+  holds the findings + a **7-item Phase-13 gap list** (top picks: the SP/SB/SD/STV **type chooser + single
+  5-step Create flow**, and **deepening the Rule builder** to match live). Pick from that list to build next.
 
 ---
 
