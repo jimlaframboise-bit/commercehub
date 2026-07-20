@@ -2041,6 +2041,9 @@ function scaleFields(rows, range, fields, idKey = 'id') {
 
 // Persist the selected date range across reloads (key: chrange).
 const loadRange = () => { try { return JSON.parse(localStorage.getItem('chrange')) || {} } catch (e) { return {} } }
+// Persist which alert ids have been marked read (key: chalertreads) so the
+// topbar bell badge and the Alerts page stay in sync across the app + reloads.
+const loadAlertReads = () => { try { return JSON.parse(localStorage.getItem('chalertreads')) || [] } catch (e) { return [] } }
 
 const Ctx = createContext(null)
 function AppProvider({ children }) {
@@ -2050,7 +2053,11 @@ function AppProvider({ children }) {
   const [customRange, setCustomRange] = useState(saved.customRange || null) // { start:'YYYY-MM-DD', end:'YYYY-MM-DD' }
   useEffect(() => { try { localStorage.setItem('chrange', JSON.stringify({ range, customRange })) } catch (e) { /* ignore */ } }, [range, customRange])
   const rangeResolved = useMemo(() => resolveRange(range, customRange), [range, customRange])
-  const value = { profileId, setProfileId, range, setRange, customRange, setCustomRange, rangeResolved, profiles }
+  const [alertReads, setAlertReads] = useState(loadAlertReads)
+  useEffect(() => { try { localStorage.setItem('chalertreads', JSON.stringify(alertReads)) } catch (e) { /* ignore */ } }, [alertReads])
+  const markAlertRead = (id) => setAlertReads((xs) => (xs.includes(id) ? xs : [...xs, id]))
+  const markAlertsRead = (ids) => setAlertReads((xs) => Array.from(new Set([...xs, ...ids])))
+  const value = { profileId, setProfileId, range, setRange, customRange, setCustomRange, rangeResolved, profiles, alertReads, markAlertRead, markAlertsRead }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 const useApp = () => useContext(Ctx)
@@ -2130,7 +2137,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.12.0</span>
+        <span className="app-version" title="CommerceHub build">v0.12.1</span>
       </div>
     </aside>
   )
@@ -2166,12 +2173,12 @@ function CustomRangePanel({ initial, onApply, onClose }) {
   )
 }
 function Topbar() {
-  const { profileId, setProfileId, profiles, range, setRange, customRange, setCustomRange, rangeResolved } = useApp()
+  const { profileId, setProfileId, profiles, range, setRange, customRange, setCustomRange, rangeResolved, alertReads } = useApp()
   const loc = useLocation()
   const [pOpen, setPOpen] = useState(false)
   const [rOpen, setROpen] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
-  const unread = alerts.filter((a) => !a.read).length
+  const unread = alerts.filter((a) => !a.read && !alertReads.includes(a.id)).length
   const crumb = CRUMBS[loc.pathname] || ''
   const [main, sub] = crumb.includes('·') ? crumb.split('·').map((s) => s.trim()) : [crumb, null]
   const selProfile = profileId === 'all' ? 'All Profiles' : profiles.find((p) => p.id === profileId)?.market
@@ -2270,21 +2277,40 @@ function Layout({ children }) {
 /* ===================== src/pages/Overview.jsx ===================== */
 
 function Overview() {
-  const { profileId } = useApp()
-  const camps = profileId === 'all' ? campaigns : campaigns.filter((c) => c.profileId === profileId)
+  const { profileId, rangeResolved } = useApp()
+  const campsRaw = profileId === 'all' ? campaigns : campaigns.filter((c) => c.profileId === profileId)
+  const { rows: camps, prev } = useMemo(() => scaleForRange(campsRaw, rangeResolved), [campsRaw, rangeResolved])
+  const prevRows = useMemo(() => camps.map((r) => prev[r.id]).filter(Boolean), [camps, prev])
   const a = aggregate(camps)
-  const dspSpend = dspOrders.reduce((s, d) => s + d.spend, 0)
-  const dspSales = dspOrders.reduce((s, d) => s + d.sales, 0)
-  const oosCount = digitalShelf.filter((d) => !d.inStock).length
-  const buyBoxAvg = digitalShelf.reduce((s, d) => s + d.buyBox, 0) / digitalShelf.length
-  const tacos = ((a.spend + dspSpend) / (a.sales + dspSales + 380000)) * 100
+  const p = prevRows.length ? aggregate(prevRows) : null
+  const dl = (curV, prvV) => (p && prvV ? ((curV - prvV) / Math.abs(prvV)) * 100 : undefined)
 
+  const dspRaw = profileId === 'all' ? dspOrders : dspOrders.filter((d) => d.profileId === profileId)
+  const dspScaled = useMemo(() => scaleForRange(dspRaw, rangeResolved).rows, [dspRaw, rangeResolved])
+  const dspSpend = dspScaled.reduce((s, d) => s + d.spend, 0)
+  const dspSales = dspScaled.reduce((s, d) => s + d.sales, 0)
+  const shelf = profileId === 'all' ? digitalShelf : digitalShelf.filter((d) => d.profileId === profileId)
+  const shelfRows = shelf.length ? shelf : digitalShelf
+  const oosCount = shelfRows.filter((d) => !d.inStock).length
+  const buyBoxAvg = shelfRows.reduce((s, d) => s + d.buyBox, 0) / shelfRows.length
+  const organicBase = 380000 * (rangeResolved.days / 30)
+  const tacos = ((a.spend + dspSpend) / (a.sales + dspSales + organicBase)) * 100
+  const pTacos = p ? ((p.spend + dspSpend) / (p.sales + dspSales + organicBase)) * 100 : null
+
+  const chanSum = (match) => {
+    const rows = camps.filter((c) => match(c.type || ''))
+    return { spend: rows.reduce((s, c) => s + c.spend, 0), sales: rows.reduce((s, c) => s + c.sales, 0) }
+  }
+  const sp = chanSum((t) => t.startsWith('SP') || t === 'PAT')
+  const sb = chanSum((t) => t.startsWith('SB'))
+  const sd = chanSum((t) => t.startsWith('SD'))
   const channelData = [
-    { label: 'Sponsored Products', spend: 38200, sales: 119000, color: '#1a4fd6' },
-    { label: 'Sponsored Brands', spend: 14800, sales: 41200, color: '#1a73e8' },
-    { label: 'Sponsored Display', spend: 7400, sales: 18900, color: '#6b3fd6' },
+    { label: 'Sponsored Products', spend: Math.round(sp.spend), sales: Math.round(sp.sales), color: '#1a4fd6' },
+    { label: 'Sponsored Brands', spend: Math.round(sb.spend), sales: Math.round(sb.sales), color: '#1a73e8' },
+    { label: 'Sponsored Display', spend: Math.round(sd.spend), sales: Math.round(sd.sales), color: '#6b3fd6' },
     { label: 'DSP', spend: Math.round(dspSpend / 100) * 100, sales: Math.round(dspSales / 100) * 100, color: '#1aa260' },
   ]
+  const trendData = useMemo(() => timeseries.slice(-Math.max(2, Math.min(30, rangeResolved.days))), [rangeResolved])
 
   return (
     <>
@@ -2301,20 +2327,20 @@ function Overview() {
       </div>
 
       <KpiGrid>
-        <Kpi label="Ad Spend" value={money(a.spend)} delta={8.2} deltaGood={false} />
-        <Kpi label="Ad Sales" value={money(a.sales)} delta={12.6} />
-        <Kpi label="ACoS" value={pct(a.acos)} delta={-3.1} deltaGood />
-        <Kpi label="ROAS" value={dec2(a.roas)} delta={4.4} />
-        <Kpi label="TACoS" value={pct(tacos)} delta={-1.2} deltaGood />
-        <Kpi label="Impressions" value={compact(a.impr)} delta={6.7} />
-        <Kpi label="Orders" value={compact(a.orders)} delta={9.1} />
-        <Kpi label="Avg Buy Box" value={pct(buyBoxAvg)} delta={-2.4} deltaGood={false} />
+        <Kpi label="Ad Spend" value={money(a.spend)} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
+        <Kpi label="Ad Sales" value={money(a.sales)} delta={dl(a.sales, p?.sales)} />
+        <Kpi label="ACoS" value={pct(a.acos)} delta={dl(a.acos, p?.acos)} deltaGood={(dl(a.acos, p?.acos) || 0) <= 0} />
+        <Kpi label="ROAS" value={dec2(a.roas)} delta={dl(a.roas, p?.roas)} />
+        <Kpi label="TACoS" value={pct(tacos)} delta={pTacos ? ((tacos - pTacos) / Math.abs(pTacos)) * 100 : undefined} deltaGood={pTacos ? tacos <= pTacos : undefined} />
+        <Kpi label="Impressions" value={compact(a.impr)} delta={dl(a.impr, p?.impr)} />
+        <Kpi label="Orders" value={compact(a.orders)} delta={dl(a.orders, p?.orders)} />
+        <Kpi label="Avg Buy Box" value={pct(buyBoxAvg)} />
       </KpiGrid>
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
-        <Card title="Performance trend" sub="Spend vs Sales · last 30 days"
+        <Card title="Performance trend" sub={`Spend vs Sales · ${rangeResolved.label}`}
           actions={<Btn sm ghost icon="download">CSV</Btn>}>
-          <PerfChart data={timeseries} />
+          <PerfChart data={trendData} />
         </Card>
         <Card title="Spend & sales by channel" sub="Full-funnel media mix">
           <DualBar data={channelData} keys={[{ key: 'spend', label: 'Spend', color: '#1a4fd6' }, { key: 'sales', label: 'Sales', color: '#1aa260' }]} />
@@ -3844,7 +3870,7 @@ function Audiences() {
   ]
   return (
     <>
-      <DspHead title="Audience Builder" sub="Create custom audiences from ASINs or keywords · prebuilt segments & AMC-modeled lookalikes"><Btn icon="plus" primary>Create Audience</Btn></DspHead>
+      <DspHead title="Audience Builder" sub="Create custom audiences from ASINs or keywords · prebuilt segments & AMC-modeled lookalikes"><ExportMenu name="dsp-audiences" fields={AUDIENCE_FIELDS} rows={filtered} /><Btn icon="plus" primary>Create Audience</Btn></DspHead>
       <div className="grid-3" style={{ marginBottom: 16 }}>
         <Card title="Build from seeds" sub="Deep Intelligence audience creation">
           <div className="viewtabs" style={{ marginBottom: 12 }}>
@@ -3919,7 +3945,7 @@ function Amc() {
   ]
   return (
     <>
-      <DspHead title="Amazon Marketing Cloud" sub="Run instructional queries, schedule refreshes, and activate AMC audiences into DSP"><Btn icon="refresh" ghost>Refresh All</Btn><Btn icon="plus" primary>New Query</Btn></DspHead>
+      <DspHead title="Amazon Marketing Cloud" sub="Run instructional queries, schedule refreshes, and activate AMC audiences into DSP"><ExportMenu name="dsp-amc" fields={AMC_FIELDS} rows={filtered} /><Btn icon="refresh" ghost>Refresh All</Btn><Btn icon="plus" primary>New Query</Btn></DspHead>
       <KpiGrid>
         <Kpi label="Saved Queries" value={amcQueries.length} />
         <Kpi label="AMC Audiences" value={2} />
@@ -4442,7 +4468,7 @@ function RuleBuilder({ onClose, onSave, onSaveTemplate, initial }) {
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
               <Btn sm ghost icon="plus" onClick={() => addCond(bi)}>Add condition</Btn>
               {b.conditions.length > 1 && (
-                <div className="seg">{['AND', 'OR'].map((j) => <button key={j} className={b.join === j ? 'on' : ''} onClick={() => updBlock(bi, { join: j })}>{j}</button>)}</div>
+                <div className="seg">{['AND', 'OR', 'EITHER'].map((j) => <button key={j} className={b.join === j ? 'on' : ''} onClick={() => updBlock(bi, { join: j })}>{j}</button>)}</div>
               )}
             </div>
             <div className="cm-head" style={{ padding: '10px 0 8px' }}>THEN — action</div>
@@ -5011,7 +5037,10 @@ function Reports() {
   const [created, setCreated] = useState(() => createdStore.get('reports'))
   const [picker, setPicker] = useState(false)
   const [builder, setBuilder] = useState(null) // null | {} | template-form
-  const allReports = [...created, ...reports]
+  const [runs, setRuns] = usePersistentOverrides('ins-reports-runs')
+  const allReports = [...created, ...reports].map((r) => (runs[r.id] ? { ...r, ...runs[r.id] } : r))
+  const runReport = (r) => { setRuns({ ...runs, [r.id]: { updated: 'just now' } }); toast(`Running "${r.name}" — data refreshed`) }
+  const downloadReport = (r) => { exportCSV(`${String(r.name).replace(/[^\w -]+/g, '')}.csv`, RP_FIELDS, [r]); toast(`Downloaded "${r.name}" (CSV)`) }
   const createReport = (r) => { const row = { id: 'RPNEW' + Date.now().toString().slice(-7), owner: 'You', updated: 'just now', ...r }; const next = [row, ...created]; createdStore.set('reports', next); setCreated(next); setBuilder(null); toast(`Report "${r.name}" created`) }
   const searched = allReports.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()) || r.type.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, RP_FIELDS)
@@ -5022,7 +5051,7 @@ function Reports() {
     { key: 'recipients', label: 'Recipients', num: true, foot: (rs) => rs.reduce((s, r) => s + r.recipients, 0), render: (r) => `${r.recipients}` },
     { key: 'owner', label: 'Owner', sortVal: (r) => r.owner },
     { key: 'updated', label: 'Updated', sortVal: (r) => r.updated, render: (r) => <span className="muted">{r.updated}</span> },
-    { key: 'act', label: '', sort: false, render: () => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><Btn sm ghost icon="play">Run</Btn><Btn sm ghost icon="download" /></span> },
+    { key: 'act', label: '', sort: false, render: (r) => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}><Btn sm ghost icon="play" onClick={() => runReport(r)}>Run</Btn><Btn sm ghost icon="download" onClick={() => downloadReport(r)} /></span> },
   ]
   const dims = [{ key: 'type', label: 'Type' }, { key: 'owner', label: 'Owner' }, { key: 'format', label: 'Format' }]
   return (
@@ -5111,11 +5140,12 @@ function AlertSettingsModal({ onClose }) {
 }
 function Alerts() {
   const [showSettings, setShowSettings] = useState(false)
-  const [alerts, setAlerts] = useState(ALERTS)
+  const { alertReads, markAlertRead, markAlertsRead } = useApp()
+  const alerts = ALERTS.map((x) => (alertReads.includes(x.id) ? { ...x, read: true } : x))
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ins-alerts'))
-  const markRead = (id) => setAlerts((a) => a.map((x) => x.id === id ? { ...x, read: true } : x))
-  const markAll = () => setAlerts((a) => a.map((x) => ({ ...x, read: true })))
+  const markRead = (id) => markAlertRead(id)
+  const markAll = () => markAlertsRead(ALERTS.map((x) => x.id))
   const decorated = alerts.map((a) => ({ ...a, sevLabel: { high: 'High', med: 'Med', low: 'Low' }[a.sev], status: a.read ? 'Read' : 'Unread' }))
   const searched = decorated.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()) || a.body.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, AL_FIELDS)
