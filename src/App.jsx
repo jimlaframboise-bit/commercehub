@@ -2,7 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { AppProvider } from './state.jsx'
 import Layout from './components/Layout.jsx'
 import Overview from './pages/Overview.jsx'
-import { Campaigns, AdGroups, Targeting, SearchTerms, ShareOfVoice, Dayparting } from './pages/Ads.jsx'
+import { Campaigns, AdGroups, Targeting, SearchTerms, ShareOfVoice, Dayparting, BulkOperations } from './pages/Ads.jsx'
 import { Dsp, Audiences, Amc } from './pages/Dsp.jsx'
 import { DigitalShelf, BuyBox, Products } from './pages/Commerce.jsx'
 import { Rules, Budgets } from './pages/Automation.jsx'
@@ -20,6 +20,7 @@ export default function App() {
           <Route path="/ads/search-terms" element={<SearchTerms />} />
           <Route path="/ads/sov" element={<ShareOfVoice />} />
           <Route path="/ads/dayparting" element={<Dayparting />} />
+          <Route path="/ads/bulk" element={<BulkOperations />} />
           <Route path="/dsp" element={<Dsp />} />
           <Route path="/dsp/audiences" element={<Audiences />} />
           <Route path="/dsp/amc" element={<Amc />} />
