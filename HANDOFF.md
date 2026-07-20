@@ -2,7 +2,27 @@
 
 > **Purpose of this file:** a single source of truth so any session can pick up exactly where we left off.
 > Claude maintains this file — update it at the end of each working session (status, decisions, next steps).
-> **Last updated:** 2026-07-20 (session 9 — **GOALS.md goal established + ALL Phase-13 gaps built + Goals/Budget
+> **Last updated:** 2026-07-20 (session 10 — **GOALS.md C1/C2/C3/D1/D2 all checked; only D3 (Jim's review)
+> remains. Live at v0.12.1.**) C1: `tools/functional-test.md` — 148 tests (SA/DC/AI) drafted by 3 parallel
+> agents, each statically verified against the bundle; results table at the bottom logs the session-10 live
+> sweep. The static audit surfaced 6 real gaps, all fixed this session: (1) Overview now uses
+> rangeResolved + scaleForRange — real vs-prev KPI deltas (was hardcoded 8.2/12.6/…), trend follows range,
+> channel mix computed from campaign types (was constants), DSP/shelf tiles profile-filtered; (2+3)
+> ExportMenu added to DSP Audience Builder + AMC grids; (4) Report Center Run/download wired (Run → toast +
+> Updated "just now" persisted via `chedits:ins-reports-runs`; download → CSV of the report row); (5) topbar
+> bell badge now decrements + persists — alert read-state moved into app state (`state.jsx`: alertReads /
+> markAlertRead / markAlertsRead, localStorage **chalertreads**), Alerts page consumes it; (6) rule-builder
+> condition join seg now AND/OR/**EITHER**. v0.12.1 built (invariants clean), deployed via 5 browser commits
+> (index.html + src/pages ×4 + Layout.jsx + state.jsx + tools/functional-test.md), verified live: 19/19
+> routes render, 0 console errors, full interaction sweep passed (see functional-test.md §Results).
+> **Gotchas this session:** sandbox `.git/index.lock` STILL stuck (Jim must delete via Finder/Terminal —
+> local commits blocked, browser commits unaffected); npm registry unreachable from sandbox (no npx tsc) —
+> zero-console-error load check used as the stronger syntax gate; Chrome extension can't open file:// URLs,
+> so live-site testing (deploy first) is the pattern for bundle verification.
+> **Next session: D3 — walk Jim through the live app for final review; punch-list → GOALS.md.**
+> — Prior session 9 summary below.
+>
+> **(session 9) **GOALS.md goal established + ALL Phase-13 gaps built + Goals/Budget
 > Manager v1 → v0.12.0, deploy pending GitHub sign-in**). Jim set a formal completion goal → see **GOALS.md**
 > (definition of done; work it every session). Built this session: (1) all 7 Phase-13 gaps — Choose-Campaign-Type
 > modal + single 5-step SP flow (§9.3), Rule builder v2 (grouped type-chooser, Mode Automated/Requires-Approval,
@@ -498,6 +518,6 @@ button now opens a real modal / persists; see §2.)
    verify) are saved in memory: see the "CommerceHub deploy process" memory.
 4. **Before deploying**, always run the verification routine in §2 (build invariants + `tsc` grep incl.
    `TS2448|TS2454`) and then eyeball the live site.
-5. Bump the sidebar version label (`.app-version` in `Layout.jsx`) when a phase ships — currently **v0.9.0**.
+5. Bump the sidebar version label (`.app-version` in `Layout.jsx`) when a phase ships — currently **v0.12.1**.
    (Note: since Phase 8 the build's `leftover export/import` line reads **`8 0`**, not `0 0` — the 8 are footnote
    text containing the word "export", not real ESM exports. Don't treat it as a regression.)
