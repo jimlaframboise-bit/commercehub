@@ -11,6 +11,7 @@ const NAV = [
     section: 'Sponsored Ads', module: true,
     items: [
       { to: '/ads/campaigns', label: 'Campaigns', icon: 'ads' },
+      { to: '/ads/tagging', label: 'Tagging', icon: 'tag' },
       { to: '/ads/adgroups', label: 'Ad Groups', icon: 'layers' },
       { to: '/ads/targeting', label: 'Targeting', icon: 'target' },
       { to: '/ads/search-terms', label: 'Search Terms', icon: 'search' },
@@ -77,14 +78,15 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.12.2</span>
+        <span className="app-version" title="CommerceHub build">v0.13.0</span>
       </div>
     </aside>
   )
 }
 
 const CRUMBS = {
-  '/': 'Overview', '/ads/campaigns': 'Sponsored Ads · Campaigns', '/ads/adgroups': 'Sponsored Ads · Ad Groups',
+  '/': 'Overview', '/ads/campaigns': 'Sponsored Ads · Campaigns', '/ads/tagging': 'Sponsored Ads · Tagging',
+  '/ads/adgroups': 'Sponsored Ads · Ad Groups',
   '/ads/targeting': 'Sponsored Ads · Targeting', '/ads/search-terms': 'Sponsored Ads · Search Terms',
   '/ads/sov': 'Sponsored Ads · Share of Voice', '/ads/dayparting': 'Sponsored Ads · Dayparting',
   '/ads/bulk': 'Sponsored Ads · Bulk Operations',
