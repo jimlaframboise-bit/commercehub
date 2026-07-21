@@ -425,3 +425,35 @@ export function aggregate(rows) {
 export function campaignsFor(profileId) {
   return profileId === 'all' ? campaigns : campaigns.filter((c) => c.profileId === profileId)
 }
+
+// ---------------------------------------------------------------------------
+// Tagging (E1 — spec §12). Custom tags + sub-tags per entity type. Membership
+// is DERIVED at render time by matching each tag's matchRule (name contains /
+// does not contain, case-insensitive) against the entity text, plus any
+// explicit `members` ids (manual assignments). Brightleaf names only — all
+// data fictional. matchRule terms are chosen to hit the Brightleaf campaign /
+// keyword / product names generated above.
+// ---------------------------------------------------------------------------
+export const campaignTags = [
+  { id: 'CT1', name: 'Calming', owner: 'jim@brightleaf.co', sub: ['Soft Chews'], matchRule: { contains: ['Calming'], notContains: [] }, members: [] },
+  { id: 'CT2', name: 'Salmon Recipe', owner: 'a.rivera@brightleaf.co', sub: ['Freeze-Dried Salmon', 'Wild Salmon'], matchRule: { contains: ['Salmon'], notContains: [] }, members: [] },
+  { id: 'CT3', name: 'Pumpkin Digestive', owner: 'a.rivera@brightleaf.co', sub: [], matchRule: { contains: ['Pumpkin'], notContains: [] }, members: [] },
+  { id: 'CT4', name: 'Sweet Potato', owner: 'm.chen@brightleaf.co', sub: [], matchRule: { contains: ['Sweet Potato'], notContains: [] }, members: [] },
+  { id: 'CT5', name: 'Grain-Free', owner: 'jim@brightleaf.co', sub: ['Kibble', 'Puppy'], matchRule: { contains: ['Grain-Free', 'Puppy'], notContains: [] }, members: [] },
+  { id: 'CT6', name: 'Catch All', owner: 'jim@brightleaf.co', sub: [], matchRule: { contains: [], notContains: ['Calming', 'Salmon', 'Pumpkin', 'Sweet Potato', 'Grain-Free', 'Puppy'] }, members: [] },
+]
+export const keywordTags = [
+  { id: 'KT1', name: 'Calming', owner: 'jim@brightleaf.co', desc: 'Calming & anxiety terms', sub: [], matchRule: { contains: ['calming'], notContains: [] }, members: [] },
+  { id: 'KT2', name: 'Salmon Recipe', owner: 'a.rivera@brightleaf.co', desc: 'Salmon & fish oil terms', sub: [], matchRule: { contains: ['salmon', 'fish oil'], notContains: [] }, members: [] },
+  { id: 'KT3', name: 'Pumpkin Digestive', owner: 'a.rivera@brightleaf.co', desc: 'Digestive health terms', sub: [], matchRule: { contains: ['pumpkin', 'sensitive stomach'], notContains: [] }, members: [] },
+  { id: 'KT4', name: 'Sweet Potato', owner: 'm.chen@brightleaf.co', desc: 'Sweet potato chew terms', sub: [], matchRule: { contains: ['sweet potato'], notContains: [] }, members: [] },
+  { id: 'KT5', name: 'Grain-Free', owner: 'jim@brightleaf.co', desc: 'Grain-free & puppy food terms', sub: [], matchRule: { contains: ['grain free', 'puppy'], notContains: [] }, members: [] },
+  { id: 'KT6', name: 'Catch All', owner: 'jim@brightleaf.co', desc: 'Everything not covered by a product tag', sub: [], matchRule: { contains: [], notContains: ['calming', 'salmon', 'fish oil', 'pumpkin', 'sweet potato', 'grain free', 'puppy'] }, members: [] },
+]
+export const asinTags = [
+  { id: 'AT1', name: 'Calming', owner: 'jim@brightleaf.co', sub: ['Soft Chews'], matchRule: { contains: ['Calming'], notContains: [] }, members: [] },
+  { id: 'AT2', name: 'Salmon Recipe', owner: 'a.rivera@brightleaf.co', sub: ['Freeze-Dried', 'Wild'], matchRule: { contains: ['Salmon'], notContains: [] }, members: [] },
+  { id: 'AT3', name: 'Sweet Potato', owner: 'm.chen@brightleaf.co', sub: [], matchRule: { contains: ['Sweet Potato'], notContains: [] }, members: [] },
+  { id: 'AT4', name: 'Grain-Free', owner: 'jim@brightleaf.co', sub: ['Kibble', 'Puppy'], matchRule: { contains: ['Grain-Free', 'Puppy'], notContains: [] }, members: [] },
+  { id: 'AT5', name: 'Catch All', owner: 'jim@brightleaf.co', sub: [], matchRule: { contains: [], notContains: ['Calming', 'Salmon', 'Sweet Potato', 'Grain-Free', 'Puppy'] }, members: [] },
+]
