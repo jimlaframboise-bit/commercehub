@@ -364,3 +364,46 @@ complete sidebar/topbar tree as deployed live (every group expanded, every flyou
 
 **Conclusion:** every grid-mechanics fundamental is in the clone. The complete gap list is now GOALS §E
 (E1–E8) — nothing else exists in the live product that isn't classified above.
+
+---
+
+## §12. Tagging (E1) — live audit findings (2026-07-21, session 11b)
+
+Audited live on the Crump account: /Campaign/CampaignTagging, /Campaign/KeywordTagging,
+/Campaign/AsinTagging. (Campaign Tagging grid has the same perpetual-loading gotcha as the Campaign
+grid on this account; Keyword + ASIN grids load fine and confirm the shared template.)
+
+**Shared page template (all 3):**
+- KPI tile row (Impressions, Sale Units, Clicks, ROAS, Orders, Spend, Sales, CPC, CPA, CTR + an
+  "add KPI" tile), then a Performance trend chart (D/W/M), then the tag grid.
+- Filter bar: Filters (with hide-eye) · Plan (saved plans) · Profile multiselect · [Campaign|KWs|ASIN]
+  Tag multiselect · Owner multiselect · (Keyword page adds Type: Keyword/PAT) · Search button ·
+  clipboard icon.
+- Buttons above grid: **Manage Tag** (primary) · **Bulk Create Tag** (opens Bulk Operations
+  ?page=campaignTag in a NEW TAB).
+- Grid: checkbox · Tag Name (ASIN page rows have ▶ expanders → sub-tag child rows) · Description
+  (Keyword page) · Owner (email + share-person icon) · count link (Campaigns 336 / Keywords 125 /
+  ASINs 18 — links to the filtered entity grid; Keyword page adds an eye icon) · Impr. · Clk. · CTR ·
+  Spend · Sales · ROAS … · row ⋮ menu · pinned Total row · "Total N entries, 25/page".
+- Grid toolbar: Total-vs-dimension selector, sort, column presets, email, download, custom columns, ….
+
+**Manage Tag modal:** title "Manage Campaign Tag"; two panes side by side. Left "Tag List": search +
+"⊕ Create Tag" + rows (name + trash icon; selected row highlighted). Right "Sub Tag List": search +
+"⊕ Create Sub Tag" for the selected tag. Create Tag opens an inline panel with a MULTI-LINE textarea —
+"Please separate each item using either a line break or a comma" — Cancel/OK (batch creation by name).
+Close button bottom-right.
+
+**Bulk Operations integration:** "Create Tag" tab = 5 steps (tag type selector Campaign Tag/…,
+profile selector, Download template for creation, edit guidelines — "There can be no duplicate SubTag
+and Campaign under the same Tag" — upload). "Campaign Tag Target Setting" tab = 3 steps to bulk-set
+**Target ROAS per tag** via xlsx (tags carry targets → Budget Manager/AI consume them).
+
+**Match Tag Rules** (not reachable live; from support docs): per-tag auto-assign rules — campaign name
+contains / does not contain terms; new campaigns matching the rule are auto-added to the tag.
+
+**Clone plan (v0.13.0):** one route `/ads/tagging` with three tabs (Campaign/Keyword/ASIN — Pacvue's 3
+nav items compressed into tabs), shared template: KPI row + tag DataGrid (Tag Name w/ expandable
+sub-tags, Owner, count link, metrics aggregated from tagged entities, Total). Manage Tag modal (two
+panes, batch create, sub-tags, delete), Match Tag Rule builder per tag (contains/not-contains + live
+preview count), Bulk Create Tag → /ads/bulk create-tag tab. Tag store shared with Budget Manager
+(GOAL_TAGS) and campaign Tag chips. Brightleaf tag names only — never the client's real tag names.

@@ -94,9 +94,14 @@ Major Pacvue fundamentals that never made the spec, per the coverage audit (deta
 > coverage matrix). E-list below is now the COMPLETE gap list; everything else live is either built
 > or explicitly out of scope.
 
-- [ ] **E1. Tagging management** — live nav confirms THREE pages: Campaign Tagging, Keyword Tagging,
-      Asin Tagging (+ Match Tag Rules auto-assign, Billing Tags per docs). Biggest gap: Budget Manager
-      is tag-scoped but tags can't be managed. **Build first.**
+- [x] **E1. Tagging management** — ✅ SHIPPED v0.13.0 (2026-07-21, session 11b). Live-audited the real
+      pages first (SPEC §12), then built `/ads/tagging`: 3 tabs (Campaign/Keyword/ASIN), KPI row +
+      tag DataGrid (sub-tag expanders, owner, campaign-count drill to `?tag=`, USD-est money, Total),
+      Manage Tag modal (two panes, batch create via comma/line-break, sub-tags, delete), Match Tag
+      Rule builder (contains/not-contains + live preview), Bulk Create Tag → XL Create Tag tab,
+      derived tag chips on the Campaign grid. Verified live: renders, 0 console errors, modal faithful.
+      Deferred: Budget Manager GOAL_TAGS still hardcoded (cross-file risk — fold into E-follow-up);
+      sub-tag rows scatter under user sort (known trade-off, ~6 rows).
 - [ ] **E2. Campaign AI / Product AI surfaces** — confirmed as two nav-level Optimization pages.
 - [ ] **E3. Hourly charts (deprioritized)** — Pacvue REMOVED the Hourly nav item; hourly analysis now
       lives inside dashboards/Explorer. Implement as hourly charts on Campaign drill / Overview, last.
@@ -117,6 +122,7 @@ User Management admin depth, AMC 4-page split (one page suffices).
 
 | Date | Session | Progress |
 |------|---------|----------|
+| 2026-07-21 | 11b-2 | **E1 Tagging SHIPPED (v0.13.0).** Live-audited real Tagging pages on the Crump account (Manage Tag modal, batch create textarea, Bulk Create Tag → BulkOperations?page=campaignTag, tag-level Target ROAS, sub-tag expanders on ASIN grid) → SPEC §12. Built `/ads/tagging` (3 tabs), Manage Tag modal, Match Tag Rule builder w/ live preview, ?tag= campaign drill, tag chips. 6 commits (b17c234…), verified live, 0 console errors. E1 checked; next E4 Profile grid (quick win) then E5. |
 | 2026-07-21 | 11b | **Full live Pacvue re-review (Jim's request).** Complete nav sweep of product.pacvue.com — all 13 groups + every flyout + topbar/account menus captured → FUNCTIONALITY-SPEC §11 (inventory + coverage matrix). Key finds: Tagging = 3 pages (Campaign/Keyword/Asin); Hourly nav item REMOVED by Pacvue (E3 deprioritized); new-to-us surfaces: Explorer, Portfolio/Placement/ASIN/Ads grids, SP Prompts, Brand Analysis, Budget Scheduler, Recommendation, Live Ad Momentum, Automation Health, Product Center, Platform Intelligence, Event/Task Center. §E expanded to E1–E8 = the complete, provably-exhaustive gap list. DSP confirmed as separate ADSP login platform (clone already covers). |
 | 2026-07-21 | 11 | **D3 done — v1.0 goal CLOSED.** Jim delegated review to Claude's testing. Ran 3 parallel adversarial code reviews + fundamentals coverage audit (4 agents). 39 findings: 1 blocker (stale bulk-selection crash), 4 high (channel-mix always-0 bars, wrong TACoS prev-delta, seeded-rule edit duplication, + mixed-currency class), rest med/low. 37 fixed, 2 documented-acceptable. Shipped **v0.12.2** (4 browser commits), verified live: 0 console errors, channel mix real, (USD est.) totals, Targeting tabs real (134/24/0), derived Rule KPIs. Coverage audit: nothing specced is missing; 4 unspecced fundamentals logged as Phase 14 (§E: Tagging mgmt, Campaign/Product AI, Hourly, Profile grid). Full record: tools/d3-review.md. Gotcha: .git/index.lock still stuck (Jim must delete manually). |
 | 2026-07-20 | 10 | **C1+C2+C3+D1+D2 done — only D3 (Jim's review) remains.** C1: 148-test script written by 3 parallel agents (tools/functional-test.md), every test statically verified against the bundle. Static audit found 6 real gaps → all fixed: Overview real vs-prev deltas + date-range scaling + data-driven channel mix; ExportMenu on DSP Audiences + AMC; Report Run/download wired (chedits:ins-reports-runs); bell badge synced to Alerts read-state via new chalertreads in app state; EITHER join in rule builder. v0.12.1 built + deployed (5 browser commits) + verified live. C2 live sweep on deployed bundle: all 19 routes render, 0 console errors, filters/dimensions/presets/inline-edit/create-flows/rule-builder-v2/goals/dayparting/commerce-scaling/drill-down all pass (results table in functional-test.md). Test artifacts cleaned. Note: sandbox .git/index.lock still stuck (Jim: delete in Finder); npm registry unavailable this session so tsc check superseded by zero-console-error load. |

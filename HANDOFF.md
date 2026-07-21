@@ -24,8 +24,18 @@
 > 3 pages; Hourly nav item removed by Pacvue → E3 deprioritized; new: Portfolio/Placement/ASIN/Ads
 > grids = E5, Report suite = E6, Research = E7, Optimization extras = E8). DSP = separate ADSP login
 > platform, already covered by the clone.
-> **Next session: Phase 14 — start with E1 Tagging management (build the 3 tagging pages + Match Tag
-> Rules), then E4 Profile grid (quick win), then E5.**
+> **Session 11b (cont.): E1 Tagging SHIPPED as v0.13.0.** Live-audited the real Tagging pages first
+> (SPEC §12 — Manage Tag two-pane modal, batch-create textarea, Bulk Create Tag opens
+> BulkOperations?page=campaignTag in a new tab, tags carry Target ROAS, ASIN grid has sub-tag ▶
+> expanders). Built `/ads/tagging` in Ads.jsx (3 tabs Campaign/Keyword/ASIN, KPI row, tag DataGrid
+> w/ sub-tag expanders + owner + count-drill `?tag=` on Campaigns + USD-est money), Manage Tag modal,
+> Match Tag Rule builder (contains/not-contains, live preview), tag chips on Campaign grid; seeds in
+> mock.js (`campaignTags/keywordTags/asinTags`, Brightleaf names). New keys: `chcreated:tags-*`,
+> `chedits:tags-*`. Deployed (6 commits, b17c234…3730209+2), verified live: renders, 0 console errors.
+> Deferred: Budget Manager GOAL_TAGS still hardcoded; sub-tag rows scatter under user sort (~6 rows,
+> cosmetic). **Browser-commit gotcha learned: typing "/" in a commit message when focus misses the
+> summary field opens GitHub's search — click the field, confirm focus, avoid slashes in messages.**
+> **Next session: E4 Profile grid (quick win), then E5 grid family (Portfolio/Placement/ASIN/Ads).**
 > — Prior session 10 summary below.
 >
 > **(session 10)** C1: `tools/functional-test.md` — 148 tests (SA/DC/AI) drafted by 3 parallel
