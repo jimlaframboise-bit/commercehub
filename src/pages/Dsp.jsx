@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
-import { Kpi, KpiGrid, Card, Pill, DataGrid, FilterBar, applyFilters, loadFilterModel, Btn, SearchBox, ExportMenu, scaleFields } from '../components/ui.jsx'
+import { Kpi, KpiGrid, Card, Pill, DataGrid, FilterBar, applyFilters, loadFilterModel, Btn, SearchBox, ExportMenu, scaleFields, fxUSD } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
-import { dspOrders, audiences, amcQueries, profileById } from '../data/mock.js'
+import { dspOrders, audiences, amcQueries, amcAudiences, profileById } from '../data/mock.js'
 import { compact, money, pct, dec2, int } from '../lib/format.js'
 import { useApp } from '../state.jsx'
 
@@ -9,6 +9,8 @@ const symD = (pid) => profileById[pid]?.currency || '$'
 const symOfD = (rs) => symD(rs[0]?.profileId)
 const dSum = (rs, k) => rs.reduce((a, b) => a + (b[k] || 0), 0)
 const dAvg = (rs, k) => (rs.length ? dSum(rs, k) / rs.length : 0)
+const dspUsdSum = (rs, k) => rs.reduce((a, b) => a + (b[k] || 0) * fxUSD(b.profileId), 0)
+const dspWavg = (rs, k, wk) => { const w = dSum(rs, wk); return w ? rs.reduce((a, b) => a + (b[k] || 0) * (b[wk] || 0), 0) / w : 0 }
 
 function DspHead({ title, sub, children }) {
   return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
@@ -50,24 +52,27 @@ export function Dsp() {
   const filtered = applyFilters(searched, filters, DSP_FIELDS)
   const prevFiltered = filtered.map((r) => prev[r.id])
 
-  const a = { spend: dSum(filtered, 'spend'), sales: dSum(filtered, 'sales'), impr: dSum(filtered, 'impr'), purchases: dSum(filtered, 'purchases'), ntb: dAvg(filtered, 'ntbPct') }
-  const p = prevFiltered.length ? { spend: dSum(prevFiltered, 'spend'), sales: dSum(prevFiltered, 'sales'), impr: dSum(prevFiltered, 'impr'), purchases: dSum(prevFiltered, 'purchases') } : null
-  const dl = (cur, prv) => (p && prv ? ((cur - prv) / Math.abs(prv)) * 100 : undefined)
+  const mixed = profileId === 'all' // mixed currencies → aggregate money in USD (est.)
+  const mSum = (rs, k) => (mixed ? dspUsdSum(rs, k) : dSum(rs, k))
+  const mSym = mixed ? '$' : symD(profileId)
+  const a = { spend: mSum(filtered, 'spend'), sales: mSum(filtered, 'sales'), impr: dSum(filtered, 'impr'), purchases: dSum(filtered, 'purchases'), ntb: dspWavg(filtered, 'ntbPct', 'purchases') }
+  const p = prevFiltered.length ? { spend: mSum(prevFiltered, 'spend'), sales: mSum(prevFiltered, 'sales'), impr: dSum(prevFiltered, 'impr'), purchases: dSum(prevFiltered, 'purchases') } : null
+  const dl = (cur, prv) => (!allTime && p && prv ? ((cur - prv) / Math.abs(prv)) * 100 : undefined)
 
   const columns = [
     { key: 'name', label: 'Order / Line Item', sticky: true, width: 280, sortVal: (r) => r.name, render: (r) => <div>{r.name}<small>{r.tactic} · {r.profileId.toUpperCase()}</small></div> },
     { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
-    { key: 'budget', label: 'Budget', num: true, foot: (rs) => money(dSum(rs, 'budget'), symOfD(rs)), render: (r) => money(r.budget, symD(r.profileId)) },
-    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => money(dSum(rs, 'spend'), symOfD(rs)), render: (r) => money(r.spend, symD(r.profileId)) },
+    { key: 'budget', label: 'Budget', num: true, foot: (rs) => money(mSum(rs, 'budget'), mixed ? '$' : symOfD(rs)), render: (r) => money(r.budget, symD(r.profileId)) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => money(mSum(rs, 'spend'), mixed ? '$' : symOfD(rs)), render: (r) => money(r.spend, symD(r.profileId)) },
     { key: 'impr', label: 'Impressions', num: true, delta: true, foot: (rs) => compact(dSum(rs, 'impr')), render: (r) => compact(r.impr) },
     { key: 'clicks', label: 'Clicks', num: true, delta: true, foot: (rs) => int(dSum(rs, 'clicks')), render: (r) => int(r.clicks) },
     { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(dSum(rs, 'impr') ? (dSum(rs, 'clicks') / dSum(rs, 'impr')) * 100 : 0, 2), render: (r) => pct(r.ctr, 2) },
-    { key: 'cpm', label: 'CPM', num: true, foot: (rs) => money(dSum(rs, 'impr') ? (dSum(rs, 'spend') / dSum(rs, 'impr')) * 1000 : 0, symOfD(rs)), render: (r) => money(r.cpm, symD(r.profileId)) },
-    { key: 'dpvr', label: 'DPVR', num: true, foot: (rs) => pct(dAvg(rs, 'dpvr'), 1), render: (r) => pct(r.dpvr, 1) },
+    { key: 'cpm', label: 'CPM', num: true, foot: (rs) => money(dSum(rs, 'impr') ? (mSum(rs, 'spend') / dSum(rs, 'impr')) * 1000 : 0, mixed ? '$' : symOfD(rs)), render: (r) => money(r.cpm, symD(r.profileId)) },
+    { key: 'dpvr', label: 'DPVR', num: true, foot: (rs) => pct(dspWavg(rs, 'dpvr', 'impr'), 1), render: (r) => pct(r.dpvr, 1) },
     { key: 'purchases', label: 'Purchases', num: true, delta: true, foot: (rs) => int(dSum(rs, 'purchases')), render: (r) => int(r.purchases) },
-    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => money(dSum(rs, 'sales'), symOfD(rs)), render: (r) => money(r.sales, symD(r.profileId)) },
-    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(dSum(rs, 'spend') ? dSum(rs, 'sales') / dSum(rs, 'spend') : 0), render: (r) => <b style={{ color: r.roas >= 5 ? 'var(--green)' : 'inherit' }}>{dec2(r.roas)}</b> },
-    { key: 'ntbPct', label: 'NTB %', num: true, foot: (rs) => pct(dAvg(rs, 'ntbPct'), 0), render: (r) => pct(r.ntbPct, 0) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => money(mSum(rs, 'sales'), mixed ? '$' : symOfD(rs)), render: (r) => money(r.sales, symD(r.profileId)) },
+    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(mSum(rs, 'spend') ? mSum(rs, 'sales') / mSum(rs, 'spend') : 0), render: (r) => <b style={{ color: r.roas >= 5 ? 'var(--green)' : 'inherit' }}>{dec2(r.roas)}</b> },
+    { key: 'ntbPct', label: 'NTB %', num: true, foot: (rs) => pct(dspWavg(rs, 'ntbPct', 'purchases'), 0), render: (r) => pct(r.ntbPct, 0) },
   ]
   const presets = {
     Default: ['name', 'status', 'budget', 'spend', 'impr', 'clicks', 'ctr', 'cpm', 'dpvr', 'purchases', 'sales', 'roas', 'ntbPct'],
@@ -81,8 +86,8 @@ export function Dsp() {
         <ExportMenu name="dsp-campaigns" fields={DSP_FIELDS} rows={filtered} /><Btn icon="plus" primary>New DSP Order</Btn>
       </DspHead>
       <KpiGrid>
-        <Kpi label="DSP Spend" value={money(a.spend)} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
-        <Kpi label="DSP Sales" value={money(a.sales)} delta={dl(a.sales, p?.sales)} />
+        <Kpi label={mixed ? 'DSP Spend (USD est.)' : 'DSP Spend'} value={money(a.spend, mSym)} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
+        <Kpi label={mixed ? 'DSP Sales (USD est.)' : 'DSP Sales'} value={money(a.sales, mSym)} delta={dl(a.sales, p?.sales)} />
         <Kpi label="ROAS" value={dec2(a.spend ? a.sales / a.spend : 0)} delta={dl(a.spend ? a.sales / a.spend : 0, p ? (p.spend ? p.sales / p.spend : 0) : undefined)} />
         <Kpi label="Impressions" value={compact(a.impr)} delta={dl(a.impr, p?.impr)} />
         <Kpi label="Purchases" value={compact(a.purchases)} delta={dl(a.purchases, p?.purchases)} />
@@ -105,7 +110,7 @@ export function Dsp() {
           <FilterBar id="dsp-orders" fields={DSP_FIELDS} value={filters} onChange={setFilters} />
         </>}
       />
-      <div className="footnote">DPVR = Detail Page View Rate · CPM = cost per 1,000 impressions · NTB = New-to-Brand. Filter and save Plans, group by tactic, and export the current view. AMC audiences and DSP dayparting auto-apply from the Audience Builder & Rule Manager.</div>
+      <div className="footnote">DPVR = Detail Page View Rate · CPM = cost per 1,000 impressions · NTB = New-to-Brand.{mixed ? ' With All profiles selected, money totals are converted to USD (est.).' : ''} Filter and save Plans, group by tactic, and export the current view. AMC audiences and DSP dayparting auto-apply from the Audience Builder & Rule Manager.</div>
     </>
   )
 }
@@ -214,7 +219,7 @@ export function Amc() {
       <DspHead title="Amazon Marketing Cloud" sub="Run instructional queries, schedule refreshes, and activate AMC audiences into DSP"><ExportMenu name="dsp-amc" fields={AMC_FIELDS} rows={filtered} /><Btn icon="refresh" ghost>Refresh All</Btn><Btn icon="plus" primary>New Query</Btn></DspHead>
       <KpiGrid>
         <Kpi label="Saved Queries" value={amcQueries.length} />
-        <Kpi label="AMC Audiences" value={2} />
+        <Kpi label="AMC Audiences" value={amcAudiences.length} />
         <Kpi label="Scheduled Refreshes" value={amcQueries.filter((x) => x.schedule !== 'Ad hoc').length} />
         <Kpi label="Avg Conversion Lift" value="+18%" delta={4.0} />
       </KpiGrid>

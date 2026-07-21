@@ -176,6 +176,7 @@ function AlertSettingsModal({ onClose }) {
 }
 export function Alerts() {
   const [showSettings, setShowSettings] = useState(false)
+  const [settings, setSettings] = useState(asLoad)
   const { alertReads, markAlertRead, markAlertsRead } = useApp()
   const alerts = ALERTS.map((x) => (alertReads.includes(x.id) ? { ...x, read: true } : x))
   const [q, setQ] = useState('')
@@ -183,7 +184,11 @@ export function Alerts() {
   const markRead = (id) => markAlertRead(id)
   const markAll = () => markAlertsRead(ALERTS.map((x) => x.id))
   const decorated = alerts.map((a) => ({ ...a, sevLabel: { high: 'High', med: 'Med', low: 'Low' }[a.sev], status: a.read ? 'Read' : 'Unread' }))
-  const searched = decorated.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()) || a.body.toLowerCase().includes(q.toLowerCase()))
+  // Apply saved Alert Settings: category toggles + minimum severity.
+  const visible = decorated.filter((a) => (!a.cat || settings[a.cat] !== false) && sevRank[a.sev] >= sevRank[settings.minSev])
+  const hiddenCount = decorated.length - visible.length
+  const todayCount = visible.filter((a) => { const t = a.time.match(/^(\d+)([mh]) ago$/); return t && (t[2] === 'm' || Number(t[1]) < 24) }).length
+  const searched = visible.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()) || a.body.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, AL_FIELDS)
   const columns = [
     { key: 'title', label: 'Alert', sticky: true, width: 360, sortVal: (r) => r.title, render: (a) => (
@@ -201,12 +206,13 @@ export function Alerts() {
   return (
     <>
       <InsHead title="Alerts" sub="Real-time notifications across ads, budget & retail signals"><ExportMenu name="alerts" fields={AL_FIELDS} rows={filtered} /><Btn icon="check" ghost onClick={markAll}>Mark all read</Btn><Btn icon="gear" primary onClick={() => setShowSettings(true)}>Alert Settings</Btn></InsHead>
-      {showSettings && <AlertSettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && <AlertSettingsModal onClose={() => { setShowSettings(false); setSettings(asLoad()) }} />}
       <KpiGrid>
-        <Kpi label="Unread" value={alerts.filter(a => !a.read).length} />
-        <Kpi label="High Severity" value={alerts.filter(a => a.sev === 'high').length} />
-        <Kpi label="Today" value={alerts.length} />
+        <Kpi label="Unread" value={visible.filter(a => !a.read).length} />
+        <Kpi label="High Severity" value={visible.filter(a => a.sev === 'high').length} />
+        <Kpi label="Today" value={todayCount} />
       </KpiGrid>
+      {hiddenCount > 0 && <div className="footnote" style={{ margin: '0 0 10px' }}>{hiddenCount} alert{hiddenCount > 1 ? 's' : ''} hidden by Alert Settings (category toggles / minimum severity).</div>}
       <DataGrid
         id="ins-alerts"
         columns={columns}

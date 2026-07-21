@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { Kpi, KpiGrid, Card, Pill, Toggle, Check, DataGrid, FilterBar, applyFilters, loadFilterModel, Btn, SearchBox, EditableNum, StateSelect, Modal, toast, createdStore, usePersistentOverrides, ExportMenu, exportCSV, scaleForRange } from '../components/ui.jsx'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Kpi, KpiGrid, Card, Pill, Toggle, Check, DataGrid, FilterBar, applyFilters, loadFilterModel, Btn, SearchBox, EditableNum, StateSelect, Modal, toast, createdStore, usePersistentOverrides, ExportMenu, exportCSV, scaleForRange, fxUSD } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
 import {
   campaigns as ALL_CAMPAIGNS, keywords, searchTerms, shareOfVoice, dayparting, DAYS,
@@ -13,6 +13,13 @@ const symA = (pid) => profileById[pid]?.currency || '$'
 const typeTone = (t) => (t.startsWith('SP') ? 'blue' : t.startsWith('SB') ? 'purple' : 'amber')
 const symOf = (rs) => (rs[0] ? symA(rs[0].profileId) : '$')
 const sumKey = (k) => (rs) => rs.reduce((a, b) => a + (b[k] || 0), 0)
+/* SA-R7: mixed-currency money aggregates — when rows span currencies (profile = All),
+   convert to USD via fxUSD() and flag the figure as an estimate. */
+const adsMixedCur = (rs) => new Set(rs.map((r) => symA(r.profileId))).size > 1
+const adsUsdSum = (rs, k) => rs.reduce((a, r) => a + (r[k] || 0) * fxUSD(r.profileId), 0)
+const adsMoneyFoot = (k, dec = 0) => (rs) => (adsMixedCur(rs)
+  ? `${cur(adsUsdSum(rs, k), '$', dec)} (USD est.)`
+  : cur(sumKey(k)(rs), symOf(rs), dec))
 
 const CAMPAIGN_FIELDS = [
   { key: 'name', label: 'Campaign Name', type: 'text' },
@@ -54,7 +61,7 @@ const ADGROUP_FIELDS = [
 const TARGETING_FIELDS = [
   { key: 'keyword', label: 'Targeting', type: 'text' },
   { key: 'campaign', label: 'Campaign', type: 'text' },
-  { key: 'matchType', label: 'Match Type', type: 'enum', options: ['Broad', 'Phrase', 'Exact'] },
+  { key: 'matchType', label: 'Match Type', type: 'enum', options: ['Broad', 'Phrase', 'Exact', 'PAT', 'Negative Exact'] },
   { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused', 'Archived'] },
   { key: 'bid', label: 'Bid', type: 'number' },
   { key: 'sugBid', label: 'Suggested Bid', type: 'number' },
@@ -97,22 +104,26 @@ function useProfileFilter(rows) {
   return useMemo(() => (profileId === 'all' ? rows : rows.filter((r) => r.profileId === profileId)), [rows, profileId])
 }
 
-/* ---- bulk bid / budget math ---- */
+/* ---- bulk bid / budget math (results floored: bids ≥ $0.02, budgets ≥ $1) ---- */
 const round2 = (n) => Math.round(n * 100) / 100
+const MIN_BID = 0.02
+const MIN_BUDGET = 1
 const applyBidOp = (cur, suggested, mode, amt) => {
-  if (mode === 'set') return round2(amt)
-  if (mode === 'inc') return round2(cur * (1 + amt / 100))
-  if (mode === 'dec') return round2(cur * (1 - amt / 100))
-  if (mode === 'suggested') return round2(suggested)
-  if (mode === 'ceiling') return round2(Math.min(cur, amt))
-  if (mode === 'floor') return round2(Math.max(cur, amt))
-  return cur
+  let n = cur
+  if (mode === 'set') n = amt
+  else if (mode === 'inc') n = cur * (1 + amt / 100)
+  else if (mode === 'dec') n = cur * (1 - amt / 100)
+  else if (mode === 'suggested') n = suggested
+  else if (mode === 'ceiling') n = Math.min(cur, amt)
+  else if (mode === 'floor') n = Math.max(cur, amt)
+  return Math.max(MIN_BID, round2(n))
 }
 const applyBudgetOp = (cur, mode, amt) => {
-  if (mode === 'set') return round2(amt)
-  if (mode === 'inc') return round2(cur * (1 + amt / 100))
-  if (mode === 'dec') return round2(cur * (1 - amt / 100))
-  return cur
+  let n = cur
+  if (mode === 'set') n = amt
+  else if (mode === 'inc') n = cur * (1 + amt / 100)
+  else if (mode === 'dec') n = cur * (1 - amt / 100)
+  return Math.max(MIN_BUDGET, round2(n))
 }
 
 function BulkBidModal({ count, currency, onApply, onClose, suggestedLabel = 'suggested', initialMode = 'set' }) {
@@ -228,7 +239,8 @@ const WIZ_THEMES = [
   { v: 'Competitor', s: 'Competitor brand / ASIN terms — conquest.' },
 ]
 
-function CreateCampaignWizard({ products, profileId, currency = '$', onClose, onLaunch }) {
+function CreateCampaignWizard({ products, profileId, onClose, onLaunch }) {
+  const currency = symA(profileId)
   const [step, setStep] = useState(0)
   const today = new Date().toISOString().slice(0, 10)
   const [f, setF] = useState({
@@ -268,8 +280,8 @@ function CreateCampaignWizard({ products, profileId, currency = '$', onClose, on
         id: 'CNEW' + (Date.now() + i).toString().slice(-7),
         name: sampleName(asin), asin, product: p.title || asin, profileId,
         state: 'Enabled', status: 'Enabled', campaignType: f.type, targetingType: tgt,
-        adGroups: { active: groupCount, total: groupCount }, dailyBudget: Number(f.dailyBudget),
-        actlBid: Number(f.maxBid) || 1, avlBid: round2((Number(f.maxBid) || 1) * 1.3),
+        adGroups: { active: groupCount, total: groupCount }, dailyBudget: Math.max(MIN_BUDGET, Number(f.dailyBudget)),
+        actlBid: Math.max(MIN_BID, Number(f.maxBid) || 1), avlBid: round2(Math.max(MIN_BID, Number(f.maxBid) || 1) * 1.3),
         portfolio: 'New Launch', bidStrategy: 'Dynamic - down only',
         tag: 'NEW', startDate: f.startDate, endDate: f.endDate, ai: f.ai, ...zero,
       }
@@ -378,7 +390,7 @@ function CreateCampaignWizard({ products, profileId, currency = '$', onClose, on
     )
   }
   return (
-    <Modal width={640} title="Create Campaign" sub="Super Wizard — build one or many campaigns" onClose={onClose}
+    <Modal width={640} title="Create Campaign" sub="Super Wizard — build one or many campaigns" onClose={onClose} confirmClose
       footer={<>
         {step > 0 && <Btn ghost onClick={() => setStep(step - 1)}>Back</Btn>}
         <div style={{ flex: 1 }} />
@@ -441,7 +453,7 @@ function ChooseCampaignType({ onClose, onContinue }) {
 }
 
 const AUTO_GROUPS = ['Close match', 'Loose match', 'Substitutes', 'Complements']
-function SingleCampaignFlow({ type, products, profiles, profileId, currency = '$', onClose, onLaunch }) {
+function SingleCampaignFlow({ type, products, profiles, profileId, onClose, onLaunch }) {
   const [step, setStep] = useState(0)
   const today = new Date().toISOString().slice(0, 10)
   const typeLabel = CC_TYPES.find((t) => t.v === type)?.t || type
@@ -455,12 +467,14 @@ function SingleCampaignFlow({ type, products, profiles, profileId, currency = '$
     negatives: [], negInput: '', negMatch: 'Negative Exact',
   })
   const set = (patch) => setF((x) => ({ ...x, ...patch }))
+  const currency = symA(f.profile === 'all' ? 'us' : f.profile)
   const steps = ['Campaign', 'Adgroup and Ads', 'Targeting', 'Negative Targeting', 'Complete']
   const last = steps.length - 1
   const canNext = () => {
     if (step === 0) return f.name.trim().length > 0 && f.name.length <= 128 && Number(f.dailyBudget) > 0 && (f.dateMode === 'Any Date Range' || !!f.startDate)
     if (step === 1) return f.adgroupName.trim().length > 0 && f.ads.length > 0
-    if (step === 2) return f.targeting === 'Automatic' ? AUTO_GROUPS.some((g) => f.autoGroups[g]) : f.keywords.length > 0
+    // Only SP campaigns have an Automatic mode — every other type must add ≥1 keyword/target.
+    if (step === 2) return (type === 'SP' && f.targeting === 'Automatic') ? AUTO_GROUPS.some((g) => f.autoGroups[g]) : f.keywords.length > 0
     return true
   }
   const addKw = () => { const t = f.kwInput.trim(); if (!t) return; set({ keywords: [...f.keywords, { text: t, match: f.kwMatch, bid: f.kwBid }], kwInput: '' }) }
@@ -474,8 +488,8 @@ function SingleCampaignFlow({ type, products, profiles, profileId, currency = '$
       id: 'CNEW' + Date.now().toString().slice(-7),
       name: f.name.trim(), asin: f.ads[0], product: firstAd.title || f.ads[0], profileId: f.profile === 'all' ? 'us' : f.profile,
       state: f.state, status: f.state, campaignType, targetingType,
-      adGroups: { active: 1, total: 1 }, dailyBudget: Number(f.dailyBudget),
-      actlBid: Number(f.defaultBid) || 1, avlBid: round2((Number(f.defaultBid) || 1) * 1.3),
+      adGroups: { active: 1, total: 1 }, dailyBudget: Math.max(MIN_BUDGET, Number(f.dailyBudget)),
+      actlBid: Math.max(MIN_BID, Number(f.defaultBid) || 1), avlBid: round2(Math.max(MIN_BID, Number(f.defaultBid) || 1) * 1.3),
       portfolio: 'New Launch', bidStrategy: 'Dynamic - down only', tag: 'NEW',
       startDate: f.dateMode === 'Any Date Range' ? today : f.startDate,
       endDate: f.dateMode === 'Any Date Range' ? '' : f.endDate, ...zero,
@@ -587,7 +601,7 @@ function SingleCampaignFlow({ type, products, profiles, profileId, currency = '$
     )
   }
   return (
-    <Modal width={640} title={`Create Campaign — ${typeLabel}`} sub="Single campaign flow" onClose={onClose}
+    <Modal width={640} title={`Create Campaign — ${typeLabel}`} sub="Single campaign flow" onClose={onClose} confirmClose
       footer={<>
         {step > 0 && <Btn ghost onClick={() => setStep(step - 1)}>Previous</Btn>}
         <div style={{ flex: 1 }} />
@@ -695,16 +709,21 @@ function TrackKeywordModal({ onClose, onCreate }) {
 }
 
 function KpiRow({ rows, prev }) {
-  const a = aggregate(rows)
-  const p = prev && prev.length ? aggregate(prev) : null
+  // SA-R7: when the row set spans currencies, aggregate money in USD estimates.
+  const mixed = adsMixedCur(rows)
+  const toUsd = (rs) => (mixed ? rs.map((r) => ({ ...r, spend: (r.spend || 0) * fxUSD(r.profileId), sales: (r.sales || 0) * fxUSD(r.profileId) })) : rs)
+  const a = aggregate(toUsd(rows))
+  const prevRows = (prev || []).filter(Boolean)
+  const p = prevRows.length ? aggregate(toUsd(prevRows)) : null
+  const est = (v) => (mixed ? `${v} (USD est.)` : v)
   const dl = (cur, prv) => (p && prv ? ((cur - prv) / Math.abs(prv)) * 100 : undefined)
   return (
     <KpiGrid>
       <Kpi label="Impressions" value={compact(a.impr)} delta={dl(a.impr, p?.impr)} />
       <Kpi label="Clicks" value={compact(a.clk)} delta={dl(a.clk, p?.clk)} />
       <Kpi label="CTR" value={pct(a.ctr, 2)} delta={dl(a.ctr, p?.ctr)} />
-      <Kpi label="Spend" value={money(a.spend)} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
-      <Kpi label="Sales" value={money(a.sales)} delta={dl(a.sales, p?.sales)} />
+      <Kpi label="Spend" value={est(money(a.spend))} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
+      <Kpi label="Sales" value={est(money(a.sales))} delta={dl(a.sales, p?.sales)} />
       <Kpi label="ACoS" value={pct(a.acos)} delta={dl(a.acos, p?.acos)} deltaGood={(dl(a.acos, p?.acos) || 0) <= 0} />
       <Kpi label="ROAS" value={dec2(a.roas)} delta={dl(a.roas, p?.roas)} />
       <Kpi label="Orders" value={compact(a.orders)} delta={dl(a.orders, p?.orders)} />
@@ -722,6 +741,7 @@ export function Campaigns() {
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ads-campaigns'))
   const [sel, setSel] = useState(new Set())
+  useEffect(() => { setSel(new Set()) }, [profileId]) // SA-R1: selection ids belong to the previous profile's rows
 
   const [modal, setModal] = useState(null) // 'bid' | 'budget' | 'tag' | 'daypart' | 'rule'
   const [wizard, setWizard] = useState(false)
@@ -759,12 +779,13 @@ export function Campaigns() {
   const setState = (id, st) => merge(id, { state: st, status: statusFor(st) })
   const byId = Object.fromEntries(data.map((c) => [c.id, c]))
 
-  const bulkState = (st) => { const ids = [...sel]; mergeMany(ids, () => ({ state: st, status: statusFor(st) })); setSel(new Set()); toast(`${ids.length} campaign${ids.length === 1 ? '' : 's'} ${st.toLowerCase()}`) }
-  const applyBulkBid = (mode, amt) => { const ids = [...sel]; mergeMany(ids, (id) => ({ actlBid: applyBidOp(byId[id].actlBid, byId[id].avlBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} campaign${ids.length === 1 ? '' : 's'} — all succeeded`) }
-  const applyBulkBudget = (mode, amt) => { const ids = [...sel]; mergeMany(ids, (id) => ({ dailyBudget: applyBudgetOp(byId[id].dailyBudget, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated daily budget on ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
-  const applyBulkTag = (tag) => { const ids = [...sel]; mergeMany(ids, () => ({ tag })); setSel(new Set()); setModal(null); toast(`Tagged ${ids.length} campaign${ids.length === 1 ? '' : 's'} “${tag}”`) }
-  const applyBulkDaypart = (sched) => { const ids = [...sel]; mergeMany(ids, () => ({ daypart: sched })); setSel(new Set()); setModal(null); toast(`Dayparting “${sched}” applied to ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
-  const applyBulkRule = (rule) => { const ids = [...sel]; mergeMany(ids, () => ({ appliedRule: rule.name })); setSel(new Set()); setModal(null); toast(`Rule “${rule.name}” applied to ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
+  const selIds = () => [...sel].filter((id) => byId[id]) // SA-R1: skip ids no longer in the visible row set
+  const bulkState = (st) => { const ids = selIds(); mergeMany(ids, () => ({ state: st, status: statusFor(st) })); setSel(new Set()); toast(`${ids.length} campaign${ids.length === 1 ? '' : 's'} ${st.toLowerCase()}`) }
+  const applyBulkBid = (mode, amt) => { const ids = selIds(); mergeMany(ids, (id) => ({ actlBid: applyBidOp(byId[id].actlBid, byId[id].avlBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} campaign${ids.length === 1 ? '' : 's'} — all succeeded`) }
+  const applyBulkBudget = (mode, amt) => { const ids = selIds(); mergeMany(ids, (id) => ({ dailyBudget: applyBudgetOp(byId[id].dailyBudget, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated daily budget on ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
+  const applyBulkTag = (tag) => { const ids = selIds(); mergeMany(ids, () => ({ tag })); setSel(new Set()); setModal(null); toast(`Tagged ${ids.length} campaign${ids.length === 1 ? '' : 's'} “${tag}”`) }
+  const applyBulkDaypart = (sched) => { const ids = selIds(); mergeMany(ids, () => ({ daypart: sched })); setSel(new Set()); setModal(null); toast(`Dayparting “${sched}” applied to ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
+  const applyBulkRule = (rule) => { const ids = selIds(); mergeMany(ids, () => ({ appliedRule: rule.name })); setSel(new Set()); setModal(null); toast(`Rule “${rule.name}” applied to ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
 
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
@@ -779,15 +800,15 @@ export function Campaigns() {
     { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
     { key: 'campaignType', label: 'Type', render: (r) => <span className={`pill ${typeTone(r.campaignType)}`} style={{ borderRadius: 5 }}>{r.campaignType}</span> },
     { key: 'adGroups', label: 'Ad Groups', num: true, sort: false, render: (r) => <span className="muted">{r.adGroups.active}/{r.adGroups.total}</span> },
-    { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: (rs) => cur(sumKey('dailyBudget')(rs), symOf(rs), 0), render: (r) => (
-      <EditableNum value={r.dailyBudget} prefix={symA(r.profileId)} dec={0} onCommit={(v) => { merge(r.id, { dailyBudget: v }); toast(`Daily budget set to ${cur(v, symA(r.profileId), 0)}`) }} />) },
+    { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: adsMoneyFoot('dailyBudget'), render: (r) => (
+      <EditableNum value={r.dailyBudget} prefix={symA(r.profileId)} dec={0} min={MIN_BUDGET} onCommit={(v) => { merge(r.id, { dailyBudget: v }); toast(`Daily budget set to ${cur(v, symA(r.profileId), 0)}`) }} />) },
     { key: 'bid', label: 'Bid (Act/Avl)', num: true, sort: false, render: (r) => <span className="muted">{r.actlBid} / {r.avlBid}</span> },
     { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
     { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
     { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
-    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
     { key: 'cpc', label: 'CPC', num: true, foot: (rs) => cur(aggregate(rs).cpc, symOf(rs), 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
-    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
     { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
     { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
     { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
@@ -838,8 +859,8 @@ export function Campaigns() {
           <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
         </div>
       )}
-      {modal === 'bid' && <BulkBidModal count={sel.size} currency="$" suggestedLabel="available bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
-      {modal === 'budget' && <BulkBudgetModal count={sel.size} currency="$" onApply={applyBulkBudget} onClose={() => setModal(null)} />}
+      {modal === 'bid' && <BulkBidModal count={sel.size} currency={symA(profileId)} suggestedLabel="available bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
+      {modal === 'budget' && <BulkBudgetModal count={sel.size} currency={symA(profileId)} onApply={applyBulkBudget} onClose={() => setModal(null)} />}
       {modal === 'tag' && <BulkTagModal count={sel.size} onApply={applyBulkTag} onClose={() => setModal(null)} />}
       {modal === 'daypart' && <BulkDaypartModal count={sel.size} onApply={applyBulkDaypart} onClose={() => setModal(null)} />}
       {modal === 'rule' && <ApplyRuleModal count={sel.size} rules={allRules} onApply={applyBulkRule} onClose={() => setModal(null)} />}
@@ -896,22 +917,20 @@ function adGroupsForCampaign(c) {
   })
 }
 export function AdGroups() {
-  const { rangeResolved } = useApp()
+  const { profileId, rangeResolved } = useApp()
   const loc = useLocation()
   const campId = new URLSearchParams(loc.search || '').get('camp')
   const allCamps = useMemo(() => [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS], [])
   const drillCamp = campId ? allCamps.find((c) => c.id === campId) : null
-  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const base = useProfileFilter(allCamps)
   const [created, setCreated] = useState(() => createdStore.get('adgroups'))
   const [showNew, setShowNew] = useState(false)
   const createdRows = useMemo(() => created
     .filter((g) => !campId || g.campaignId === campId)
     .map((g) => ({ ...ZERO_METRICS, id: g.id, name: g.name, campaign: g.campaign, campaignId: g.campaignId, profileId: g.profileId, state: g.state, defaultBid: g.defaultBid, targets: 0 })), [created, campId])
-  const seedRows = drillCamp ? adGroupsForCampaign(drillCamp) : base.slice(0, 30).map((c, i) => ({
-    id: c.id + '-ag', name: c.name.split('-').slice(0, 2).join('-') + ' · Ad Group ' + (1 + (i % 3)),
-    campaign: c.name, campaignId: c.id, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
-    targets: 4 + (i % 9), impr: c.impr, clk: c.clk, spend: c.spend, sales: c.sales, orders: c.orders, acos: c.acos, roas: c.roas, ctr: c.ctr,
-  }))
+  // SA-R6: the flat view derives ad groups from the same adGroupsForCampaign() weights/ids
+  // as the drill view, so metrics and overrides agree between the two paths.
+  const seedRows = drillCamp ? adGroupsForCampaign(drillCamp) : base.flatMap((c) => adGroupsForCampaign(c))
   const rawRows = [...createdRows, ...seedRows]
   const createNewGroup = (g) => { const row = { id: 'AGNEW' + Date.now().toString().slice(-7), ...g }; const next = [row, ...created]; createdStore.set('adgroups', next); setCreated(next); setShowNew(false); toast(`Ad group "${g.name}" created`) }
   const [overrides, setOverrides] = usePersistentOverrides('ads-adgroups')
@@ -921,25 +940,46 @@ export function AdGroups() {
   const filtered = applyFilters(rows, filters, ADGROUP_FIELDS)
   const prevFiltered = filtered.map((r) => prev[r.id])
   const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
+  const mergeMany = (ids, fn) => setOverrides((o) => { const n = { ...o }; ids.forEach((id) => { n[id] = { ...n[id], ...fn(id) } }); return n })
+  const byId = Object.fromEntries(rows.map((r) => [r.id, r]))
+  const [sel, setSel] = useState(new Set())
+  useEffect(() => { setSel(new Set()) }, [profileId, campId]) // SA-R1: drop stale selections
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
+  const bulkState = (st) => { const ids = [...sel].filter((id) => byId[id]); mergeMany(ids, () => ({ state: st })); setSel(new Set()); toast(`${ids.length} ad group${ids.length === 1 ? '' : 's'} ${st.toLowerCase()}`) }
   const columns = [
     { key: 'name', label: 'Ad Group', sticky: true, width: 300, render: (r) => <div className="cellname">{r.name}<small>{r.campaign}</small></div> },
     { key: 'state', label: 'State', render: (r) => <StateSelect value={r.state === 'Enabled' ? 'Enabled' : 'Paused'} options={['Enabled', 'Paused']} onChange={(st) => { merge(r.id, { state: st }); toast(`Ad group ${st.toLowerCase()}`) }} /> },
     { key: 'defaultBid', label: 'Default Bid', num: true, render: (r) => <EditableNum value={r.defaultBid} prefix={symA(r.profileId)} dec={2} onCommit={(v) => { merge(r.id, { defaultBid: v }); toast(`Default bid set to ${cur(v, symA(r.profileId), 2)}`) }} /> },
     { key: 'targets', label: 'Targets', num: true, foot: (rs) => int(sumKey('targets')(rs)) },
-    { key: 'impr', label: 'Impr.', num: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
-    { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
     { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
-    { key: 'spend', label: 'Spend', num: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'sales', label: 'Sales', num: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
-    { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
-    { key: 'acos', label: 'ACoS', num: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => pct(r.acos) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => pct(r.acos) },
     { key: 'roas', label: 'ROAS', num: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
   ]
+  const agPresets = {
+    'Default Plan': ['name', 'state', 'defaultBid', 'targets', 'impr', 'clk', 'ctr', 'spend', 'sales', 'orders', 'acos', 'roas'],
+    Performance: ['name', 'state', 'impr', 'clk', 'ctr', 'spend', 'sales', 'orders', 'acos', 'roas'],
+    'Bid Management': ['name', 'state', 'defaultBid', 'targets', 'spend', 'acos', 'roas'],
+  }
   return (
     <>
       <AdsHead title="Ad Groups" sub={drillCamp ? `${filtered.length} ad groups in this campaign` : `${filtered.length} ad groups · ${rangeResolved.label}`}>
         <ExportMenu name="ad-groups" fields={ADGROUP_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setShowNew(true)}>New Ad Group</Btn>
       </AdsHead>
+      {sel.size > 0 && (
+        <div className="bulkbar">
+          <span className="sel">{sel.size} selected</span>
+          <Btn sm icon="play" onClick={() => bulkState('Enabled')}>Enable</Btn>
+          <Btn sm icon="pause" onClick={() => bulkState('Paused')}>Pause</Btn>
+          <div style={{ flex: 1 }} />
+          <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
+        </div>
+      )}
       {showNew && <NewAdGroupModal camps={allCamps} defaultCampId={campId} currency={drillCamp ? symA(drillCamp.profileId) : '$'} onClose={() => setShowNew(false)} onCreate={createNewGroup} />}
       {drillCamp && (
         <div className="drillbar">
@@ -954,8 +994,17 @@ export function AdGroups() {
         columns={columns}
         rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }}
+        presets={agPresets}
+        defaultPreset="Default Plan"
         dimensions={[{ key: 'profileId', label: 'Profile' }, { key: 'state', label: 'State' }]}
         totals
+        compare
+        comparePrev={prev}
+        compareDisabled={rangeResolved.label === 'All time'}
+        selectable
+        selected={sel}
+        onToggle={toggleSel}
+        onToggleAll={toggleAll}
         toolbarLeft={<FilterBar id="ads-adgroups" fields={ADGROUP_FIELDS} value={filters} onChange={setFilters} />}
       />
     </>
@@ -964,31 +1013,63 @@ export function AdGroups() {
 
 /* ============================ TARGETING (Keywords) ============================ */
 export function Targeting() {
-  const { rangeResolved } = useApp()
+  const { profileId, rangeResolved } = useApp()
   const [created, setCreated] = useState(() => createdStore.get('keywords'))
   const [showAdd, setShowAdd] = useState(false)
   const allCamps = useMemo(() => [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS], [])
-  const allKeywords = useMemo(() => [...created, ...keywords], [created])
+  // SA-R3: mock keywords in "-PAT-" campaigns become product-target rows (ASIN / category
+  // expressions, matchType PAT) so the Product Targets tab has a real, deterministic partition.
+  const allKeywords = useMemo(() => {
+    const campById = Object.fromEntries(ALL_CAMPAIGNS.map((c) => [c.id, c]))
+    const seeded = keywords.map((k) => {
+      if (!/-PAT-/.test(k.campaign)) return k
+      const target = /PAT-Category/.test(k.campaign) ? `Category: ${k.keyword}` : `ASIN: ${campById[k.campaignId]?.asin || k.keyword}`
+      return { ...k, matchType: 'PAT', keyword: target }
+    })
+    return [...created, ...seeded]
+  }, [created])
   const base = useProfileFilter(allKeywords)
+  // SA-R3 / SA-R9: Negatives = search terms the user negated + negatives created from this grid.
+  const [stActs] = usePersistentOverrides('ads-searchterms-acts')
+  const [createdNegs, setCreatedNegs] = useState(() => createdStore.get('negatives'))
+  const negAll = useMemo(() => [
+    ...createdNegs,
+    ...searchTerms.filter((s) => stActs[s.id] === 'negate').map((s) => ({
+      ...ZERO_METRICS, id: 'NEG-' + s.id, keyword: s.term, campaign: s.campaign, profileId: s.profileId,
+      matchType: 'Negative Exact', state: 'Enabled', bid: 0, sugBid: 0, topOfSearchIS: 0,
+    })),
+  ], [createdNegs, stActs])
+  const negRows = useProfileFilter(negAll)
   const addKeywords = (rows) => {
     const stamped = rows.map((r, i) => ({ ...ZERO_METRICS, id: 'KNEW' + (Date.now() + i).toString().slice(-7), keyword: r.keyword, campaignId: r.campaignId, campaign: r.campaign, profileId: r.profileId, matchType: r.matchType, state: 'Enabled', bid: r.bid, sugBid: r.bid, topOfSearchIS: 0 }))
     const next = [...stamped, ...created]; createdStore.set('keywords', next); setCreated(next); setShowAdd(false); toast(`Added ${rows.length} keyword${rows.length === 1 ? '' : 's'} — added to the grid`)
   }
   const [tab, setTab] = useState('Keywords')
   const [sel, setSel] = useState(new Set())
+  useEffect(() => { setSel(new Set()) }, [profileId, tab]) // SA-R1: drop stale selections
   const [overrides, setOverrides] = usePersistentOverrides('ads-targeting')
   const [modal, setModal] = useState(null) // 'set' | 'inc' | 'dec'
   const [filters, setFilters] = useState(() => loadFilterModel('ads-targeting'))
   const withEdits = base.map((k) => (overrides[k.id] ? { ...k, ...overrides[k.id] } : k))
   const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, rangeResolved), [withEdits, rangeResolved])
-  const filtered = applyFilters(data, filters, TARGETING_FIELDS)
-  const byId = Object.fromEntries(data.map((k) => [k.id, k]))
+  // SA-R3: real tab partition — Keywords / Product Targets (PAT) / Negatives.
+  const kwRows = data.filter((r) => r.matchType !== 'PAT')
+  const patRows = data.filter((r) => r.matchType === 'PAT')
+  const tabRows = tab === 'Keywords' ? kwRows : tab === 'Product Targets' ? patRows : negRows
+  const filtered = applyFilters(tabRows, filters, TARGETING_FIELDS)
+  const byId = Object.fromEntries([...data, ...negRows].map((k) => [k.id, k]))
   const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
   const mergeMany = (ids, fn) => setOverrides((o) => { const n = { ...o }; ids.forEach((id) => { n[id] = { ...n[id], ...fn(id) } }); return n })
   const setState = (id, st) => merge(id, { state: st })
-  const applyBulkBid = (mode, amt) => { const ids = [...sel]; mergeMany(ids, (id) => ({ bid: applyBidOp(byId[id].bid, byId[id].sugBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} target${ids.length === 1 ? '' : 's'} — all succeeded`) }
-  const bulkPause = () => { const ids = [...sel]; mergeMany(ids, () => ({ state: 'Paused' })); setSel(new Set()); toast(`Paused ${ids.length} target${ids.length === 1 ? '' : 's'}`) }
-  const bulkNegative = () => { const n = sel.size; setSel(new Set()); toast(`Added ${n} term${n === 1 ? '' : 's'} as negative exact`) }
+  const selIds = () => [...sel].filter((id) => byId[id]) // SA-R1: skip ids no longer in the row set
+  const applyBulkBid = (mode, amt) => { const ids = selIds(); mergeMany(ids, (id) => ({ bid: applyBidOp(byId[id].bid, byId[id].sugBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} target${ids.length === 1 ? '' : 's'} — all succeeded`) }
+  const bulkPause = () => { const ids = selIds(); mergeMany(ids, () => ({ state: 'Paused' })); setSel(new Set()); toast(`Paused ${ids.length} target${ids.length === 1 ? '' : 's'}`) }
+  const bulkNegative = () => {
+    const rows = selIds().map((id) => byId[id])
+    const stamped = rows.map((r, i) => ({ ...ZERO_METRICS, id: 'NEGNEW' + (Date.now() + i).toString().slice(-7), keyword: r.keyword, campaign: r.campaign, profileId: r.profileId, matchType: 'Negative Exact', state: 'Enabled', bid: 0, sugBid: 0, topOfSearchIS: 0 }))
+    const next = [...stamped, ...createdNegs]; createdStore.set('negatives', next); setCreatedNegs(next)
+    setSel(new Set()); toast(`Added ${stamped.length} term${stamped.length === 1 ? '' : 's'} as negative exact — see the Negatives tab`)
+  }
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
   const columns = [
@@ -1000,8 +1081,8 @@ export function Targeting() {
     { key: 'topOfSearchIS', label: 'Top-of-Search IS', num: true, render: (r) => pct(r.topOfSearchIS) },
     { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
     { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
-    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
     { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
     { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : 'inherit' }}>{pct(r.acos)}</span> },
     { key: 'roas', label: 'ROAS', num: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
@@ -1009,9 +1090,11 @@ export function Targeting() {
   return (
     <>
       <AdsHead title="Targeting" sub={`Keywords & product targets · ${rangeResolved.label}`}><ExportMenu name="targeting" fields={TARGETING_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setShowAdd(true)}>Add Keywords</Btn></AdsHead>
-      {showAdd && <AddKeywordsModal camps={allCamps} onClose={() => setShowAdd(false)} onCreate={addKeywords} />}
-      <div className="viewtabs" style={{ maxWidth: 360 }}>
-        {['Keywords', 'Product Targets', 'Negatives'].map((t) => <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</div>)}
+      {showAdd && <AddKeywordsModal camps={allCamps} currency={symA(profileId)} onClose={() => setShowAdd(false)} onCreate={addKeywords} />}
+      <div className="viewtabs" style={{ maxWidth: 420 }}>
+        {[['Keywords', kwRows.length], ['Product Targets', patRows.length], ['Negatives', negRows.length]].map(([t, n]) => (
+          <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t} ({n})</div>
+        ))}
       </div>
       {sel.size > 0 && (
         <div className="bulkbar">
@@ -1020,11 +1103,11 @@ export function Targeting() {
           <Btn sm icon="trendUp" onClick={() => setModal('inc')}>Bid +%</Btn>
           <Btn sm icon="trendDown" onClick={() => setModal('dec')}>Bid −%</Btn>
           <Btn sm icon="pause" onClick={bulkPause}>Pause</Btn>
-          <Btn sm icon="x" onClick={bulkNegative}>Add as Negative</Btn>
+          {tab !== 'Negatives' && <Btn sm icon="x" onClick={bulkNegative}>Add as Negative</Btn>}
           <div style={{ flex: 1 }} /><Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
         </div>
       )}
-      {modal && <BulkBidModal count={sel.size} currency="$" initialMode={modal} suggestedLabel="suggested bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
+      {modal && <BulkBidModal count={sel.size} currency={symA(profileId)} initialMode={modal} suggestedLabel="suggested bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
       <DataGrid
         id="ads-targeting"
         columns={columns}
@@ -1049,12 +1132,24 @@ export function Targeting() {
 /* ============================ SEARCH TERMS (harvesting) ============================ */
 export function SearchTerms() {
   const { rangeResolved } = useApp()
+  const nav = useNavigate()
   const baseRaw = useProfileFilter(searchTerms)
-  const base = useMemo(() => scaleForRange(baseRaw, rangeResolved).rows, [baseRaw, rangeResolved])
+  // SA-R9: recompute the recommendation from the SCALED metrics (mirrors the mock's
+  // criteria: ACoS < 30 && orders > 6 → harvest; ACoS > 80 → negate; else monitor).
+  const base = useMemo(() => scaleForRange(baseRaw, rangeResolved).rows.map((r) => ({
+    ...r, recommend: r.acos < 30 && r.orders > 6 ? 'harvest' : r.acos > 80 ? 'negate' : 'monitor',
+  })), [baseRaw, rangeResolved])
   const [filter, setFilter] = useState('All')
   const [acts, setActs] = usePersistentOverrides('ads-searchterms-acts')
-  const harvest = (id) => { setActs((o) => ({ ...o, [id]: 'harvest' })); toast('Harvested to manual campaign') }
-  const negate = (id) => { setActs((o) => ({ ...o, [id]: 'negate' })); toast('Added as negative exact') }
+  const harvest = (r) => {
+    if (acts[r.id] !== 'harvest') { // add the term as a keyword target so it shows up in Targeting
+      const camp = ALL_CAMPAIGNS.find((c) => c.name === r.campaign)
+      const bid = Math.max(MIN_BID, round2(r.cpc || 0.75))
+      createdStore.add('keywords', { ...ZERO_METRICS, id: 'KNEW' + Date.now().toString().slice(-7), keyword: r.term, campaignId: camp?.id || '', campaign: r.campaign, profileId: r.profileId, matchType: 'Exact', state: 'Enabled', bid, sugBid: bid, topOfSearchIS: 0 })
+    }
+    setActs((o) => ({ ...o, [r.id]: 'harvest' })); toast('Harvested to manual campaign — keyword added to Targeting')
+  }
+  const negate = (id) => { setActs((o) => ({ ...o, [id]: 'negate' })); toast('Added as negative exact — see Targeting › Negatives') }
   const [filters, setFilters] = useState(() => loadFilterModel('ads-searchterms'))
   const recTone = { harvest: 'green', negate: 'red', monitor: 'gray' }
   const chipFiltered = base.filter((r) => filter === 'All' || r.recommend === filter.toLowerCase())
@@ -1065,23 +1160,23 @@ export function SearchTerms() {
     { key: 'campaign', label: 'Campaign', render: (r) => <span className="muted">{r.campaign.split('-').slice(0, 2).join('-')}</span> },
     { key: 'impr', label: 'Impr.', num: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
     { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
-    { key: 'spend', label: 'Spend', num: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'sales', label: 'Sales', num: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'spend', label: 'Spend', num: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
     { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
     { key: 'acos', label: 'ACoS', num: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => pct(r.acos) },
     { key: 'recommend', label: 'Recommendation', render: (r) => <Pill tone={recTone[r.recommend]}>{r.recommend}</Pill> },
     { key: 'act', label: '', sort: false, render: (r) => (r.recommend === 'harvest'
-      ? <Btn sm primary icon={acts[r.id] === 'harvest' ? 'check' : 'plus'} onClick={() => harvest(r.id)}>{acts[r.id] === 'harvest' ? 'Harvested' : 'Harvest'}</Btn>
+      ? <Btn sm primary icon={acts[r.id] === 'harvest' ? 'check' : 'plus'} onClick={() => harvest(r)}>{acts[r.id] === 'harvest' ? 'Harvested' : 'Harvest'}</Btn>
       : r.recommend === 'negate'
         ? <Btn sm icon={acts[r.id] === 'negate' ? 'check' : 'x'} onClick={() => negate(r.id)}>{acts[r.id] === 'negate' ? 'Negated' : 'Negate'}</Btn>
         : <span className="muted">—</span>) },
   ]
   return (
     <>
-      <AdsHead title="Search Terms" sub="Auto-harvest winners into manual campaigns · negate wasted spend"><ExportMenu name="search-terms" fields={SEARCHTERM_FIELDS} rows={filtered} /><Btn icon="sliders" primary>Harvesting Rules</Btn></AdsHead>
+      <AdsHead title="Search Terms" sub="Auto-harvest winners into manual campaigns · negate wasted spend"><ExportMenu name="search-terms" fields={SEARCHTERM_FIELDS} rows={filtered} /><Btn icon="sliders" primary onClick={() => nav('/rules')}>Harvesting Rules</Btn></AdsHead>
       <div className="hint" style={{ marginBottom: 14 }}>
         <Icon name="bulb" size={16} />
-        <div><b>{counts.harvest} terms</b> qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%) and <b>{counts.negate} terms</b> are flagged to negate. Rule R3 runs nightly to auto-apply.</div>
+        <div><b>{counts.harvest} terms</b> qualify for harvesting (Orders &gt; 6, ACoS &lt; 30%) and <b>{counts.negate} terms</b> are flagged to negate. Rule R3 runs nightly to auto-apply.</div>
       </div>
       <DataGrid
         id="ads-searchterms"
@@ -1130,9 +1225,9 @@ export function ShareOfVoice() {
       <AdsHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><ExportMenu name="share-of-voice" fields={SOV_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setShowTrack(true)}>Track Keyword</Btn></AdsHead>
       {showTrack && <TrackKeywordModal onClose={() => setShowTrack(false)} onCreate={trackKeyword} />}
       <KpiGrid>
-        <Kpi label="Avg Paid SOV" value={pct(avgPaid)} delta={3.2} />
-        <Kpi label="Avg Organic SOV" value={pct(avgOrg)} delta={-1.1} deltaGood={false} />
-        <Kpi label="Avg Total SOV" value={pct(avgPaid + avgOrg)} delta={1.8} />
+        <Kpi label="Avg Paid SOV" value={pct(avgPaid)} />
+        <Kpi label="Avg Organic SOV" value={pct(avgOrg)} />
+        <Kpi label="Avg Total SOV" value={pct(avgPaid + avgOrg)} />
         <Kpi label="Keywords Tracked" value={filtered.length} />
         <Kpi label="#1 Rank Keywords" value={filtered.filter((r) => r.yourRank === 1).length} />
       </KpiGrid>
@@ -1141,6 +1236,7 @@ export function ShareOfVoice() {
         columns={columns}
         rows={filtered}
         initialSort={{ key: 'searchVolume', dir: 'desc' }}
+        totals
         dimensions={[{ key: 'topCompetitor', label: 'Top Competitor' }]}
         toolbarLeft={<FilterBar id="ads-sov" fields={SOV_FIELDS} value={filters} onChange={setFilters} />}
       />
@@ -1260,6 +1356,17 @@ const XL_FIELDS = {
   'Campaign Tag Target Setting': [{ key: 'tag', label: 'Tag Name' }, { key: 'target', label: 'Target' }, { key: 'bid', label: 'Bid' }],
   'Upload Campaign Mapping': [{ key: 'name', label: 'Campaign Name' }, { key: 'group', label: 'Mapping Group' }],
 }
+// Map the Campaign Type dropdown to the campaignType prefixes used in the mock rows.
+const XL_TYPE_PREFIX = { 'Sponsored Products': 'SP', 'Sponsored Brands': 'SB', 'Sponsored Display': 'SD', 'Sponsored TV': 'STV' }
+// Amazon bulk-file style column headers (vs the Pacvue-style labels above).
+const XL_AMZ_LABELS = {
+  name: 'Campaign', campaignType: 'Ad Type', state: 'Campaign Status', dailyBudget: 'Daily Budget',
+  startDate: 'Campaign Start Date', endDate: 'Campaign End Date', targetingType: 'Targeting Type',
+  actlBid: 'Ad Group Default Bid', setting: 'Operation', newValue: 'Value', adGroup: 'Ad Group Name',
+  target: 'Keyword or Product Targeting', matchType: 'Match Type', bid: 'Max Bid', tag: 'Label', group: 'Portfolio Name',
+}
+// Target/keyword uploads are capped at 1,000 keywords; everything else at 10,000 rows.
+const XL_KW_TABS = ['Campaign Target Setting', 'Campaign Tag Target Setting']
 
 export function BulkOperations() {
   const { profiles } = useApp()
@@ -1271,12 +1378,18 @@ export function BulkOperations() {
   const [history, setHistory] = useState(() => createdStore.get('bulkops'))
   const fileRef = useRef(null)
   const fields = XL_FIELDS[tab]
+  // SA-R11: Pacvue vs Amazon format changes the exported column headers, not just the filename.
+  const fmtFields = fmt === 'Amazon' ? fields.map((f) => ({ ...f, label: XL_AMZ_LABELS[f.key] || f.label })) : fields
   const stamp = new Date().toISOString().slice(0, 10)
   const fname = (kind) => `${fmt.toLowerCase()}-${tab.toLowerCase().replace(/[^a-z]+/g, '-')}-${kind}-${stamp}.csv`
-  const downloadTemplate = () => { exportCSV(fname('template'), fields, []); toast(`${fmt} template downloaded — fill it in, then Upload`) }
+  const downloadTemplate = () => { exportCSV(fname('template'), fmtFields, []); toast(`${fmt} template downloaded — fill it in, then Upload`) }
   const downloadExisting = () => {
-    const rows = ALL_CAMPAIGNS.filter((c) => c.profileId === profile || profile === 'all').map((c) => ({ ...c, setting: quick, newValue: '', adGroup: '', target: '', matchType: '', bid: c.actlBid, tag: c.tag || '', group: '' }))
-    exportCSV(fname('existing-data'), fields, rows); toast(`Exported ${rows.length} rows for editing`)
+    const prefix = XL_TYPE_PREFIX[ctype] || ''
+    const rows = ALL_CAMPAIGNS
+      .filter((c) => (c.profileId === profile || profile === 'all') && c.campaignType.startsWith(prefix))
+      .map((c) => ({ ...c, setting: quick, newValue: '', adGroup: '', target: '', matchType: '', bid: c.actlBid, tag: c.tag || '', group: '' }))
+    if (!rows.length) { toast(`No ${ctype} campaigns on this profile`, 'error'); return }
+    exportCSV(fname('existing-data'), fmtFields, rows); toast(`Exported ${rows.length} ${ctype} row${rows.length === 1 ? '' : 's'} for editing`)
   }
   const onUpload = (e) => {
     const file = e.target.files?.[0]; if (!file) return
@@ -1284,9 +1397,13 @@ export function BulkOperations() {
     reader.onload = () => {
       const lines = String(reader.result).split(/\r?\n/).filter((l) => l.trim())
       const n = Math.max(0, lines.length - 1)
-      const rec = { id: 'BO' + Date.now().toString().slice(-6), tab, setting: tab === 'Quick Campaign Edits' ? quick : '—', file: file.name, rows: n, format: fmt, status: n > 10000 ? 'Rejected — over 10,000 row limit' : 'Processed', when: new Date().toLocaleString() }
+      const isKw = XL_KW_TABS.includes(tab) || (tab === 'Quick Campaign Edits' && quick.includes('Targeting'))
+      const limit = isKw ? 1000 : 10000
+      const status = n > limit ? `Rejected — over ${limit.toLocaleString()} ${isKw ? 'keyword' : 'row'} limit` : 'Processed'
+      const rec = { id: 'BO' + Date.now().toString().slice(-6), tab, setting: tab === 'Quick Campaign Edits' ? quick : '—', file: file.name, rows: n, format: fmt, status, when: new Date().toLocaleString() }
       const next = [rec, ...createdStore.get('bulkops')]; createdStore.set('bulkops', next); setHistory(next)
-      toast(rec.status === 'Processed' ? `Processed ${n} row${n === 1 ? '' : 's'} from ${file.name}` : rec.status)
+      if (status === 'Processed') toast(`Processed ${n} row${n === 1 ? '' : 's'} from ${file.name}`)
+      else toast(status, 'error')
     }
     reader.readAsText(file); e.target.value = ''
   }
@@ -1325,7 +1442,7 @@ export function BulkOperations() {
           </tbody></table>
         )}
       </Card>
-      <div className="footnote">Pick a tab per operation type. Quick Campaign Edits supports: {XL_QUICK.join(' · ')}. Files over 10,000 campaign rows are rejected, matching live limits.</div>
+      <div className="footnote">Pick a tab per operation type. Quick Campaign Edits supports: {XL_QUICK.join(' · ')}. Files over 10,000 campaign rows (or 1,000 keyword rows for target files) are rejected, matching live limits.</div>
     </>
   )
 }

@@ -45,7 +45,7 @@ const actionStr = (b) => {
 }
 const buildTrigger = (f) => {
   const b = f.blocks[0]
-  const parts = b.conditions.filter((c) => c.value !== '' || c.op === 'between').map(condStr)
+  const parts = b.conditions.filter((c) => c.value !== '' && (c.op !== 'between' || c.value2 !== '')).map(condStr)
   let s = parts.join(` ${b.join} `)
   const gates = []
   if (f.minClicks) gates.push(`min ${f.minClicks} clicks`)
@@ -143,7 +143,8 @@ function RuleBuilder({ onClose, onSave, onSaveTemplate, initial }) {
   const addBlock = () => upd({ blocks: [...f.blocks, blankBlock()] })
   const delBlock = (bi) => upd({ blocks: f.blocks.filter((b, j) => j !== bi) })
   const step1Ok = f.name.trim().length > 0 && f.name.length <= 150
-  const blocksOk = f.blocks.every((b) => b.conditions.some((c) => c.value !== '') && (!RB_NEEDS_VAL.has(b.action) || b.actionValue !== ''))
+  const condOk = (c) => c.value !== '' && (c.op !== 'between' || c.value2 !== '')
+  const blocksOk = f.blocks.every((b) => b.conditions.some(condOk) && b.conditions.every((c) => c.op !== 'between' || c.value === '' || c.value2 !== '') && (!RB_NEEDS_VAL.has(b.action) || b.actionValue !== ''))
   const canSave = step1Ok && blocksOk
   const cleanForm = () => {
     const { name, ruleType, type, scope, timezone, mode, runStart, runEnd, excludeDates, sendEmail, blocks, lookback, excludeLatest, excludeDays, minClicks, minSpend, frequency } = f
@@ -251,7 +252,7 @@ function RuleBuilder({ onClose, onSave, onSaveTemplate, initial }) {
       </div>
       <div style={{ width: 190, flex: '0 0 auto', borderLeft: '1px solid var(--border)', paddingLeft: 12 }}>
         <div className="cm-head" style={{ padding: '0 0 8px' }}>Rule Kickstart</div>
-        {RULE_TEMPLATES.map((t) => (
+        {[...RULE_TEMPLATES, ...createdStore.get('ruleTemplates')].map((t) => (
           <div key={t.key} className="tmpl-card" style={{ padding: 8, marginBottom: 6, cursor: 'pointer' }} onClick={() => { setF(normForm(t.form)); setPreview(null); toast(`Loaded “${t.title}”`) }}>
             <div className="grow"><div className="title" style={{ fontSize: 12 }}>{t.title}</div><div className="desc" style={{ fontSize: 11 }}>{t.desc}</div></div>
           </div>
@@ -320,21 +321,36 @@ const fallbackForm = (r) => ({
   scope: RB_SCOPES.includes(r.scope) ? r.scope : 'All SP campaigns',
   frequency: RB_FREQ.includes(r.runs) ? r.runs : 'Every 6 hours',
 })
+// Persisted overrides for seeded rules (edits + status toggles) — keyed by rule id.
+const seedRuleStore = {
+  get() { try { return JSON.parse(localStorage.getItem('chedits:auto-rules-seed')) || {} } catch (e) { return {} } },
+  set(v) { try { localStorage.setItem('chedits:auto-rules-seed', JSON.stringify(v)) } catch (e) { /* ignore */ } },
+}
 export function Rules() {
-  const [rules, setRules] = useState(() => [...createdStore.get('rules'), ...RULES])
+  const [rules, setRules] = useState(() => { const ov = seedRuleStore.get(); return [...createdStore.get('rules'), ...RULES.map((r) => (ov[r.id] ? { ...r, ...ov[r.id] } : r))] })
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('auto-rules'))
   const [builder, setBuilder] = useState(false)
   const [edit, setEdit] = useState(null) // carries an existing rule's form (edit) OR a template form (create, no _id)
   const [picker, setPicker] = useState(false)
   const [typeChooser, setTypeChooser] = useState(false)
-  const onSaveTemplate = (tmpl) => createdStore.add('ruleTemplates', tmpl)
+  const onSaveTemplate = (tmpl) => {
+    const existing = createdStore.get('ruleTemplates')
+    const i = existing.findIndex((t) => t.title === tmpl.title)
+    if (i >= 0) createdStore.set('ruleTemplates', existing.map((t, j) => (j === i ? { ...tmpl, key: t.key } : t)))
+    else createdStore.add('ruleTemplates', tmpl)
+  }
   const onSave = (rule) => {
     const created = createdStore.get('rules')
-    const isEdit = created.some((x) => x.id === rule.id)
-    if (isEdit) {
+    if (created.some((x) => x.id === rule.id)) {
       createdStore.set('rules', created.map((x) => x.id === rule.id ? rule : x))
       setRules((rs) => rs.map((x) => x.id === rule.id ? rule : x))
+      toast(`Rule “${rule.name}” updated`)
+    } else if (RULES.some((x) => x.id === rule.id)) {
+      // Seeded rule edited — replace in place via the override store (never prepend a duplicate id).
+      const { created: _omit, ...patch } = rule
+      seedRuleStore.set({ ...seedRuleStore.get(), [rule.id]: patch })
+      setRules((rs) => rs.map((x) => x.id === rule.id ? { ...x, ...patch } : x))
       toast(`Rule “${rule.name}” updated`)
     } else {
       createdStore.set('rules', [rule, ...created])
@@ -346,7 +362,13 @@ export function Rules() {
   const toggle = (id) => {
     setRules((rs) => rs.map((r) => r.id === id ? { ...r, status: r.status === 'Active' ? 'Paused' : 'Active' } : r))
     const created = createdStore.get('rules')
-    if (created.some((x) => x.id === id)) createdStore.set('rules', created.map((x) => x.id === id ? { ...x, status: x.status === 'Active' ? 'Paused' : 'Active' } : x))
+    if (created.some((x) => x.id === id)) {
+      createdStore.set('rules', created.map((x) => x.id === id ? { ...x, status: x.status === 'Active' ? 'Paused' : 'Active' } : x))
+    } else if (RULES.some((x) => x.id === id)) {
+      const ov = seedRuleStore.get()
+      const curStatus = (ov[id] && ov[id].status) || RULES.find((x) => x.id === id).status
+      seedRuleStore.set({ ...ov, [id]: { ...ov[id], status: curStatus === 'Active' ? 'Paused' : 'Active' } })
+    }
   }
   const openEdit = (r) => setEdit({ ...(r._f || fallbackForm(r)), _id: r.id, _status: r.status, _affected: r.affected })
   const duplicate = (r) => {
@@ -359,6 +381,8 @@ export function Rules() {
   const filtered = applyFilters(searched, filters, RM_FIELDS)
   const active = rules.filter((r) => r.status === 'Active').length
   const affected = rules.reduce((s, r) => s + r.affected, 0)
+  const actions24h = rules.filter((r) => r.status === 'Active' && r.lastRun !== '—').reduce((s, r) => s + r.affected, 0)
+  const typesInUse = new Set(rules.filter((r) => r.status === 'Active').map((r) => r.type)).size
   const columns = [
     { key: 'name', label: 'Rule', sticky: true, width: 240, sortVal: (r) => r.name, render: (r) => (
       <div className="flex items-center gap-8">
@@ -388,8 +412,8 @@ export function Rules() {
         <Kpi label="Active Rules" value={active} />
         <Kpi label="Total Rules" value={rules.length} />
         <Kpi label="Line Items Managed" value={affected.toLocaleString()} />
-        <Kpi label="Actions (24h)" value="1,284" />
-        <Kpi label="Est. Spend Saved (30d)" value="$8.4K" delta={6.2} />
+        <Kpi label="Actions (24h)" value={int(actions24h)} />
+        <Kpi label="Rule Types in Use" value={typesInUse} />
       </KpiGrid>
       <DataGrid
         id="auto-rules"
@@ -423,7 +447,7 @@ const BM_FIELDS = [
   { key: 'forecast', label: 'Forecast EOM', type: 'number' },
   { key: 'pacePct', label: 'Pace %', type: 'number' },
 ]
-const BM_DAY = 20, BM_DAYS = 30
+const BM_DAY = new Date().getDate(), BM_DAYS = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
 const capStore = {
   get() { try { return JSON.parse(localStorage.getItem('chbudgetcaps')) || {} } catch (e) { return {} } },
   set(v) { try { localStorage.setItem('chbudgetcaps', JSON.stringify(v)) } catch (e) { /* ignore */ } },
@@ -503,7 +527,7 @@ function tagMonth(pid, tag, mk, mi, goals, curr) {
   const hasDefault = h % 4 !== 0 && mi === 0 // current month: 3 of 4 tags have budgets; future months mostly unset
   const override = goals[key]
   const budget = override != null ? override : (hasDefault ? (2000 + (h % 9) * 1000) : null)
-  const dayOfMonth = new Date().getDate(), daysIn = 30
+  const dayOfMonth = BM_DAY, daysIn = BM_DAYS
   const spendPct = mi === 0 ? 0.55 + (h % 30) / 100 : 0
   const spend = budget && mi === 0 ? Math.round(budget * spendPct) : 0
   const pct = budget ? (spend / budget) * 100 : 0
@@ -515,9 +539,15 @@ function tagMonth(pid, tag, mk, mi, goals, curr) {
   return { key, budget, spend, pct, planned, delivery, est, roas, yday, curr }
 }
 
-function AllocModal({ tag, onClose }) {
-  const [tmpl, setTmpl] = useState(false)
-  const [mode, setMode] = useState('Even Amount')
+// Persisted daily-budget-allocation choices, keyed `profileId|tag`.
+const allocStore = {
+  get() { try { return JSON.parse(localStorage.getItem('challoc')) || {} } catch (e) { return {} } },
+  set(v) { try { localStorage.setItem('challoc', JSON.stringify(v)) } catch (e) { /* ignore */ } },
+}
+function AllocModal({ pid, tag, onClose }) {
+  const allocKey = `${pid}|${tag}`
+  const [tmpl, setTmpl] = useState(() => !!allocStore.get()[allocKey]?.tmpl)
+  const [mode, setMode] = useState(() => allocStore.get()[allocKey]?.mode || 'Even Amount')
   const [metric, setMetric] = useState('Impression')
   const h = gHash(tag + metric)
   const dow = Array.from({ length: 7 }, (_, i) => 60 + ((h >> i) % 40))
@@ -525,7 +555,7 @@ function AllocModal({ tag, onClose }) {
   const W = 300, H = 110
   return (
     <Modal width={720} title="Edit Daily Budget Allocation" sub={`${tag} — how the monthly budget goal spreads across days`} onClose={onClose}
-      footer={<><div style={{ flex: 1 }} /><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="check" onClick={() => { toast(`Allocation saved — ${mode}`); onClose() }}>Confirm</Btn></>}>
+      footer={<><div style={{ flex: 1 }} /><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="check" onClick={() => { allocStore.set({ ...allocStore.get(), [allocKey]: { mode, tmpl } }); toast(`Allocation saved — ${mode}`); onClose() }}>Confirm</Btn></>}>
       <label className="rb-check" style={{ marginBottom: 12 }}><Toggle on={tmpl} onClick={() => setTmpl(!tmpl)} /> Use Template</label>
       <div className="fld"><span>Daily Budget Mode</span>
         <div className="seg" style={{ marginTop: 4 }}>
@@ -566,11 +596,24 @@ export function Budgets() {
   const [goals, setGoals] = useState(() => goalStore.get())
   const [toggles, setToggles] = useState(() => { try { return JSON.parse(localStorage.getItem('chgoaltoggles')) || {} } catch (e) { return {} } })
   const [expanded, setExpanded] = useState(() => new Set(['ca']))
-  const [alloc, setAlloc] = useState(null) // tag name
+  const [alloc, setAlloc] = useState(null) // { pid, tag }
   const [editCell, setEditCell] = useState(null) // goal key being edited
   const [editVal, setEditVal] = useState('')
   const months = monthKeys(3)
-  const saveGoal = (key, v) => { const next = { ...goals, [key]: Number(v) || null }; goalStore.set(next); setGoals(next); setEditCell(null); toast('Budget goal saved') }
+  const saveGoal = (key, v, shown) => {
+    setEditCell(null)
+    const raw = String(v).trim()
+    const num = Number(raw)
+    if (raw === '' || !(num > 0)) { // '' = clear the override; 0 / invalid → clear too
+      if (goals[key] == null) return
+      const next = { ...goals }; delete next[key]
+      goalStore.set(next); setGoals(next); toast('Budget goal cleared')
+      return
+    }
+    if (num === (goals[key] != null ? goals[key] : shown)) return // unchanged on blur — skip save + toast
+    const next = { ...goals, [key]: num }
+    goalStore.set(next); setGoals(next); toast('Budget goal saved')
+  }
   const tglKey = (pid, tag, t) => `${pid}|${tag}|${t}`
   const tglOn = (pid, tag, t) => toggles[tglKey(pid, tag, t)] !== false // default on
   const flipTgl = (pid, tag, t) => setToggles((x) => { const n = { ...x, [tglKey(pid, tag, t)]: !tglOn(pid, tag, t) }; try { localStorage.setItem('chgoaltoggles', JSON.stringify(n)) } catch (e) { /* ignore */ } return n })
@@ -619,7 +662,7 @@ export function Budgets() {
         <div>Set monthly caps per marketplace with <b>Set Budget Cap</b>. When a cap is reached, campaigns auto-pause until the budget refreshes next month. Pacing guard (Rule R7) throttles bids if daily pace runs hot.</div>
       </div>
       {capModal && <SetBudgetCapModal rows={data} onClose={() => setCapModal(false)} onSave={saveCap} />}
-      {alloc && <AllocModal tag={alloc} onClose={() => setAlloc(null)} />}
+      {alloc && <AllocModal pid={alloc.pid} tag={alloc.tag} onClose={() => setAlloc(null)} />}
       <Card title="Budget goals — by profile & tag" sub="Monthly budget goals with pacing, delivery & automation guardrails · click a Budget cell to set a goal · Calendar edits daily allocation">
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', minWidth: 1450, width: '100%', fontSize: 12.5 }}>
@@ -659,7 +702,7 @@ export function Budgets() {
                     {open && tags.map((tag, ti) => (
                       <tr key={tag} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ padding: '7px 8px 7px 28px', whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'var(--bg, #fff)' }}><a style={{ color: 'var(--brand)', cursor: 'pointer' }}>{tag}</a></td>
-                        <td style={{ textAlign: 'center' }}><Btn sm ghost icon="clock" title="Edit Daily Budget Allocation" onClick={() => setAlloc(tag)} /></td>
+                        <td style={{ textAlign: 'center' }}><Btn sm ghost icon="clock" title="Edit Daily Budget Allocation" onClick={() => setAlloc({ pid: b.profileId, tag })} /></td>
                         {GOAL_TOGGLES.map((t) => {
                           const m0 = tagRows[ti][0]
                           return (
@@ -674,8 +717,8 @@ export function Budgets() {
                             <td style={{ textAlign: 'right', borderLeft: '2px solid var(--border)', whiteSpace: 'nowrap' }}>
                               {editCell === m.key ? (
                                 <input autoFocus type="number" defaultValue={m.budget || ''} style={{ width: 80 }}
-                                  onKeyDown={(e) => { if (e.key === 'Enter') saveGoal(m.key, e.target.value); if (e.key === 'Escape') setEditCell(null) }}
-                                  onBlur={(e) => saveGoal(m.key, e.target.value)} />
+                                  onKeyDown={(e) => { if (e.key === 'Enter') saveGoal(m.key, e.target.value, m.budget); if (e.key === 'Escape') setEditCell(null) }}
+                                  onBlur={(e) => saveGoal(m.key, e.target.value, m.budget)} />
                               ) : (
                                 <span style={{ cursor: 'pointer' }} onClick={() => setEditCell(m.key)}>
                                   {m.budget ? cur(m.budget, b.currency) : <span className="muted">Not set ✎</span>}
@@ -704,6 +747,7 @@ export function Budgets() {
       </Card>
       <DataGrid
         id="auto-budgets"
+        rowKey="profileId"
         columns={columns}
         rows={filtered}
         initialSort={{ key: 'pacePct', dir: 'desc' }}

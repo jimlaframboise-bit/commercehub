@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Kpi, KpiGrid, Pill, DataGrid, FilterBar, applyFilters, loadFilterModel, Btn, SearchBox, ExportMenu, scaleFields } from '../components/ui.jsx'
+import { Kpi, KpiGrid, Pill, DataGrid, FilterBar, applyFilters, loadFilterModel, Btn, SearchBox, ExportMenu, scaleFields, fxUSD } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
 import { digitalShelf, profileById } from '../data/mock.js'
 import { compact, money, pct, cur, int } from '../lib/format.js'
@@ -41,8 +41,22 @@ function useCommerceData() {
       aplusLabel: r.aplus ? 'Yes' : 'No',
       videoLabel: r.video ? 'Yes' : 'No',
     })
-    return { rows: rows.map(decorate), prev, allTime: rangeResolved.label === 'All time', range: rangeResolved }
+    return {
+      rows: rows.map(decorate), prev, allTime: rangeResolved.label === 'All time', range: rangeResolved,
+      profileId, noShelf: base.length === 0, marketName: profileById[profileId]?.market,
+    }
   }, [profileId, rangeResolved])
+}
+
+/* Empty state shown when the selected profile has no shelf tracking (e.g. Amazon UK). */
+function CmShelfEmpty({ market }) {
+  return (
+    <div className="card" style={{ padding: '44px 20px', textAlign: 'center' }}>
+      <div className="icobox" style={{ margin: '0 auto 10px', background: 'var(--brand-soft)', color: 'var(--brand)' }}><Icon name="box" size={18} /></div>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>Shelf tracking not enabled{market ? ` for ${market}` : ' for this profile'}</div>
+      <div className="muted" style={{ fontSize: 12.5 }}>Enable retail data for this profile to monitor availability, Buy Box, pricing and content health.</div>
+    </div>
+  )
 }
 
 const CATEGORIES = ['Pet Treats', 'Snacks', 'Pet Food', 'Supplements']
@@ -92,7 +106,8 @@ const PRODUCT_FIELDS = [
 
 /* ============================ DIGITAL SHELF ============================ */
 export function DigitalShelf() {
-  const { rows: data, prev, allTime, range } = useCommerceData()
+  const { rows: data, prev, allTime, range, noShelf, marketName } = useCommerceData()
+  const kv = (v) => (noShelf ? '—' : v)
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('commerce-shelf'))
   const searched = data.filter((d) => d.title.toLowerCase().includes(q.toLowerCase()) || d.asin.toLowerCase().includes(q.toLowerCase()))
@@ -126,18 +141,18 @@ export function DigitalShelf() {
         <ExportMenu name="digital-shelf" fields={SHELF_FIELDS} rows={filtered} /><Btn icon="refresh" ghost>Recrawl</Btn>
       </CommerceHead>
       <KpiGrid>
-        <Kpi label="ASINs Monitored" value={filtered.length} />
-        <Kpi label="Out of Stock" value={oos} />
-        <Kpi label="Buy Box < 80%" value={lowBB} />
-        <Kpi label="Content Issues" value={contentGaps} />
-        <Kpi label="Avg Content Score" value={filtered.length ? Math.round(cAvg(filtered, 'listingScore')) : 0} />
-        <Kpi label="Avg Rating" value={cAvg(filtered, 'rating').toFixed(2) + '★'} />
+        <Kpi label="ASINs Monitored" value={kv(filtered.length)} />
+        <Kpi label="Out of Stock" value={kv(oos)} />
+        <Kpi label="Buy Box < 80%" value={kv(lowBB)} />
+        <Kpi label="Content Issues" value={kv(contentGaps)} />
+        <Kpi label="Avg Content Score" value={kv(filtered.length ? Math.round(cAvg(filtered, 'listingScore')) : 0)} />
+        <Kpi label="Avg Rating" value={kv(cAvg(filtered, 'rating').toFixed(2) + '★')} />
       </KpiGrid>
       <div className="hint" style={{ marginBottom: 14 }}>
         <Icon name="link" size={16} />
         <div>Retail signals are wired into advertising automation: out-of-stock or Buy Box loss triggers <b>auto-pause</b> (Rule R5) to stop wasted ad spend on unavailable products.</div>
       </div>
-      <DataGrid
+      {noShelf ? <CmShelfEmpty market={marketName} /> : <DataGrid
         id="commerce-shelf"
         columns={columns}
         rows={filtered}
@@ -153,7 +168,7 @@ export function DigitalShelf() {
           <SearchBox value={q} onChange={setQ} placeholder="Search products / ASIN…" />
           <FilterBar id="commerce-shelf" fields={SHELF_FIELDS} value={filters} onChange={setFilters} />
         </>}
-      />
+      />}
       <div className="footnote">Build multi-condition filters across content score, Buy Box, availability and pricing, save them as <b>Plans</b>, group by category or marketplace, and export the current view.</div>
     </>
   )
@@ -161,7 +176,8 @@ export function DigitalShelf() {
 
 /* ============================ BUY BOX & INVENTORY ============================ */
 export function BuyBox() {
-  const { rows: data, range } = useCommerceData()
+  const { rows: data, range, noShelf, marketName } = useCommerceData()
+  const kv = (v) => (noShelf ? '—' : v)
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('commerce-buybox'))
   const searched = data.filter((d) => d.title.toLowerCase().includes(q.toLowerCase()) || d.asin.toLowerCase().includes(q.toLowerCase()))
@@ -182,13 +198,13 @@ export function BuyBox() {
         <ExportMenu name="buy-box-inventory" fields={BUYBOX_FIELDS} rows={filtered} /><Btn icon="sliders" primary>Automation Rules</Btn>
       </CommerceHead>
       <KpiGrid>
-        <Kpi label="Avg Buy Box" value={pct(cAvg(filtered, 'buyBox'))} />
-        <Kpi label="ASINs Losing BB" value={filtered.filter((d) => d.buyBox < 80).length} />
-        <Kpi label="Out of Stock" value={filtered.filter((d) => !d.inStock).length} />
-        <Kpi label="MAP Violations" value={filtered.filter((d) => d.mapViolation).length} />
-        <Kpi label="Ads Auto-Paused" value={filtered.filter((d) => !d.inStock || d.buyBox < 50).length} />
+        <Kpi label="Avg Buy Box" value={kv(pct(cAvg(filtered, 'buyBox')))} />
+        <Kpi label="ASINs Losing BB" value={kv(filtered.filter((d) => d.buyBox < 80).length)} />
+        <Kpi label="Out of Stock" value={kv(filtered.filter((d) => !d.inStock).length)} />
+        <Kpi label="MAP Violations" value={kv(filtered.filter((d) => d.mapViolation).length)} />
+        <Kpi label="Ads Auto-Paused" value={kv(filtered.filter((d) => !d.inStock || d.buyBox < 50).length)} />
       </KpiGrid>
-      <DataGrid
+      {noShelf ? <CmShelfEmpty market={marketName} /> : <DataGrid
         id="commerce-buybox"
         columns={columns}
         rows={filtered}
@@ -199,7 +215,7 @@ export function BuyBox() {
           <SearchBox value={q} onChange={setQ} placeholder="Search products / ASIN…" />
           <FilterBar id="commerce-buybox" fields={BUYBOX_FIELDS} value={filters} onChange={setFilters} />
         </>}
-      />
+      />}
       <div className="footnote">When Buy Box drops below threshold or stock runs out, advertising is automatically paused for that ASIN and resumed on recovery.</div>
     </>
   )
@@ -207,12 +223,28 @@ export function BuyBox() {
 
 /* ============================ PRODUCT CENTER ============================ */
 export function Products() {
-  const { rows: data, prev, allTime, range } = useCommerceData()
+  const { rows: data, prev, allTime, range, profileId, noShelf, marketName } = useCommerceData()
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('commerce-products'))
-  // de-dupe by ASIN (catalog-level content view)
-  const byAsin = Object.values(data.reduce((m, d) => { m[d.asin] = m[d.asin] || d; return m }, {}))
-  const prevByAsin = {}; byAsin.forEach((r) => { prevByAsin[r.asin] = prev[r.id] })
+  const kv = (v) => (noShelf ? '—' : v)
+  // de-dupe by ASIN (catalog-level content view): sum cumulative metrics across
+  // marketplaces (converting revenue to USD when profiles differ); keep the first
+  // row's state/quality fields (price, rating, Buy Box, content score…).
+  const cmMixed = profileId === 'all'
+  const cmFx = (pid) => (cmMixed ? fxUSD(pid) : 1)
+  const byAsin = Object.values(data.reduce((m, d) => {
+    const t = m[d.asin]
+    if (!t) m[d.asin] = { ...d, orderedRevenue: d.orderedRevenue * cmFx(d.profileId) }
+    else { t.glanceViews += d.glanceViews; t.orderedRevenue += d.orderedRevenue * cmFx(d.profileId); t.reviews += d.reviews }
+    return m
+  }, {}))
+  const prevByAsin = {}
+  data.forEach((d) => {
+    const pr = prev[d.id]; if (!pr) return
+    const t = prevByAsin[d.asin]
+    if (!t) prevByAsin[d.asin] = { ...pr, orderedRevenue: pr.orderedRevenue * cmFx(d.profileId) }
+    else { t.glanceViews += pr.glanceViews; t.orderedRevenue += pr.orderedRevenue * cmFx(d.profileId); t.reviews += pr.reviews }
+  })
   const searched = byAsin.filter((d) => d.title.toLowerCase().includes(q.toLowerCase()) || d.asin.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, PRODUCT_FIELDS)
   const columns = [
@@ -224,7 +256,7 @@ export function Products() {
     { key: 'rating', label: 'Rating', num: true, foot: (rs) => cAvg(rs, 'rating').toFixed(2) + '★', render: (r) => `${r.rating.toFixed(1)}★` },
     { key: 'reviews', label: 'Reviews', num: true, foot: (rs) => compact(cSum('reviews')(rs)), render: (r) => compact(r.reviews) },
     { key: 'conversion', label: 'CVR', num: true, foot: (rs) => pct(cAvg(rs, 'conversion')), render: (r) => pct(r.conversion) },
-    { key: 'orderedRevenue', label: 'Ordered Rev.', num: true, delta: true, foot: (rs) => money(cSum('orderedRevenue')(rs)), render: (r) => money(r.orderedRevenue) },
+    { key: 'orderedRevenue', label: 'Ordered Rev.', num: true, delta: true, foot: (rs) => money(cSum('orderedRevenue')(rs), cmMixed ? '$' : symOfC(rs)), render: (r) => money(r.orderedRevenue, cmMixed ? '$' : sym(r.profileId)) },
   ]
   const presets = {
     Default: ['title', 'images', 'aplusLabel', 'videoLabel', 'listingScore', 'rating', 'reviews', 'conversion', 'orderedRevenue'],
@@ -238,13 +270,13 @@ export function Products() {
         <ExportMenu name="product-center" fields={PRODUCT_FIELDS} rows={filtered} /><Btn icon="plus" primary>Bulk Edit Content</Btn>
       </CommerceHead>
       <KpiGrid>
-        <Kpi label="Products" value={filtered.length} />
-        <Kpi label="Missing A+" value={filtered.filter((d) => !d.aplus).length} />
-        <Kpi label="No Video" value={filtered.filter((d) => !d.video).length} />
-        <Kpi label="Content Score < 75" value={filtered.filter((d) => d.listingScore < 75).length} />
-        <Kpi label="Avg Rating" value={cAvg(filtered, 'rating').toFixed(2) + '★'} />
+        <Kpi label="Products" value={kv(filtered.length)} />
+        <Kpi label="Missing A+" value={kv(filtered.filter((d) => !d.aplus).length)} />
+        <Kpi label="No Video" value={kv(filtered.filter((d) => !d.video).length)} />
+        <Kpi label="Content Score < 75" value={kv(filtered.filter((d) => d.listingScore < 75).length)} />
+        <Kpi label="Avg Rating" value={kv(cAvg(filtered, 'rating').toFixed(2) + '★')} />
       </KpiGrid>
-      <DataGrid
+      {noShelf ? <CmShelfEmpty market={marketName} /> : <DataGrid
         id="commerce-products"
         columns={columns}
         rows={filtered}
@@ -261,7 +293,7 @@ export function Products() {
           <SearchBox value={q} onChange={setQ} placeholder="Search products / ASIN…" />
           <FilterBar id="commerce-products" fields={PRODUCT_FIELDS} value={filters} onChange={setFilters} />
         </>}
-      />
+      />}
     </>
   )
 }
