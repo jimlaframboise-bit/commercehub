@@ -284,3 +284,83 @@ mock insight charts. Not yet built: Calendar Template Manager, Bulk Upload, anal
 5. **Dedicated Bulk Operations spreadsheet page** ("Pacvue XL") with the 6 tabs + Quick Campaign Edits list.
 6. **Column-preset names** — align to Target ACOS View / Performance / Default Plan / Custom Columns.
 7. **Date presets** — add the **"Exclude latest 2 days"** variants.
+
+---
+
+## §11. Full live nav inventory + coverage matrix (2026-07-21, session 11 — Crump account, product.pacvue.com)
+
+Jim asked for a full re-review to ensure no functionality is missing from the build plan. This is the
+complete sidebar/topbar tree as deployed live (every group expanded, every flyout captured). Names in
+[New] carry Pacvue's "New" badge. This supersedes §1's older nav capture.
+
+### 11.1 Complete nav tree
+
+- **Favorites** (user-starred shortcuts rail)
+- **Home** — KPI cards Performance (Sales/Spend/ROAS) · Efficiency (CPC/SPC/CVR) · Awareness
+  (Impr/Clicks/CTR), each with vs-prev value + delta; D/W/M charts; topbar filters: Profile multiselect,
+  Campaign Tag with **"Or"/"And" join**, month date-range with prev/next arrows.
+- **Product Center**: Product Dashboard · Product Listing
+- **Budget Manager** (single item → /Budget/BudgetDashboard)
+- **Advertising**: Explorer · Profile · Tagging › (**Campaign Tagging · Keyword Tagging · Asin Tagging**)
+  · Portfolio · Campaign · Placement [New] · Adgroup · Ads [New] › (Ads · **SP Prompts** [New]) ·
+  Targeting · ASIN · Search Term · Negative Targeting · Bulk Operations
+- **Share of Voice** (single item)
+- **Report**: Default Report [New] · My Report · SP Prompt Analytics Report [New] · Marketplace
+  Dashboard · Custom Dashboard · Brand Analysis [New] › (Brand Benchmark [New] · Brand Metrics Report)
+- **Research**: Keyword Research · PAT Research · Audience Research
+- **Optimization**: Dayparting Scheduler · Budget Scheduler · Rule · Campaign AI · Product AI ·
+  Recommendation · Live Ad Momentum · Bid Explorer · Automation Health
+- **AMC Console**: AMC Dashboard · AMC Report · AMC Account · AMC Activate · Audience Hub › (AMC Audience)
+- **Price Tracker** (single item → /PriceTracker/Home)
+- **Platform Intelligence**: Competitive › (Product Tracking) · Category › (Search Term · Product ·
+  Brand & Sales)
+- **Event**: Advertising Event · Task Center
+- **Topbar**: retailer switcher (amazon ▾) · Pacvue HQ · account switcher · Download center · Bell ·
+  What's New (megaphone, badge) · Help · Account menu (My Account /Account/MyAccount · User Management
+  /Permission/UserManage · Settings /Account/Setting · Notifications /Notification · Language · Log Out)
+- **DSP**: not in this nav — Pacvue serves DSP via the separate **ADSP login platform** (login page
+  offers Advertising / ADSP / RAS / Commerce). The clone's built-in DSP module already covers this.
+
+### 11.2 Changes vs the §1 capture (what moved)
+
+- **"Hourly" is GONE from the Advertising nav** (was a §1 item). Hourly analysis now appears inside
+  dashboards/Explorer rather than as a grid. E3 (Hourly view) deprioritized accordingly.
+- **"Product Eligibility" gone** as a nav item (folded into Product Listing / ad-action columns).
+- New since §1: Explorer, Placement grid, ASIN grid, Negative Targeting page, SP Prompts, Product
+  Center group, Brand Analysis, Budget Scheduler (separate from Budget Manager), Recommendation, Live
+  Ad Momentum, Automation Health, Audience Research, Platform Intelligence group, Event group.
+
+### 11.3 Coverage matrix (Pacvue surface → clone)
+
+| Pacvue surface | Clone status | Where / plan |
+|---|---|---|
+| Home dashboard | ✅ | /  (Overview) |
+| Campaign / Adgroup / Targeting / Search Term grids | ✅ | /ads/* |
+| Negative Targeting | ◐ tab, not page | Targeting → Negatives tab (fine) |
+| Bulk Operations | ✅ | /ads/bulk |
+| Share of Voice | ✅ | /ads/sov |
+| Dayparting Scheduler | ✅ | /ads/dayparting |
+| Rule | ✅ | /rules |
+| Budget Manager (+goals) | ✅ | /budgets |
+| My Report / report builder | ◐ | /reports (Report Center) |
+| AMC (4 pages + Audience Hub) | ◐ one page | /dsp/amc |
+| DSP (ADSP platform) | ✅ | /dsp, /dsp/audiences |
+| Commerce-ish (Product Center) | ◐ | /commerce/* covers shelf/buybox/products |
+| Settings/User Mgmt | ◐ | /settings (static team list) |
+| **Tagging (Campaign/Keyword/Asin)** | ❌ | **GOALS E1** |
+| **Campaign AI / Product AI** | ❌ | **GOALS E2** |
+| **Profile grid** | ❌ | **GOALS E4** |
+| **Portfolio grid** | ❌ | **GOALS E5** |
+| **Placement grid** | ❌ (dimension only) | **GOALS E5** |
+| **ASIN (advertised product) grid** | ❌ | **GOALS E5** |
+| **Ads grid** | ❌ | **GOALS E5** |
+| Explorer | ❌ | E5 stretch |
+| SP Prompts + SP Prompt Analytics | ❌ | out of scope v1.x (very new, AI-prompt niche) |
+| Default Report / Custom Dashboard / Marketplace Dashboard / Brand Analysis | ❌ | **GOALS E6** |
+| Research (Keyword/PAT/Audience) | ❌ | **GOALS E7** (stretch) |
+| Budget Scheduler / Recommendation / Live Ad Momentum / Bid Explorer / Automation Health | ❌ | E8 (stretch) |
+| Hourly view | ❌ (nav item removed by Pacvue) | E3 — deprioritized to hourly charts |
+| Price Tracker / Platform Intelligence / Event / Task Center / Pacvue HQ / multi-retailer | ❌ | explicitly out of scope |
+
+**Conclusion:** every grid-mechanics fundamental is in the clone. The complete gap list is now GOALS §E
+(E1–E8) — nothing else exists in the live product that isn't classified above.

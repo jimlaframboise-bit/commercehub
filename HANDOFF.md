@@ -18,8 +18,14 @@
 > view, Profile grid). Deployed v0.12.2 via 4 browser commits (5659769→87f3fad), verified live: 0 console
 > errors, all spot-checks pass. **Gotcha: sandbox `.git/index.lock` STILL stuck — Jim must delete it in
 > Finder/Terminal; browser commits unaffected.**
-> **Next session: Phase 14 (§E in GOALS.md) — start with E1 Tagging management, or whatever Jim flags
-> from walking the live app.**
+> **Session 11b (same day):** Jim asked for a full Pacvue re-review → complete live nav sweep of
+> product.pacvue.com (all groups/flyouts/topbar) written up as **FUNCTIONALITY-SPEC §11** (authoritative
+> nav inventory + coverage matrix). GOALS §E expanded to **E1–E8 = the complete gap list** (Tagging is
+> 3 pages; Hourly nav item removed by Pacvue → E3 deprioritized; new: Portfolio/Placement/ASIN/Ads
+> grids = E5, Report suite = E6, Research = E7, Optimization extras = E8). DSP = separate ADSP login
+> platform, already covered by the clone.
+> **Next session: Phase 14 — start with E1 Tagging management (build the 3 tagging pages + Match Tag
+> Rules), then E4 Profile grid (quick win), then E5.**
 > — Prior session 10 summary below.
 >
 > **(session 10)** C1: `tools/functional-test.md` — 148 tests (SA/DC/AI) drafted by 3 parallel

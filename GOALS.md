@@ -89,18 +89,35 @@ different files; use worktree isolation if two agents must touch code at once.
 Major Pacvue fundamentals that never made the spec, per the coverage audit (details in
 `tools/d3-review.md`). Unchecked = not yet approved/built; work them next unless Jim reprioritizes:
 
-- [ ] **E1. Tagging management** — Custom Tags + sub-tags page, Match Tag Rules (auto-assign by
-      name-contains), Billing Tags. Biggest gap: Budget Manager is tag-scoped but tags can't be managed.
-- [ ] **E2. Campaign AI / Product AI surfaces** — standalone pages (Target ROAS + Max Bid hands-off mode;
-      Efficiency/Traffic/Conversion strategies), not just the Super Wizard checkbox.
-- [ ] **E3. Hourly view** — hour-of-day performance actuals grid/chart (Pacvue signature feature).
-- [ ] **E4. Profile grid** — per-profile performance table (first view in Pacvue's Advertising nav;
-      trivial from existing mock data).
+> **Updated 2026-07-21 (session 11b):** full live nav sweep of product.pacvue.com completed at Jim's
+> request — every group + flyout captured (FUNCTIONALITY-SPEC §11 is the authoritative inventory +
+> coverage matrix). E-list below is now the COMPLETE gap list; everything else live is either built
+> or explicitly out of scope.
+
+- [ ] **E1. Tagging management** — live nav confirms THREE pages: Campaign Tagging, Keyword Tagging,
+      Asin Tagging (+ Match Tag Rules auto-assign, Billing Tags per docs). Biggest gap: Budget Manager
+      is tag-scoped but tags can't be managed. **Build first.**
+- [ ] **E2. Campaign AI / Product AI surfaces** — confirmed as two nav-level Optimization pages.
+- [ ] **E3. Hourly charts (deprioritized)** — Pacvue REMOVED the Hourly nav item; hourly analysis now
+      lives inside dashboards/Explorer. Implement as hourly charts on Campaign drill / Overview, last.
+- [ ] **E4. Profile grid** — confirmed (Advertising → Profile). Trivial from existing mock data.
+- [ ] **E5. Advertising grid family completion** — Portfolio, Placement [New], ASIN (advertised
+      product), and Ads grids (all confirmed nav-level; same DataGrid pattern). Stretch: Explorer.
+- [ ] **E6. Report suite depth** — Default Report (template library), Custom Dashboard, Marketplace
+      Dashboard; stretch: Brand Analysis (Benchmark + Metrics Report).
+- [ ] **E7. Research trio (stretch)** — Keyword Research, PAT Research, Audience Research.
+- [ ] **E8. Optimization extras (stretch)** — Budget Scheduler, Recommendation, Live Ad Momentum,
+      Bid Explorer, Automation Health.
+
+**Explicitly out of scope (Jim can promote):** SP Prompts + SP Prompt Analytics, Price Tracker,
+Platform Intelligence (Competitive/Category), Event/Task Center, Pacvue HQ, multi-retailer switcher,
+User Management admin depth, AMC 4-page split (one page suffices).
 
 ## Session log
 
 | Date | Session | Progress |
 |------|---------|----------|
+| 2026-07-21 | 11b | **Full live Pacvue re-review (Jim's request).** Complete nav sweep of product.pacvue.com — all 13 groups + every flyout + topbar/account menus captured → FUNCTIONALITY-SPEC §11 (inventory + coverage matrix). Key finds: Tagging = 3 pages (Campaign/Keyword/Asin); Hourly nav item REMOVED by Pacvue (E3 deprioritized); new-to-us surfaces: Explorer, Portfolio/Placement/ASIN/Ads grids, SP Prompts, Brand Analysis, Budget Scheduler, Recommendation, Live Ad Momentum, Automation Health, Product Center, Platform Intelligence, Event/Task Center. §E expanded to E1–E8 = the complete, provably-exhaustive gap list. DSP confirmed as separate ADSP login platform (clone already covers). |
 | 2026-07-21 | 11 | **D3 done — v1.0 goal CLOSED.** Jim delegated review to Claude's testing. Ran 3 parallel adversarial code reviews + fundamentals coverage audit (4 agents). 39 findings: 1 blocker (stale bulk-selection crash), 4 high (channel-mix always-0 bars, wrong TACoS prev-delta, seeded-rule edit duplication, + mixed-currency class), rest med/low. 37 fixed, 2 documented-acceptable. Shipped **v0.12.2** (4 browser commits), verified live: 0 console errors, channel mix real, (USD est.) totals, Targeting tabs real (134/24/0), derived Rule KPIs. Coverage audit: nothing specced is missing; 4 unspecced fundamentals logged as Phase 14 (§E: Tagging mgmt, Campaign/Product AI, Hourly, Profile grid). Full record: tools/d3-review.md. Gotcha: .git/index.lock still stuck (Jim must delete manually). |
 | 2026-07-20 | 10 | **C1+C2+C3+D1+D2 done — only D3 (Jim's review) remains.** C1: 148-test script written by 3 parallel agents (tools/functional-test.md), every test statically verified against the bundle. Static audit found 6 real gaps → all fixed: Overview real vs-prev deltas + date-range scaling + data-driven channel mix; ExportMenu on DSP Audiences + AMC; Report Run/download wired (chedits:ins-reports-runs); bell badge synced to Alerts read-state via new chalertreads in app state; EITHER join in rule builder. v0.12.1 built + deployed (5 browser commits) + verified live. C2 live sweep on deployed bundle: all 19 routes render, 0 console errors, filters/dimensions/presets/inline-edit/create-flows/rule-builder-v2/goals/dayparting/commerce-scaling/drill-down all pass (results table in functional-test.md). Test artifacts cleaned. Note: sandbox .git/index.lock still stuck (Jim: delete in Finder); npm registry unavailable this session so tsc check superseded by zero-console-error load. |
 | 2026-07-20 | 9 | GOALS.md created. Built ALL of A1–A7 (create-flow chooser + 5-step SP flow; rule builder v2 w/ type chooser, Mode, Cap, Same SKU, multi-block, Preview, Save-as-template, Kickstart rail; Bulk Operations page at /ads/bulk; filter operators; Placement + drill-down dimensions; column presets; exclude-2-day date presets). B1 live audit done → spec §10 (Goals = Budget Manager, no standalone Goal Center). B2 built: Budget goals grid (profile→tag, monthly goals, 4 toggles, Edit Daily Budget Allocation modal). v0.12.0 bundle built + committed locally. Deployed v0.12.0 (root + all changed src synced via browser commits) after Jim signed in to GitHub; verified live: create-type chooser + 5-step SP flow, rule builder v2 step 1+2 (blocks, Same SKU, Cap, Kickstart, Preview footer), /ads/bulk (6 tabs), Budget goals grid (toggles, Not-set alerts, month columns). Remaining: C1 scripted full-feature sweep, C3, D2 partial, D3 review. |
