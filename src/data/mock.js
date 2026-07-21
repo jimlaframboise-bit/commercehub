@@ -219,13 +219,20 @@ export const dayparting = DAYS.map((d, di) =>
 // Automation rules
 // ---------------------------------------------------------------------------
 export const rules = [
-  { id: 'R1', name: 'Defend Target ACoS ≤ 28%', type: 'Bid', scope: 'All SP campaigns', status: 'Active', trigger: 'ACoS > 28% over 14d', action: 'Decrease bid by 12%', runs: 'Every 6 hours', lastRun: '2h ago', affected: 142 },
-  { id: 'R2', name: 'Scale Winners (ROAS ≥ 4)', type: 'Bid', scope: 'Always-On portfolio', status: 'Active', trigger: 'ROAS ≥ 4 and Orders ≥ 10 (7d)', action: 'Increase bid by 8% (max $2.40)', runs: 'Every 6 hours', lastRun: '2h ago', affected: 58 },
-  { id: 'R3', name: 'Keyword Harvesting — Auto → Manual', type: 'Harvest', scope: 'All SP-Auto', status: 'Active', trigger: 'Search term: Orders ≥ 6, ACoS ≤ 30%', action: 'Add as Exact to manual campaign', runs: 'Daily 2:00 AM', lastRun: '9h ago', affected: 23 },
-  { id: 'R4', name: 'Negate Wasted Spend', type: 'Negative', scope: 'All SP campaigns', status: 'Active', trigger: 'Clicks ≥ 15, Orders = 0 (30d)', action: 'Add as Negative Exact', runs: 'Daily 3:00 AM', lastRun: '8h ago', affected: 31 },
-  { id: 'R5', name: 'Out-of-Stock Auto-Pause', type: 'Retail', scope: 'All campaigns', status: 'Active', trigger: 'ASIN out of stock or Buy Box < 50%', action: 'Pause ads for ASIN', runs: 'Every 1 hour', lastRun: '24m ago', affected: 4 },
-  { id: 'R6', name: 'Prime Day Dayparting Boost', type: 'Dayparting', scope: 'Seasonal portfolio', status: 'Paused', trigger: 'Event window active', action: 'Apply +35% multiplier 12pm–11pm', runs: 'Hourly', lastRun: '—', affected: 0 },
-  { id: 'R7', name: 'Budget Pacing Guard', type: 'Budget', scope: 'All profiles', status: 'Active', trigger: 'Daily pace > 115% of target', action: 'Throttle bids 10% until midnight', runs: 'Every 2 hours', lastRun: '1h ago', affected: 76 },
+  { id: 'R1', name: 'Defend Target ACoS ≤ 28%', type: 'Bid', scope: 'All SP campaigns', status: 'Active', trigger: 'ACoS > 28% over 14d', action: 'Decrease bid by 12%', runs: 'Every 6 hours', lastRun: '2h ago', affected: 142,
+    _f: { name: 'Defend Target ACoS ≤ 28%', type: 'Bid', scope: 'All SP campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'ACoS', op: 'gt', value: '28', value2: '' }], join: 'AND', lookback: '14', action: 'dec_bid', actionValue: '12', frequency: 'Every 6 hours' } },
+  { id: 'R2', name: 'Scale Winners (ROAS ≥ 4)', type: 'Bid', scope: 'Always-On portfolio', status: 'Active', trigger: 'ROAS ≥ 4 and Orders ≥ 10 (7d)', action: 'Increase bid by 8% (max $2.40)', runs: 'Every 6 hours', lastRun: '2h ago', affected: 58,
+    _f: { name: 'Scale Winners (ROAS ≥ 4)', type: 'Bid', scope: 'Selected campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'ROAS', op: 'gte', value: '4', value2: '' }, { id: 'c2', metric: 'Orders', op: 'gte', value: '10', value2: '' }], join: 'AND', lookback: '7', action: 'inc_bid', actionValue: '8', cap: '2.40', frequency: 'Every 6 hours' } },
+  { id: 'R3', name: 'Keyword Harvesting — Auto → Manual', type: 'Harvest', scope: 'All SP-Auto', status: 'Active', trigger: 'Search term: Orders ≥ 6, ACoS ≤ 30%', action: 'Add as Exact to manual campaign', runs: 'Daily 2:00 AM', lastRun: '9h ago', affected: 23,
+    _f: { name: 'Keyword Harvesting — Auto → Manual', type: 'Harvest', scope: 'All SP campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Orders', op: 'gte', value: '6', value2: '' }, { id: 'c2', metric: 'ACoS', op: 'lte', value: '30', value2: '' }], join: 'AND', lookback: '30', action: 'harvest', actionValue: '', frequency: 'Daily' } },
+  { id: 'R4', name: 'Negate Wasted Spend', type: 'Negative', scope: 'All SP campaigns', status: 'Active', trigger: 'Clicks ≥ 15, Orders = 0 (30d)', action: 'Add as Negative Exact', runs: 'Daily 3:00 AM', lastRun: '8h ago', affected: 31,
+    _f: { name: 'Negate Wasted Spend', type: 'Negative', scope: 'All SP campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Clicks', op: 'gte', value: '15', value2: '' }, { id: 'c2', metric: 'Orders', op: 'lte', value: '0', value2: '' }], join: 'AND', lookback: '30', action: 'negative', actionValue: '', frequency: 'Daily' } },
+  { id: 'R5', name: 'Out-of-Stock Auto-Pause', type: 'Retail', scope: 'All campaigns', status: 'Active', trigger: 'ASIN out of stock or Buy Box < 50%', action: 'Pause ads for ASIN', runs: 'Every 1 hour', lastRun: '24m ago', affected: 4,
+    _f: { name: 'Out-of-Stock Auto-Pause', type: 'Retail', scope: 'All profiles', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Weeks of Cover', op: 'lt', value: '1', value2: '' }], join: 'AND', lookback: '7', action: 'pause', actionValue: '', frequency: 'Hourly' } },
+  { id: 'R6', name: 'Prime Day Dayparting Boost', type: 'Dayparting', scope: 'Seasonal portfolio', status: 'Paused', trigger: 'Event window active', action: 'Apply +35% multiplier 12pm–11pm', runs: 'Hourly', lastRun: '—', affected: 0,
+    _f: { name: 'Prime Day Dayparting Boost', type: 'Dayparting', scope: 'Selected campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Impressions', op: 'gt', value: '0', value2: '' }], join: 'AND', lookback: '7', action: 'placement', actionValue: '35', frequency: 'Hourly' } },
+  { id: 'R7', name: 'Budget Pacing Guard', type: 'Budget', scope: 'All profiles', status: 'Active', trigger: 'Daily pace > 115% of target', action: 'Throttle bids 10% until midnight', runs: 'Every 2 hours', lastRun: '1h ago', affected: 76,
+    _f: { name: 'Budget Pacing Guard', type: 'Budget', scope: 'All profiles', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Spend', op: 'gt', value: '115', value2: '' }], join: 'AND', lookback: '7', action: 'adj_budget', actionValue: '-10', frequency: 'Every 6 hours' } },
 ]
 
 // ---------------------------------------------------------------------------
@@ -234,8 +241,8 @@ export const rules = [
 export const budgets = profiles.map((p, i) => {
   const monthly = [185000, 92000, 38000][i]
   const spent = monthly * range(0.46, 0.82)
-  const dayOfMonth = 20
-  const daysInMonth = 30
+  const dayOfMonth = new Date().getDate()
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
   const targetPace = monthly * (dayOfMonth / daysInMonth)
   return {
     profileId: p.id,
@@ -255,11 +262,11 @@ export const budgets = profiles.map((p, i) => {
 // Alerts / notifications
 // ---------------------------------------------------------------------------
 export const alerts = [
-  { id: 'A1', sev: 'high', icon: 'box', title: 'ASIN out of stock', body: 'B0CGRAIN01 Grain-Free Kibble (US) is out of stock — Rule R5 paused 3 campaigns.', time: '24m ago', read: false },
-  { id: 'A2', sev: 'high', icon: 'trend-down', title: 'Buy Box lost', body: 'B0CSWEET01 Buy Box dropped to 41% on Amazon.com. Ad efficiency at risk.', time: '1h ago', read: false },
-  { id: 'A3', sev: 'med', icon: 'budget', title: 'Budget pacing alert', body: 'Amazon USA is 112% of target pace. Pacing guard (R7) throttled 76 campaigns.', time: '1h ago', read: false },
-  { id: 'A4', sev: 'med', icon: 'spark', title: 'Harvest opportunity', body: '23 search terms qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%).', time: '3h ago', read: true },
-  { id: 'A5', sev: 'low', icon: 'star', title: 'Rating drop', body: 'B0COMEGA01 average rating fell to 4.1★ after 6 new reviews.', time: '6h ago', read: true },
+  { id: 'A1', sev: 'high', cat: 'stock', icon: 'box', title: 'ASIN out of stock', body: 'B0CGRAIN01 Grain-Free Kibble (US) is out of stock — Rule R5 paused 3 campaigns.', time: '24m ago', read: false },
+  { id: 'A2', sev: 'high', cat: 'buybox', icon: 'trend-down', title: 'Buy Box lost', body: 'B0CSWEET01 Buy Box dropped to 41% on Amazon.com. Ad efficiency at risk.', time: '1h ago', read: false },
+  { id: 'A3', sev: 'med', cat: 'budget', icon: 'budget', title: 'Budget pacing alert', body: 'Amazon USA is 112% of target pace. Pacing guard (R7) throttled 76 campaigns.', time: '1h ago', read: false },
+  { id: 'A4', sev: 'med', cat: 'acos', icon: 'spark', title: 'Harvest opportunity', body: '23 search terms qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%).', time: '3h ago', read: true },
+  { id: 'A5', sev: 'low', cat: 'anomaly', icon: 'star', title: 'Rating drop', body: 'B0COMEGA01 average rating fell to 4.1★ after 6 new reviews.', time: '6h ago', read: true },
   { id: 'A6', sev: 'low', icon: 'doc', title: 'Scheduled report sent', body: '"Weekly Exec Summary" delivered to 4 recipients.', time: '9h ago', read: true },
 ]
 
@@ -405,13 +412,13 @@ export function aggregate(rows) {
     sales = sum('sales'), orders = sum('orders'), units = sum('units')
   return {
     impr, clk, spend, sales, orders, units,
-    ctr: (clk / impr) * 100,
-    cpc: spend / clk,
-    acos: (spend / sales) * 100,
-    roas: sales / spend,
-    cvr: (orders / clk) * 100,
-    cpa: spend / orders,
-    aov: sales / orders,
+    ctr: impr ? (clk / impr) * 100 : 0,
+    cpc: clk ? spend / clk : 0,
+    acos: sales ? (spend / sales) * 100 : 0,
+    roas: spend ? sales / spend : 0,
+    cvr: clk ? (orders / clk) * 100 : 0,
+    cpa: orders ? spend / orders : 0,
+    aov: orders ? sales / orders : 0,
   }
 }
 
