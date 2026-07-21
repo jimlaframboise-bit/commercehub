@@ -2,8 +2,27 @@
 
 > **Purpose of this file:** a single source of truth so any session can pick up exactly where we left off.
 > Claude maintains this file — update it at the end of each working session (status, decisions, next steps).
-> **Last updated:** 2026-07-20 (session 10 — **GOALS.md C1/C2/C3/D1/D2 all checked; only D3 (Jim's review)
-> remains. Live at v0.12.1.**) C1: `tools/functional-test.md` — 148 tests (SA/DC/AI) drafted by 3 parallel
+> **Last updated:** 2026-07-21 (session 11 — **D3 done, v1.0 GOAL CLOSED. Live at v0.12.2.**)
+> Jim delegated the final review to Claude's testing ("robust in covering all the major fundamentals").
+> Ran 4 parallel agents: 3 adversarial per-surface code reviews + 1 Pacvue-fundamentals coverage audit.
+> **39 findings, 37 fixed same session** (full punch list + statuses: `tools/d3-review.md`). Highlights:
+> stale-bulk-selection crash on profile switch (blocker); Overview channel-mix read a nonexistent field
+> (SP/SB/SD bars were always 0); TACoS prev-delta mixed periods; seeded-rule edit duplicated the rule;
+> mixed-currency totals now convert via `fxUSD` and show "(USD est.)"; bid/budget floors (MIN_BID/MIN_BUDGET);
+> Targeting tabs now real (Keywords/PAT/Negatives); Ad Groups bulk bar + unified drill data; Alert Settings
+> actually filter; seeded rules got `_f` snapshots + persisted toggles/edits (`chedits:auto-rules-seed`);
+> new localStorage keys: `chedits:auto-rules-seed`, `challoc`. New ui.jsx exports: `FX_USD`, `fxUSD`;
+> `EditableNum` gained `min`, `Modal` gained `confirmClose`, `DeltaChip` no longer fabricates deltas.
+> **Coverage audit:** all specced surfaces genuinely built; 4 unspecced Pacvue fundamentals logged as
+> Phase-14 candidates in GOALS.md §E (Tagging management ← biggest, Campaign/Product AI surfaces, Hourly
+> view, Profile grid). Deployed v0.12.2 via 4 browser commits (5659769→87f3fad), verified live: 0 console
+> errors, all spot-checks pass. **Gotcha: sandbox `.git/index.lock` STILL stuck — Jim must delete it in
+> Finder/Terminal; browser commits unaffected.**
+> **Next session: Phase 14 (§E in GOALS.md) — start with E1 Tagging management, or whatever Jim flags
+> from walking the live app.**
+> — Prior session 10 summary below.
+>
+> **(session 10)** C1: `tools/functional-test.md` — 148 tests (SA/DC/AI) drafted by 3 parallel
 > agents, each statically verified against the bundle; results table at the bottom logs the session-10 live
 > sweep. The static audit surfaced 6 real gaps, all fixed this session: (1) Overview now uses
 > rangeResolved + scaleForRange — real vs-prev KPI deltas (was hardcoded 8.2/12.6/…), trend follows range,
@@ -518,6 +537,6 @@ button now opens a real modal / persists; see §2.)
    verify) are saved in memory: see the "CommerceHub deploy process" memory.
 4. **Before deploying**, always run the verification routine in §2 (build invariants + `tsc` grep incl.
    `TS2448|TS2454`) and then eyeball the live site.
-5. Bump the sidebar version label (`.app-version` in `Layout.jsx`) when a phase ships — currently **v0.12.1**.
+5. Bump the sidebar version label (`.app-version` in `Layout.jsx`) when a phase ships — currently **v0.12.2**.
    (Note: since Phase 8 the build's `leftover export/import` line reads **`8 0`**, not `0 0` — the 8 are footnote
    text containing the word "export", not real ESM exports. Don't treat it as a regression.)

@@ -77,12 +77,30 @@ different files; use worktree isolation if two agents must touch code at once.
 - [x] **D2. Docs current** — HANDOFF.md + GOALS.md updated session 10; functional-test.md is the
       new test record; version bumped to v0.12.1. (FEATURE-MAP/FUNCTIONALITY-SPEC unchanged — no
       new surfaces this session.)
-- [ ] **D3. Jim's review** — Jim walks the live app; any punch-list items get added above and the
-      goal re-closes when they're done. **← the only box left.**
+- [x] **D3. Review** — Jim delegated the final review to Claude's testing process (2026-07-21:
+      "rely on your testing... robust in covering all the major fundamentals"). Executed session 11
+      as 3 parallel adversarial code reviews + a Pacvue-fundamentals coverage audit + live checks.
+      **39 findings → 37 fixed & deployed as v0.12.2, 2 documented as acceptable** (EITHER join is
+      cosmetic — no engine; chgoals key accumulation). Full punch list: `tools/d3-review.md`.
+      **v1.0 goal is CLOSED.** Jim can still walk the live app anytime; anything he flags reopens here.
+
+## E. Phase 14 candidates (fundamentals audit, 2026-07-21 — not in v1.0 scope)
+
+Major Pacvue fundamentals that never made the spec, per the coverage audit (details in
+`tools/d3-review.md`). Unchecked = not yet approved/built; work them next unless Jim reprioritizes:
+
+- [ ] **E1. Tagging management** — Custom Tags + sub-tags page, Match Tag Rules (auto-assign by
+      name-contains), Billing Tags. Biggest gap: Budget Manager is tag-scoped but tags can't be managed.
+- [ ] **E2. Campaign AI / Product AI surfaces** — standalone pages (Target ROAS + Max Bid hands-off mode;
+      Efficiency/Traffic/Conversion strategies), not just the Super Wizard checkbox.
+- [ ] **E3. Hourly view** — hour-of-day performance actuals grid/chart (Pacvue signature feature).
+- [ ] **E4. Profile grid** — per-profile performance table (first view in Pacvue's Advertising nav;
+      trivial from existing mock data).
 
 ## Session log
 
 | Date | Session | Progress |
 |------|---------|----------|
+| 2026-07-21 | 11 | **D3 done — v1.0 goal CLOSED.** Jim delegated review to Claude's testing. Ran 3 parallel adversarial code reviews + fundamentals coverage audit (4 agents). 39 findings: 1 blocker (stale bulk-selection crash), 4 high (channel-mix always-0 bars, wrong TACoS prev-delta, seeded-rule edit duplication, + mixed-currency class), rest med/low. 37 fixed, 2 documented-acceptable. Shipped **v0.12.2** (4 browser commits), verified live: 0 console errors, channel mix real, (USD est.) totals, Targeting tabs real (134/24/0), derived Rule KPIs. Coverage audit: nothing specced is missing; 4 unspecced fundamentals logged as Phase 14 (§E: Tagging mgmt, Campaign/Product AI, Hourly, Profile grid). Full record: tools/d3-review.md. Gotcha: .git/index.lock still stuck (Jim must delete manually). |
 | 2026-07-20 | 10 | **C1+C2+C3+D1+D2 done — only D3 (Jim's review) remains.** C1: 148-test script written by 3 parallel agents (tools/functional-test.md), every test statically verified against the bundle. Static audit found 6 real gaps → all fixed: Overview real vs-prev deltas + date-range scaling + data-driven channel mix; ExportMenu on DSP Audiences + AMC; Report Run/download wired (chedits:ins-reports-runs); bell badge synced to Alerts read-state via new chalertreads in app state; EITHER join in rule builder. v0.12.1 built + deployed (5 browser commits) + verified live. C2 live sweep on deployed bundle: all 19 routes render, 0 console errors, filters/dimensions/presets/inline-edit/create-flows/rule-builder-v2/goals/dayparting/commerce-scaling/drill-down all pass (results table in functional-test.md). Test artifacts cleaned. Note: sandbox .git/index.lock still stuck (Jim: delete in Finder); npm registry unavailable this session so tsc check superseded by zero-console-error load. |
 | 2026-07-20 | 9 | GOALS.md created. Built ALL of A1–A7 (create-flow chooser + 5-step SP flow; rule builder v2 w/ type chooser, Mode, Cap, Same SKU, multi-block, Preview, Save-as-template, Kickstart rail; Bulk Operations page at /ads/bulk; filter operators; Placement + drill-down dimensions; column presets; exclude-2-day date presets). B1 live audit done → spec §10 (Goals = Budget Manager, no standalone Goal Center). B2 built: Budget goals grid (profile→tag, monthly goals, 4 toggles, Edit Daily Budget Allocation modal). v0.12.0 bundle built + committed locally. Deployed v0.12.0 (root + all changed src synced via browser commits) after Jim signed in to GitHub; verified live: create-type chooser + 5-step SP flow, rule builder v2 step 1+2 (blocks, Same SKU, Cap, Kickstart, Preview footer), /ads/bulk (6 tabs), Budget goals grid (toggles, Not-set alerts, month columns). Remaining: C1 scripted full-feature sweep, C3, D2 partial, D3 review. |
