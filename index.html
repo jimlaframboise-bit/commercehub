@@ -1090,6 +1090,38 @@ function campaignsFor(profileId) {
   return profileId === 'all' ? campaigns : campaigns.filter((c) => c.profileId === profileId)
 }
 
+// ---------------------------------------------------------------------------
+// Tagging (E1 — spec §12). Custom tags + sub-tags per entity type. Membership
+// is DERIVED at render time by matching each tag's matchRule (name contains /
+// does not contain, case-insensitive) against the entity text, plus any
+// explicit `members` ids (manual assignments). Brightleaf names only — all
+// data fictional. matchRule terms are chosen to hit the Brightleaf campaign /
+// keyword / product names generated above.
+// ---------------------------------------------------------------------------
+const campaignTags = [
+  { id: 'CT1', name: 'Calming', owner: 'jim@brightleaf.co', sub: ['Soft Chews'], matchRule: { contains: ['Calming'], notContains: [] }, members: [] },
+  { id: 'CT2', name: 'Salmon Recipe', owner: 'a.rivera@brightleaf.co', sub: ['Freeze-Dried Salmon', 'Wild Salmon'], matchRule: { contains: ['Salmon'], notContains: [] }, members: [] },
+  { id: 'CT3', name: 'Pumpkin Digestive', owner: 'a.rivera@brightleaf.co', sub: [], matchRule: { contains: ['Pumpkin'], notContains: [] }, members: [] },
+  { id: 'CT4', name: 'Sweet Potato', owner: 'm.chen@brightleaf.co', sub: [], matchRule: { contains: ['Sweet Potato'], notContains: [] }, members: [] },
+  { id: 'CT5', name: 'Grain-Free', owner: 'jim@brightleaf.co', sub: ['Kibble', 'Puppy'], matchRule: { contains: ['Grain-Free', 'Puppy'], notContains: [] }, members: [] },
+  { id: 'CT6', name: 'Catch All', owner: 'jim@brightleaf.co', sub: [], matchRule: { contains: [], notContains: ['Calming', 'Salmon', 'Pumpkin', 'Sweet Potato', 'Grain-Free', 'Puppy'] }, members: [] },
+]
+const keywordTags = [
+  { id: 'KT1', name: 'Calming', owner: 'jim@brightleaf.co', desc: 'Calming & anxiety terms', sub: [], matchRule: { contains: ['calming'], notContains: [] }, members: [] },
+  { id: 'KT2', name: 'Salmon Recipe', owner: 'a.rivera@brightleaf.co', desc: 'Salmon & fish oil terms', sub: [], matchRule: { contains: ['salmon', 'fish oil'], notContains: [] }, members: [] },
+  { id: 'KT3', name: 'Pumpkin Digestive', owner: 'a.rivera@brightleaf.co', desc: 'Digestive health terms', sub: [], matchRule: { contains: ['pumpkin', 'sensitive stomach'], notContains: [] }, members: [] },
+  { id: 'KT4', name: 'Sweet Potato', owner: 'm.chen@brightleaf.co', desc: 'Sweet potato chew terms', sub: [], matchRule: { contains: ['sweet potato'], notContains: [] }, members: [] },
+  { id: 'KT5', name: 'Grain-Free', owner: 'jim@brightleaf.co', desc: 'Grain-free & puppy food terms', sub: [], matchRule: { contains: ['grain free', 'puppy'], notContains: [] }, members: [] },
+  { id: 'KT6', name: 'Catch All', owner: 'jim@brightleaf.co', desc: 'Everything not covered by a product tag', sub: [], matchRule: { contains: [], notContains: ['calming', 'salmon', 'fish oil', 'pumpkin', 'sweet potato', 'grain free', 'puppy'] }, members: [] },
+]
+const asinTags = [
+  { id: 'AT1', name: 'Calming', owner: 'jim@brightleaf.co', sub: ['Soft Chews'], matchRule: { contains: ['Calming'], notContains: [] }, members: [] },
+  { id: 'AT2', name: 'Salmon Recipe', owner: 'a.rivera@brightleaf.co', sub: ['Freeze-Dried', 'Wild'], matchRule: { contains: ['Salmon'], notContains: [] }, members: [] },
+  { id: 'AT3', name: 'Sweet Potato', owner: 'm.chen@brightleaf.co', sub: [], matchRule: { contains: ['Sweet Potato'], notContains: [] }, members: [] },
+  { id: 'AT4', name: 'Grain-Free', owner: 'jim@brightleaf.co', sub: ['Kibble', 'Puppy'], matchRule: { contains: ['Grain-Free', 'Puppy'], notContains: [] }, members: [] },
+  { id: 'AT5', name: 'Catch All', owner: 'jim@brightleaf.co', sub: [], matchRule: { contains: [], notContains: ['Calming', 'Salmon', 'Sweet Potato', 'Grain-Free', 'Puppy'] }, members: [] },
+]
+
 
 /* ===================== src/components/Icon.jsx ===================== */
 // Compact inline SVG icon set (Feather-style, 24x24 stroke).
@@ -2079,6 +2111,7 @@ const NAV = [
     section: 'Sponsored Ads', module: true,
     items: [
       { to: '/ads/campaigns', label: 'Campaigns', icon: 'ads' },
+      { to: '/ads/tagging', label: 'Tagging', icon: 'tag' },
       { to: '/ads/adgroups', label: 'Ad Groups', icon: 'layers' },
       { to: '/ads/targeting', label: 'Targeting', icon: 'target' },
       { to: '/ads/search-terms', label: 'Search Terms', icon: 'search' },
@@ -2145,14 +2178,15 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.12.2</span>
+        <span className="app-version" title="CommerceHub build">v0.13.0</span>
       </div>
     </aside>
   )
 }
 
 const CRUMBS = {
-  '/': 'Overview', '/ads/campaigns': 'Sponsored Ads · Campaigns', '/ads/adgroups': 'Sponsored Ads · Ad Groups',
+  '/': 'Overview', '/ads/campaigns': 'Sponsored Ads · Campaigns', '/ads/tagging': 'Sponsored Ads · Tagging',
+  '/ads/adgroups': 'Sponsored Ads · Ad Groups',
   '/ads/targeting': 'Sponsored Ads · Targeting', '/ads/search-terms': 'Sponsored Ads · Search Terms',
   '/ads/sov': 'Sponsored Ads · Share of Voice', '/ads/dayparting': 'Sponsored Ads · Dayparting',
   '/ads/bulk': 'Sponsored Ads · Bulk Operations',
@@ -3156,14 +3190,29 @@ function KpiRow({ rows, prev }) {
 /* ============================ CAMPAIGNS ============================ */
 function Campaigns() {
   const { profileId, rangeResolved, profiles } = useApp()
+  const loc = useLocation()
+  const urlTag = new URLSearchParams(loc.search || '').get('tag')
   const [created, setCreated] = useState(() => createdStore.get('campaigns'))
   const allCampaigns = useMemo(() => [...created, ...ALL_CAMPAIGNS], [created])
   const base = useProfileFilter(allCampaigns)
   const [overrides, setOverrides] = usePersistentOverrides('ads-campaigns')
+  // E1 Tagging: effective campaign-tag list (seeds + chedits overrides + user tags) →
+  // derived tag chip in the name cell and the ?tag= drill filter from the Tagging page.
+  const [campTagOv] = usePersistentOverrides('tags-campaign')
+  const campTagList = useMemo(() => tagMergedList(createdStore.get('tags-campaign'), campaignTags, campTagOv), [campTagOv])
+  const derivedTagOf = useMemo(() => {
+    const cache = {}
+    return (c) => {
+      if (cache[c.id] !== undefined) return cache[c.id]
+      const t = campTagList.find((t) => tagHasMember(t, c.id, c.name))
+      cache[c.id] = t ? t.name : null
+      return cache[c.id]
+    }
+  }, [campTagList])
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ads-campaigns'))
   const [sel, setSel] = useState(new Set())
-  useEffect(() => { setSel(new Set()) }, [profileId]) // SA-R1: selection ids belong to the previous profile's rows
+  useEffect(() => { setSel(new Set()) }, [profileId, urlTag]) // SA-R1: selection ids belong to the previous profile's rows
 
   const [modal, setModal] = useState(null) // 'bid' | 'budget' | 'tag' | 'daypart' | 'rule'
   const [wizard, setWizard] = useState(false)
@@ -3192,7 +3241,10 @@ function Campaigns() {
   const withEdits = base.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id], placement: placementOf(c.id) } : { ...c, placement: placementOf(c.id) }))
   const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, rangeResolved), [withEdits, rangeResolved])
   const searched = data.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
-  const filtered = applyFilters(searched, filters, CAMPAIGN_FIELDS)
+  // E1: ?tag=<name> scopes the grid to that tag's members (derived rule matches + manual assignments)
+  const urlTagObj = urlTag ? campTagList.find((t) => t.name === urlTag) : null
+  const tagScoped = urlTag ? (urlTagObj ? searched.filter((c) => tagHasMember(urlTagObj, c.id, c.name)) : []) : searched
+  const filtered = applyFilters(tagScoped, filters, CAMPAIGN_FIELDS)
   const prevFiltered = filtered.map((r) => prev[r.id])
 
   const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
@@ -3215,7 +3267,7 @@ function Campaigns() {
   const columns = [
     { key: 'name', label: 'Campaign', sticky: true, width: 320, sortVal: (r) => r.name, render: (r) => (
       <div className="namecell">
-        <div className="nc-top"><Link className="celllink" to={`/ads/adgroups?camp=${r.id}`} title="Drill into ad groups">{r.name}</Link>{r.tag && <span className="tag">{r.tag}</span>}{r.daypart && <span className="tag" title={`Dayparting: ${r.daypart}`}><Icon name="clock" size={10} /></span>}{r.appliedRule && <span className="tag" title={`Rule: ${r.appliedRule}`}><Icon name="sliders" size={10} /></span>}</div>
+        <div className="nc-top"><Link className="celllink" to={`/ads/adgroups?camp=${r.id}`} title="Drill into ad groups">{r.name}</Link>{(r.tag || derivedTagOf(r)) && <span className="tag" title={r.tag ? 'Tag (manual)' : 'Tag (derived from Match Tag Rule)'}>{r.tag || derivedTagOf(r)}</span>}{r.daypart && <span className="tag" title={`Dayparting: ${r.daypart}`}><Icon name="clock" size={10} /></span>}{r.appliedRule && <span className="tag" title={`Rule: ${r.appliedRule}`}><Icon name="sliders" size={10} /></span>}</div>
         <small>{r.profileId.toUpperCase()} · {r.product?.split('—')[0]}</small>
       </div>) },
     { key: 'state', label: 'State', render: (r) => <StateSelect value={r.state} onChange={(st) => setState(r.id, st)} /> },
@@ -3264,6 +3316,14 @@ function Campaigns() {
         <ExportMenu name="campaigns" fields={CAMPAIGN_FIELDS} rows={filtered} />
         <Btn icon="plus" primary onClick={() => setChooser(true)}>Create Campaign</Btn>
       </AdsHead>
+      {urlTag && (
+        <div className="drillbar">
+          <Link className="celllink" to="/ads/tagging"><Icon name="chevDown" size={13} style={{ transform: 'rotate(90deg)' }} /> Back to Tagging</Link>
+          <span className="muted">Campaigns tagged</span><b>{urlTag}</b>
+          <span className="tag"><Icon name="tag" size={10} /> {filtered.length}</span>
+          {!urlTagObj && <span className="muted">— tag not found; showing no rows</span>}
+        </div>
+      )}
       <KpiRow rows={filtered} prev={prevFiltered} />
 
       {sel.size > 0 && (
@@ -3792,7 +3852,10 @@ const XL_KW_TABS = ['Campaign Target Setting', 'Campaign Tag Target Setting']
 
 function BulkOperations() {
   const { profiles } = useApp()
-  const [tab, setTab] = useState(XL_TABS[0])
+  const bulkLoc = useLocation()
+  // E1: /ads/bulk?tab=Create Tag preselects a tab (used by Tagging → Bulk Create Tag).
+  const qTab = new URLSearchParams(bulkLoc.search || '').get('tab')
+  const [tab, setTab] = useState(XL_TABS.includes(qTab) ? qTab : XL_TABS[0])
   const [profile, setProfile] = useState(profiles[0]?.id)
   const [ctype, setCtype] = useState(XL_CTYPES[0])
   const [fmt, setFmt] = useState('Pacvue')
@@ -3866,6 +3929,354 @@ function BulkOperations() {
       </Card>
       <div className="footnote">Pick a tab per operation type. Quick Campaign Edits supports: {XL_QUICK.join(' · ')}. Files over 10,000 campaign rows (or 1,000 keyword rows for target files) are rejected, matching live limits.</div>
     </>
+  )
+}
+
+/* ============================ TAGGING (E1 — spec §12) ============================ */
+const TAGS_TABS = ['Campaign Tags', 'Keyword Tags', 'ASIN Tags']
+const TAGS_KIND = { 'Campaign Tags': 'campaign', 'Keyword Tags': 'keyword', 'ASIN Tags': 'asin' }
+const TAGS_OWNERS = ['jim@brightleaf.co', 'a.rivera@brightleaf.co', 'm.chen@brightleaf.co']
+const TAGS_FIELDS = [
+  { key: 'name', label: 'Tag Name', type: 'text' },
+  { key: 'owner', label: 'Owner', type: 'enum', options: TAGS_OWNERS },
+  { key: 'count', label: 'Entities', type: 'number' },
+  { key: 'impr', label: 'Impressions', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+]
+
+/* Case-insensitive contains / not-contains match (Pacvue "Match Tag Rules"). */
+const tagRuleMatch = (text, rule) => {
+  if (!rule) return false
+  const s = String(text || '').toLowerCase()
+  const inc = (rule.contains || []).filter(Boolean)
+  const exc = (rule.notContains || []).filter(Boolean)
+  if (!inc.length && !exc.length) return false
+  if (inc.length && !inc.some((t) => s.includes(t.toLowerCase()))) return false
+  if (exc.some((t) => s.includes(t.toLowerCase()))) return false
+  return true
+}
+const tagHasMember = (tag, id, text) => (tag.members || []).includes(id) || tagRuleMatch(text, tag.matchRule)
+/* Merge user-created tags + seed tags with their chedits overrides; drop deleted. */
+function tagMergedList(created, seeds, overrides) {
+  const merged = [...created.map((t) => ({ ...t, user: true })), ...seeds.map((t) => ({ ...t, ...(overrides?.[t.id] || {}) }))]
+  return merged.filter((t) => !t.deleted)
+}
+/* Entities per tag type — computed lazily (ALL_CAMPAIGNS alias is injected late in the single-file build). */
+function tagEntitiesFor(kind) {
+  const camps = [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS]
+  if (kind === 'campaign') return { list: camps, textOf: (c) => c.name, noun: 'Campaigns' }
+  if (kind === 'keyword') return { list: [...createdStore.get('keywords'), ...keywords], textOf: (k) => k.keyword, noun: 'Keywords' }
+  return { list: camps, textOf: (c) => `${c.asin} ${c.product}`, noun: 'ASINs', countOf: (rows) => new Set(rows.map((r) => r.asin)).size }
+}
+const tagsParents = (rs) => rs.filter((r) => !r._child)
+const tagsSum = (k) => (rs) => tagsParents(rs).reduce((a, r) => a + (r[k] || 0), 0)
+const tagsMoneyFoot = (k) => (rs) => {
+  const ps = tagsParents(rs)
+  const syms = new Set(ps.map((r) => r._sym))
+  const est = ps.some((r) => r._est) || syms.size > 1
+  return `${cur(tagsSum(k)(rs), syms.size === 1 ? [...syms][0] : '$', 0)}${est ? ' (USD est.)' : ''}`
+}
+
+/* ---- Manage Tag modal: two panes — Tag List | Sub Tag List (spec §12) ---- */
+function TagBatchCreate({ placeholder, onCancel, onOk }) {
+  const [text, setText] = useState('')
+  const parse = (s) => [...new Set(s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean))]
+  const names = parse(text)
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 8, marginBottom: 8, background: 'var(--surface-2)' }}>
+      <textarea rows={3} autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder}
+        style={{ width: '100%', font: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+      <div className="muted" style={{ fontSize: 11, margin: '4px 0 8px' }}>Please separate each item using either a line break or a comma</div>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <Btn sm ghost onClick={onCancel}>Cancel</Btn>
+        <Btn sm primary onClick={() => names.length && onOk(names)}>OK{names.length > 0 ? ` (${names.length})` : ''}</Btn>
+      </div>
+    </div>
+  )
+}
+function TagManageModal({ kind, tags, onCreate, onDelete, onPatch, onClose }) {
+  const noun = kind === 'campaign' ? 'Campaign' : kind === 'keyword' ? 'Keyword' : 'ASIN'
+  const [selId, setSelId] = useState(tags[0]?.id || null)
+  const [lq, setLq] = useState('')
+  const [rq, setRq] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [creatingSub, setCreatingSub] = useState(false)
+  const sel = tags.find((t) => t.id === selId) || null
+  const listBox = { maxHeight: 250, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }
+  const shownTags = tags.filter((t) => t.name.toLowerCase().includes(lq.toLowerCase()))
+  const shownSubs = sel ? (sel.sub || []).filter((s) => s.toLowerCase().includes(rq.toLowerCase())) : []
+  return (
+    <Modal width={720} title={`Manage ${noun} Tag`} sub="Create, organize and delete tags & sub tags — changes apply immediately" onClose={onClose}
+      footer={<><div style={{ flex: 1 }} /><Btn primary onClick={onClose}>Close</Btn></>}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div>
+          <div className="cm-head" style={{ padding: '0 0 6px' }}>Tag List</div>
+          <div style={{ marginBottom: 8 }}><SearchBox value={lq} onChange={setLq} placeholder="Search tags…" /></div>
+          <div style={{ marginBottom: 8 }}><Btn sm ghost icon="plus" onClick={() => setCreating((v) => !v)}>Create Tag</Btn></div>
+          {creating && <TagBatchCreate placeholder={'Q3 Push\nHero ASINs, Seasonal'} onCancel={() => setCreating(false)} onOk={(names) => { onCreate(names); setCreating(false) }} />}
+          <div style={listBox}>
+            {shownTags.length === 0 && <div className="muted" style={{ padding: 10, fontSize: 12 }}>No tags match.</div>}
+            {shownTags.map((t) => (
+              <div key={t.id} onClick={() => setSelId(t.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--border)', background: selId === t.id ? 'var(--brand-soft)' : 'transparent' }}>
+                <Icon name="tag" size={13} />
+                <span style={{ flex: 1, fontWeight: 600, fontSize: 12.5, color: selId === t.id ? 'var(--brand)' : 'var(--text)' }}>
+                  {t.name}{t.user && <span className="tag" style={{ marginLeft: 6 }}>USER</span>}
+                </span>
+                <button className="gf-x" title="Delete tag" onClick={(e) => { e.stopPropagation(); onDelete(t) }}><Icon name="x" size={13} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="cm-head" style={{ padding: '0 0 6px' }}>Sub Tag List{sel ? ` — ${sel.name}` : ''}</div>
+          <div style={{ marginBottom: 8 }}><SearchBox value={rq} onChange={setRq} placeholder="Search sub tags…" /></div>
+          <div style={{ marginBottom: 8 }}><Btn sm ghost icon="plus" onClick={() => sel && setCreatingSub((v) => !v)}>Create Sub Tag</Btn></div>
+          {creatingSub && sel && (
+            <TagBatchCreate placeholder={'Freeze-Dried Salmon\nWild Salmon'} onCancel={() => setCreatingSub(false)}
+              onOk={(names) => { onPatch(sel, { sub: [...new Set([...(sel.sub || []), ...names])] }); setCreatingSub(false); toast(`Added ${names.length} sub tag${names.length === 1 ? '' : 's'} to “${sel.name}”`) }} />
+          )}
+          <div style={listBox}>
+            {!sel && <div className="muted" style={{ padding: 10, fontSize: 12 }}>Select a tag on the left to manage its sub tags.</div>}
+            {sel && shownSubs.length === 0 && <div className="muted" style={{ padding: 10, fontSize: 12 }}>No sub tags yet — create one above.</div>}
+            {sel && shownSubs.map((s) => (
+              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
+                <Icon name="layers" size={13} />
+                <span style={{ flex: 1, fontSize: 12.5 }}>{s}</span>
+                <button className="gf-x" title="Delete sub tag" onClick={() => { onPatch(sel, { sub: (sel.sub || []).filter((x) => x !== s) }); toast(`Sub tag “${s}” deleted`) }}><Icon name="x" size={13} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="modal-note" style={{ marginTop: 12 }}><Icon name="bulb" size={14} />Sub tags group entities inside a tag (no duplicate sub tag under the same tag). Deleting a tag removes it from every view; membership rules are managed per tag via ⋮ → Match Tag Rule.</div>
+    </Modal>
+  )
+}
+
+/* ---- Match Tag Rule builder: contains / does-not-contain + live preview (spec §12) ---- */
+function TagRuleModal({ kind, tag, onSave, onClose }) {
+  const noun = kind === 'campaign' ? 'campaign' : kind === 'keyword' ? 'keyword' : 'ASIN'
+  const [inc, setInc] = useState((tag.matchRule?.contains || []).join(', '))
+  const [exc, setExc] = useState((tag.matchRule?.notContains || []).join(', '))
+  const parse = (s) => s.split(',').map((x) => x.trim()).filter(Boolean)
+  const rule = useMemo(() => {
+    const c = parse(inc), n = parse(exc)
+    return (c.length || n.length) ? { contains: c, notContains: n } : null
+  }, [inc, exc])
+  const entDef = useMemo(() => tagEntitiesFor(kind), [kind])
+  const matches = useMemo(() => (rule ? entDef.list.filter((e) => tagRuleMatch(entDef.textOf(e), rule)) : []), [rule, entDef])
+  const count = entDef.countOf ? entDef.countOf(matches) : matches.length
+  return (
+    <Modal width={520} title="Match Tag Rule" sub={`Auto-assign ${noun}s to “${tag.name}” by name`} onClose={onClose}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><div style={{ flex: 1 }} /><Btn primary icon="check" onClick={() => { onSave(rule) }}>Save rule</Btn></>}>
+      <label className="fld">Name contains (comma-separated — any term matches)
+        <input autoFocus value={inc} onChange={(e) => setInc(e.target.value)} placeholder="e.g. Salmon, Freeze-Dried" />
+      </label>
+      <label className="fld">Name does not contain
+        <input value={exc} onChange={(e) => setExc(e.target.value)} placeholder="e.g. Puppy" />
+      </label>
+      <div className="modal-note"><Icon name="bulb" size={14} />
+        {rule
+          ? <span>Live preview: <b>{count} {noun}{count === 1 ? '' : 's'}</b> currently match this rule. New {noun}s that match are auto-added to the tag.</span>
+          : <span>No rule — this tag keeps only manual assignments. Saving with both fields empty clears the rule.</span>}
+      </div>
+    </Modal>
+  )
+}
+
+/* ---- One Tagging tab (remounted per tab via key so per-kind stores re-init) ---- */
+function TaggingTab({ tab, tabsBar }) {
+  const kind = TAGS_KIND[tab]
+  const { profileId, rangeResolved } = useApp()
+  const nav = useNavigate()
+  const seeds = kind === 'campaign' ? campaignTags : kind === 'keyword' ? keywordTags : asinTags
+  const [created, setCreated] = useState(() => createdStore.get('tags-' + kind))
+  const [overrides, setOverrides] = usePersistentOverrides('tags-' + kind)
+  const tags = useMemo(() => tagMergedList(created, seeds, overrides), [created, seeds, overrides])
+
+  const entDef = useMemo(() => tagEntitiesFor(kind), [kind])
+  const baseEnts = useMemo(() => (profileId === 'all' ? entDef.list : entDef.list.filter((e) => e.profileId === profileId)), [entDef, profileId])
+  const { rows: scaled, prev: prevMap } = useMemo(() => scaleForRange(baseEnts, rangeResolved), [baseEnts, rangeResolved])
+
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-tags-' + kind))
+  const [expandedTags, setExpandedTags] = useState(() => new Set())
+  const [sel, setSel] = useState(new Set())
+  const [manage, setManage] = useState(false)
+  const [ruleTag, setRuleTag] = useState(null)
+  useEffect(() => { setSel(new Set()) }, [profileId])
+
+  const memberRows = (tag) => scaled.filter((e) => tagHasMember(tag, e.id, entDef.textOf(e)))
+  const buildRow = (tag, members, extra) => {
+    const a = aggregate(members)
+    const mixed = adsMixedCur(members)
+    const spend = mixed ? adsUsdSum(members, 'spend') : a.spend
+    const sales = mixed ? adsUsdSum(members, 'sales') : a.sales
+    return {
+      id: tag.id, name: tag.name, owner: tag.owner, desc: tag.desc || '',
+      count: entDef.countOf ? entDef.countOf(members) : members.length,
+      impr: a.impr, clk: a.clk, ctr: a.ctr, spend, sales, orders: a.orders,
+      roas: spend ? sales / spend : 0,
+      _sym: mixed ? '$' : symOf(members), _est: mixed, _tag: tag, _members: members, ...extra,
+    }
+  }
+  const parentRows = tags.map((t) => buildRow(t, memberRows(t)))
+  const prevRowsById = useMemo(() => {
+    const out = {}
+    for (const r of parentRows) {
+      const pm = r._members.map((e) => prevMap[e.id]).filter(Boolean)
+      const a = aggregate(pm)
+      out[r.id] = { impr: a.impr, clk: a.clk, ctr: a.ctr, spend: a.spend, sales: a.sales, orders: a.orders, roas: a.roas }
+    }
+    return out
+  }, [tags, scaled]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const searchedTags = parentRows.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))
+  const filteredTags = applyFilters(searchedTags, filters, TAGS_FIELDS)
+  // Order by spend and inject expanded sub-tag child rows right below their parent
+  // (grid gets no initialSort so this order shows; header sorts scatter children — known trade-off).
+  const gridRows = []
+  for (const r of [...filteredTags].sort((a, b) => b.spend - a.spend)) {
+    gridRows.push(r)
+    if (kind !== 'keyword' && expandedTags.has(r.id)) {
+      for (const s of (r._tag.sub || [])) {
+        const subMembers = r._members.filter((e) => tagRuleMatch(entDef.textOf(e), { contains: [s], notContains: [] }))
+        gridRows.push(buildRow({ id: r.id + '::' + s, name: s, owner: r.owner }, subMembers, { _child: true }))
+      }
+    }
+  }
+  // KPI row — union of the tab's tagged entities (deduped), scaled for the date range.
+  const taggedEnts = [...new Map(filteredTags.flatMap((r) => r._members).map((e) => [e.id, e])).values()]
+  const taggedPrev = taggedEnts.map((e) => prevMap[e.id])
+
+  const saveCreated = (next) => { createdStore.set('tags-' + kind, next); setCreated(next) }
+  const patchTag = (tag, patch) => {
+    if (tag.user) saveCreated(created.map((t) => (t.id === tag.id ? { ...t, ...patch } : t)))
+    else setOverrides((o) => ({ ...o, [tag.id]: { ...o[tag.id], ...patch } }))
+  }
+  const deleteTag = (tag) => {
+    if (tag.user) saveCreated(created.filter((t) => t.id !== tag.id))
+    else setOverrides((o) => ({ ...o, [tag.id]: { ...o[tag.id], deleted: true } }))
+    toast(`Tag “${tag.name}” deleted`)
+  }
+  const createTags = (names) => {
+    const stamped = names.map((n, i) => ({ id: 'TAGNEW' + (Date.now() + i).toString().slice(-8), name: n, owner: TAGS_OWNERS[0], sub: [], matchRule: null, members: [] }))
+    saveCreated([...stamped, ...created])
+    toast(`Created ${stamped.length} tag${stamped.length === 1 ? '' : 's'}`)
+  }
+  const saveRule = (rule) => { patchTag(ruleTag, { matchRule: rule }); setRuleTag(null); toast(`Match Tag Rule ${rule ? 'saved' : 'cleared'} — membership recalculated`) }
+  const bulkDelete = () => {
+    const byId = Object.fromEntries(parentRows.map((r) => [r.id, r]))
+    const targets = [...sel].map((id) => byId[id]).filter(Boolean).map((r) => r._tag)
+    const userIds = new Set(targets.filter((t) => t.user).map((t) => t.id))
+    const seedIds = targets.filter((t) => !t.user).map((t) => t.id)
+    if (userIds.size) saveCreated(created.filter((t) => !userIds.has(t.id)))
+    if (seedIds.length) setOverrides((o) => { const n = { ...o }; seedIds.forEach((id) => { n[id] = { ...n[id], deleted: true } }); return n })
+    setSel(new Set())
+    toast(`Deleted ${targets.length} tag${targets.length === 1 ? '' : 's'}`)
+  }
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleAll = () => setSel((s) => (s.size === filteredTags.length ? new Set() : new Set(filteredTags.map((r) => r.id))))
+  const toggleExpand = (id) => setExpandedTags((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const noun = entDef.noun
+  const columns = [
+    { key: 'name', label: 'Tag Name', sticky: true, width: 260, sortVal: (r) => r.name, render: (r) => (
+      <div className="namecell" style={r._child ? { paddingLeft: 24 } : undefined}>
+        <div className="nc-top">
+          {!r._child && kind !== 'keyword' && (r._tag.sub || []).length > 0 && (
+            <span style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }} title={expandedTags.has(r.id) ? 'Collapse sub tags' : 'Expand sub tags'} onClick={() => toggleExpand(r.id)}>
+              <Icon name={expandedTags.has(r.id) ? 'chevDown' : 'chevRight'} size={13} />
+            </span>
+          )}
+          <span style={{ fontWeight: r._child ? 500 : 600 }}>{r.name}</span>
+          {r._child && <span className="tag">Sub Tag</span>}
+          {!r._child && r._tag.matchRule && <span className="tag" title={`Match Tag Rule: contains ${(r._tag.matchRule.contains || []).join(', ') || '—'}${(r._tag.matchRule.notContains || []).length ? ` · not ${(r._tag.matchRule.notContains).join(', ')}` : ''}`}><Icon name="sliders" size={10} /></span>}
+          {!r._child && r._tag.user && <span className="tag">USER</span>}
+        </div>
+        {!r._child && kind === 'keyword' && r.desc && <small>{r.desc}</small>}
+      </div>
+    ) },
+    { key: 'owner', label: 'Owner', render: (r) => (r._child ? '' : <span className="muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Icon name="users" size={12} />{r.owner}</span>) },
+    { key: 'count', label: noun, num: true, foot: (rs) => int(tagsSum('count')(rs)), render: (r) => (
+      kind === 'campaign' && !r._child
+        ? <Link className="celllink" to={`/ads/campaigns?tag=${encodeURIComponent(r.name)}`} title="View tagged campaigns in the Campaign grid">{int(r.count)}</Link>
+        : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>{kind === 'keyword' && !r._child && <Icon name="eye" size={12} style={{ color: 'var(--text-3)' }} />}{int(r.count)}</span>
+    ) },
+    { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(tagsSum('impr')(rs)), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clk.', num: true, delta: true, foot: (rs) => int(tagsSum('clk')(rs)), render: (r) => int(r.clk) },
+    { key: 'ctr', label: 'CTR', num: true, foot: (rs) => { const i = tagsSum('impr')(rs); return pct(i ? (tagsSum('clk')(rs) / i) * 100 : 0, 2) }, render: (r) => pct(r.ctr, 2) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: tagsMoneyFoot('spend'), render: (r) => `${cur(r.spend, r._sym)}${r._est ? '*' : ''}` },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: tagsMoneyFoot('sales'), render: (r) => `${cur(r.sales, r._sym)}${r._est ? '*' : ''}` },
+    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => { const s = tagsSum('spend')(rs); return dec2(s ? tagsSum('sales')(rs) / s : 0) }, render: (r) => dec2(r.roas) },
+    { key: 'act', label: '', sort: false, render: (r) => (r._child ? '' : (
+      <Popover align="right" width={180} trigger={<Btn sm ghost icon="dots" />}>
+        {(close) => (
+          <div className="colmenu"><div className="cm-list">
+            <div className="cm-opt" onClick={() => { setRuleTag(r._tag); close() }}>Match Tag Rule</div>
+            {kind === 'campaign' && <div className="cm-opt" onClick={() => { close(); nav(`/ads/campaigns?tag=${encodeURIComponent(r.name)}`) }}>View campaigns</div>}
+            <div className="cm-opt" style={{ color: 'var(--red)' }} onClick={() => { deleteTag(r._tag); close() }}>Delete tag</div>
+          </div></div>
+        )}
+      </Popover>
+    )) },
+  ]
+
+  return (
+    <>
+      <AdsHead title="Tagging" sub={`${filteredTags.length} ${tab.toLowerCase()} · ${rangeResolved.label} · membership derived from Match Tag Rules + manual assignments`}>
+        <ExportMenu name={'tags-' + kind} fields={TAGS_FIELDS} rows={filteredTags} />
+        <Btn icon="file" onClick={() => nav(`/ads/bulk?tab=${encodeURIComponent('Create Tag')}`)}>Bulk Create Tag</Btn>
+        <Btn icon="tag" primary onClick={() => setManage(true)}>Manage Tag</Btn>
+      </AdsHead>
+      {tabsBar}
+      <KpiRow rows={taggedEnts} prev={taggedPrev} />
+      {sel.size > 0 && (
+        <div className="bulkbar">
+          <span className="sel">{sel.size} selected</span>
+          <Btn sm icon="x" onClick={bulkDelete}>Delete Tags</Btn>
+          <div style={{ flex: 1 }} />
+          <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
+        </div>
+      )}
+      {manage && <TagManageModal kind={kind} tags={tags} onCreate={createTags} onDelete={deleteTag} onPatch={patchTag} onClose={() => setManage(false)} />}
+      {ruleTag && <TagRuleModal kind={kind} tag={ruleTag} onSave={saveRule} onClose={() => setRuleTag(null)} />}
+      <DataGrid
+        id={'ads-tags-' + kind}
+        columns={columns}
+        rows={gridRows}
+        totals
+        compare
+        comparePrev={prevRowsById}
+        compareDisabled={rangeResolved.label === 'All time'}
+        selectable
+        selected={sel}
+        onToggle={toggleSel}
+        onToggleAll={toggleAll}
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search tags…" />
+          <FilterBar id={'ads-tags-' + kind} fields={TAGS_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Tags auto-collect {noun.toLowerCase()} via <b>Match Tag Rules</b> (name contains / does not contain — row ⋮ menu). <b>Manage Tag</b> batch-creates tags & sub tags; ▶ expands sub-tag rollups{kind === 'campaign' ? '; the count links open the Campaign grid filtered to the tag' : ''}. Metrics aggregate the tagged {noun.toLowerCase()} for the selected date range.</div>
+    </>
+  )
+}
+
+function Tagging() {
+  const [tab, setTab] = useState(TAGS_TABS[0])
+  return (
+    <TaggingTab key={tab} tab={tab} tabsBar={
+      <div className="viewtabs" style={{ maxWidth: 420 }}>
+        {TAGS_TABS.map((t) => (
+          <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</div>
+        ))}
+      </div>
+    } />
   )
 }
 
@@ -5497,6 +5908,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/ads/campaigns" element={<Campaigns />} />
+          <Route path="/ads/tagging" element={<Tagging />} />
           <Route path="/ads/adgroups" element={<AdGroups />} />
           <Route path="/ads/targeting" element={<Targeting />} />
           <Route path="/ads/search-terms" element={<SearchTerms />} />
