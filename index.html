@@ -883,13 +883,20 @@ const dayparting = DAYS.map((d, di) =>
 // Automation rules
 // ---------------------------------------------------------------------------
 const rules = [
-  { id: 'R1', name: 'Defend Target ACoS ≤ 28%', type: 'Bid', scope: 'All SP campaigns', status: 'Active', trigger: 'ACoS > 28% over 14d', action: 'Decrease bid by 12%', runs: 'Every 6 hours', lastRun: '2h ago', affected: 142 },
-  { id: 'R2', name: 'Scale Winners (ROAS ≥ 4)', type: 'Bid', scope: 'Always-On portfolio', status: 'Active', trigger: 'ROAS ≥ 4 and Orders ≥ 10 (7d)', action: 'Increase bid by 8% (max $2.40)', runs: 'Every 6 hours', lastRun: '2h ago', affected: 58 },
-  { id: 'R3', name: 'Keyword Harvesting — Auto → Manual', type: 'Harvest', scope: 'All SP-Auto', status: 'Active', trigger: 'Search term: Orders ≥ 6, ACoS ≤ 30%', action: 'Add as Exact to manual campaign', runs: 'Daily 2:00 AM', lastRun: '9h ago', affected: 23 },
-  { id: 'R4', name: 'Negate Wasted Spend', type: 'Negative', scope: 'All SP campaigns', status: 'Active', trigger: 'Clicks ≥ 15, Orders = 0 (30d)', action: 'Add as Negative Exact', runs: 'Daily 3:00 AM', lastRun: '8h ago', affected: 31 },
-  { id: 'R5', name: 'Out-of-Stock Auto-Pause', type: 'Retail', scope: 'All campaigns', status: 'Active', trigger: 'ASIN out of stock or Buy Box < 50%', action: 'Pause ads for ASIN', runs: 'Every 1 hour', lastRun: '24m ago', affected: 4 },
-  { id: 'R6', name: 'Prime Day Dayparting Boost', type: 'Dayparting', scope: 'Seasonal portfolio', status: 'Paused', trigger: 'Event window active', action: 'Apply +35% multiplier 12pm–11pm', runs: 'Hourly', lastRun: '—', affected: 0 },
-  { id: 'R7', name: 'Budget Pacing Guard', type: 'Budget', scope: 'All profiles', status: 'Active', trigger: 'Daily pace > 115% of target', action: 'Throttle bids 10% until midnight', runs: 'Every 2 hours', lastRun: '1h ago', affected: 76 },
+  { id: 'R1', name: 'Defend Target ACoS ≤ 28%', type: 'Bid', scope: 'All SP campaigns', status: 'Active', trigger: 'ACoS > 28% over 14d', action: 'Decrease bid by 12%', runs: 'Every 6 hours', lastRun: '2h ago', affected: 142,
+    _f: { name: 'Defend Target ACoS ≤ 28%', type: 'Bid', scope: 'All SP campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'ACoS', op: 'gt', value: '28', value2: '' }], join: 'AND', lookback: '14', action: 'dec_bid', actionValue: '12', frequency: 'Every 6 hours' } },
+  { id: 'R2', name: 'Scale Winners (ROAS ≥ 4)', type: 'Bid', scope: 'Always-On portfolio', status: 'Active', trigger: 'ROAS ≥ 4 and Orders ≥ 10 (7d)', action: 'Increase bid by 8% (max $2.40)', runs: 'Every 6 hours', lastRun: '2h ago', affected: 58,
+    _f: { name: 'Scale Winners (ROAS ≥ 4)', type: 'Bid', scope: 'Selected campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'ROAS', op: 'gte', value: '4', value2: '' }, { id: 'c2', metric: 'Orders', op: 'gte', value: '10', value2: '' }], join: 'AND', lookback: '7', action: 'inc_bid', actionValue: '8', cap: '2.40', frequency: 'Every 6 hours' } },
+  { id: 'R3', name: 'Keyword Harvesting — Auto → Manual', type: 'Harvest', scope: 'All SP-Auto', status: 'Active', trigger: 'Search term: Orders ≥ 6, ACoS ≤ 30%', action: 'Add as Exact to manual campaign', runs: 'Daily 2:00 AM', lastRun: '9h ago', affected: 23,
+    _f: { name: 'Keyword Harvesting — Auto → Manual', type: 'Harvest', scope: 'All SP campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Orders', op: 'gte', value: '6', value2: '' }, { id: 'c2', metric: 'ACoS', op: 'lte', value: '30', value2: '' }], join: 'AND', lookback: '30', action: 'harvest', actionValue: '', frequency: 'Daily' } },
+  { id: 'R4', name: 'Negate Wasted Spend', type: 'Negative', scope: 'All SP campaigns', status: 'Active', trigger: 'Clicks ≥ 15, Orders = 0 (30d)', action: 'Add as Negative Exact', runs: 'Daily 3:00 AM', lastRun: '8h ago', affected: 31,
+    _f: { name: 'Negate Wasted Spend', type: 'Negative', scope: 'All SP campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Clicks', op: 'gte', value: '15', value2: '' }, { id: 'c2', metric: 'Orders', op: 'lte', value: '0', value2: '' }], join: 'AND', lookback: '30', action: 'negative', actionValue: '', frequency: 'Daily' } },
+  { id: 'R5', name: 'Out-of-Stock Auto-Pause', type: 'Retail', scope: 'All campaigns', status: 'Active', trigger: 'ASIN out of stock or Buy Box < 50%', action: 'Pause ads for ASIN', runs: 'Every 1 hour', lastRun: '24m ago', affected: 4,
+    _f: { name: 'Out-of-Stock Auto-Pause', type: 'Retail', scope: 'All profiles', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Weeks of Cover', op: 'lt', value: '1', value2: '' }], join: 'AND', lookback: '7', action: 'pause', actionValue: '', frequency: 'Hourly' } },
+  { id: 'R6', name: 'Prime Day Dayparting Boost', type: 'Dayparting', scope: 'Seasonal portfolio', status: 'Paused', trigger: 'Event window active', action: 'Apply +35% multiplier 12pm–11pm', runs: 'Hourly', lastRun: '—', affected: 0,
+    _f: { name: 'Prime Day Dayparting Boost', type: 'Dayparting', scope: 'Selected campaigns', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Impressions', op: 'gt', value: '0', value2: '' }], join: 'AND', lookback: '7', action: 'placement', actionValue: '35', frequency: 'Hourly' } },
+  { id: 'R7', name: 'Budget Pacing Guard', type: 'Budget', scope: 'All profiles', status: 'Active', trigger: 'Daily pace > 115% of target', action: 'Throttle bids 10% until midnight', runs: 'Every 2 hours', lastRun: '1h ago', affected: 76,
+    _f: { name: 'Budget Pacing Guard', type: 'Budget', scope: 'All profiles', mode: 'Automated Actions', conditions: [{ id: 'c1', metric: 'Spend', op: 'gt', value: '115', value2: '' }], join: 'AND', lookback: '7', action: 'adj_budget', actionValue: '-10', frequency: 'Every 6 hours' } },
 ]
 
 // ---------------------------------------------------------------------------
@@ -898,8 +905,8 @@ const rules = [
 const budgets = profiles.map((p, i) => {
   const monthly = [185000, 92000, 38000][i]
   const spent = monthly * range(0.46, 0.82)
-  const dayOfMonth = 20
-  const daysInMonth = 30
+  const dayOfMonth = new Date().getDate()
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
   const targetPace = monthly * (dayOfMonth / daysInMonth)
   return {
     profileId: p.id,
@@ -919,11 +926,11 @@ const budgets = profiles.map((p, i) => {
 // Alerts / notifications
 // ---------------------------------------------------------------------------
 const alerts = [
-  { id: 'A1', sev: 'high', icon: 'box', title: 'ASIN out of stock', body: 'B0CGRAIN01 Grain-Free Kibble (US) is out of stock — Rule R5 paused 3 campaigns.', time: '24m ago', read: false },
-  { id: 'A2', sev: 'high', icon: 'trend-down', title: 'Buy Box lost', body: 'B0CSWEET01 Buy Box dropped to 41% on Amazon.com. Ad efficiency at risk.', time: '1h ago', read: false },
-  { id: 'A3', sev: 'med', icon: 'budget', title: 'Budget pacing alert', body: 'Amazon USA is 112% of target pace. Pacing guard (R7) throttled 76 campaigns.', time: '1h ago', read: false },
-  { id: 'A4', sev: 'med', icon: 'spark', title: 'Harvest opportunity', body: '23 search terms qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%).', time: '3h ago', read: true },
-  { id: 'A5', sev: 'low', icon: 'star', title: 'Rating drop', body: 'B0COMEGA01 average rating fell to 4.1★ after 6 new reviews.', time: '6h ago', read: true },
+  { id: 'A1', sev: 'high', cat: 'stock', icon: 'box', title: 'ASIN out of stock', body: 'B0CGRAIN01 Grain-Free Kibble (US) is out of stock — Rule R5 paused 3 campaigns.', time: '24m ago', read: false },
+  { id: 'A2', sev: 'high', cat: 'buybox', icon: 'trend-down', title: 'Buy Box lost', body: 'B0CSWEET01 Buy Box dropped to 41% on Amazon.com. Ad efficiency at risk.', time: '1h ago', read: false },
+  { id: 'A3', sev: 'med', cat: 'budget', icon: 'budget', title: 'Budget pacing alert', body: 'Amazon USA is 112% of target pace. Pacing guard (R7) throttled 76 campaigns.', time: '1h ago', read: false },
+  { id: 'A4', sev: 'med', cat: 'acos', icon: 'spark', title: 'Harvest opportunity', body: '23 search terms qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%).', time: '3h ago', read: true },
+  { id: 'A5', sev: 'low', cat: 'anomaly', icon: 'star', title: 'Rating drop', body: 'B0COMEGA01 average rating fell to 4.1★ after 6 new reviews.', time: '6h ago', read: true },
   { id: 'A6', sev: 'low', icon: 'doc', title: 'Scheduled report sent', body: '"Weekly Exec Summary" delivered to 4 recipients.', time: '9h ago', read: true },
 ]
 
@@ -1069,13 +1076,13 @@ function aggregate(rows) {
     sales = sum('sales'), orders = sum('orders'), units = sum('units')
   return {
     impr, clk, spend, sales, orders, units,
-    ctr: (clk / impr) * 100,
-    cpc: spend / clk,
-    acos: (spend / sales) * 100,
-    roas: sales / spend,
-    cvr: (orders / clk) * 100,
-    cpa: spend / orders,
-    aov: sales / orders,
+    ctr: impr ? (clk / impr) * 100 : 0,
+    cpc: clk ? spend / clk : 0,
+    acos: sales ? (spend / sales) * 100 : 0,
+    roas: spend ? sales / spend : 0,
+    cvr: clk ? (orders / clk) * 100 : 0,
+    cpa: orders ? spend / orders : 0,
+    aov: orders ? sales / orders : 0,
   }
 }
 
@@ -1165,6 +1172,10 @@ function Kpi({ label, value, delta, deltaGood, hint }) {
   )
 }
 function KpiGrid({ children }) { return <div className="kpi-grid">{children}</div> }
+
+/* ---------------- FX rates — USD estimates for mixed-currency aggregates ---------------- */
+const FX_USD = { us: 1, ca: 0.73, uk: 1.26 };
+const fxUSD = (pid) => FX_USD[pid] ?? 1;
 
 /* ---------------- Status pill ---------------- */
 const STATUS_MAP = {
@@ -1340,15 +1351,11 @@ function SortCaret({ active, dir }) {
   if (!active) return <Icon name="chevDown" size={11} className="caret" />
   return <Icon name={dir === 'asc' ? 'arrowUp' : 'arrowDown'} size={11} className="caret on" />
 }
-function DeltaChip({ row, ck, rk, prevRow }) {
-  let d
-  if (prevRow) {
-    const cur = Number(row[ck]); const prev = Number(prevRow[ck])
-    if (!isFinite(cur) || !isFinite(prev) || prev === 0) return null
-    d = (cur - prev) / Math.abs(prev)
-  } else {
-    d = (hashUnit(String(row[rk]) + ':' + ck) - 0.42) * 0.6 // fallback mock
-  }
+function DeltaChip({ row, ck, prevRow }) {
+  if (!prevRow) return null // no real prior period supplied — show nothing rather than a mock delta
+  const cur = Number(row[ck]); const prev = Number(prevRow[ck])
+  if (!isFinite(cur) || !isFinite(prev) || prev === 0) return null
+  const d = (cur - prev) / Math.abs(prev)
   const up = d >= 0
   return <span className={`gdelta ${up ? 'up' : 'down'}`}>{up ? '▲' : '▼'}{Math.abs(d * 100).toFixed(1)}%</span>
 }
@@ -1789,7 +1796,7 @@ function FilterBar({ id, fields, value, onChange }) {
    ========================================================================== */
 
 /* Inline-editable numeric cell (click to edit, Enter/blur commit, Esc cancel). */
-function EditableNum({ value, onCommit, prefix = '', dec = 0, align = 'flex-end' }) {
+function EditableNum({ value, onCommit, prefix = '', dec = 0, align = 'flex-end', min = 0.02 }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(value)
   const editingRef = useRef(false)
@@ -1798,7 +1805,7 @@ function EditableNum({ value, onCommit, prefix = '', dec = 0, align = 'flex-end'
   const finish = (save) => {
     if (!editingRef.current) return
     editingRef.current = false; setEditing(false)
-    if (save) { const n = Number(val); if (!isNaN(n) && n !== value) onCommit(n) } else setVal(value)
+    if (save) { const n = Math.max(min, Number(val)); if (!isNaN(n) && n !== value) onCommit(n) } else setVal(value)
   }
   if (editing) {
     return (
@@ -1835,17 +1842,18 @@ function StateSelect({ value, onChange, options = ['Enabled', 'Paused', 'Archive
 }
 
 /* Generic modal dialog. */
-function Modal({ title, sub, onClose, children, footer, width = 440 }) {
+function Modal({ title, sub, onClose, children, footer, width = 440, confirmClose }) {
+  const requestClose = () => { if (!confirmClose || window.confirm('Discard your changes?')) onClose() }
   useEffect(() => {
-    const k = (e) => { if (e.key === 'Escape') onClose() }
+    const k = (e) => { if (e.key === 'Escape') requestClose() }
     document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k)
-  }, [])
+  }, [confirmClose])
   return (
-    <div className="modal-ov" onMouseDown={onClose}>
+    <div className="modal-ov" onMouseDown={requestClose}>
       <div className="modal" style={{ width }} onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-h">
           <div><h3>{title}</h3>{sub && <div className="sub">{sub}</div>}</div>
-          <button className="gf-x" onClick={onClose}><Icon name="x" size={15} /></button>
+          <button className="gf-x" onClick={requestClose}><Icon name="x" size={15} /></button>
         </div>
         <div className="modal-b">{children}</div>
         {footer && <div className="modal-f">{footer}</div>}
@@ -2137,7 +2145,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.12.1</span>
+        <span className="app-version" title="CommerceHub build">v0.12.2</span>
       </div>
     </aside>
   )
@@ -2229,7 +2237,6 @@ function Topbar() {
         )}
       </div>
 
-      <button className="topbar-ctrl"><Icon name="filter" size={15} />Filters<span className="badge">2</span></button>
       <NavLink to="/alerts" className="topbar-ctrl" style={{ position: 'relative' }}>
         <Icon name="bell" size={16} />
         {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--red)', color: '#fff', borderRadius: 9, fontSize: 9, padding: '1px 5px', fontWeight: 700 }}>{unread}</span>}
@@ -2277,31 +2284,35 @@ function Layout({ children }) {
 /* ===================== src/pages/Overview.jsx ===================== */
 
 function Overview() {
-  const { profileId, rangeResolved } = useApp()
+  const { profileId, rangeResolved, alertReads } = useApp()
+  const allTime = rangeResolved.label === 'All time'
   const campsRaw = profileId === 'all' ? campaigns : campaigns.filter((c) => c.profileId === profileId)
   const { rows: camps, prev } = useMemo(() => scaleForRange(campsRaw, rangeResolved), [campsRaw, rangeResolved])
   const prevRows = useMemo(() => camps.map((r) => prev[r.id]).filter(Boolean), [camps, prev])
   const a = aggregate(camps)
   const p = prevRows.length ? aggregate(prevRows) : null
-  const dl = (curV, prvV) => (p && prvV ? ((curV - prvV) / Math.abs(prvV)) * 100 : undefined)
+  const dl = (curV, prvV) => (!allTime && p && prvV ? ((curV - prvV) / Math.abs(prvV)) * 100 : undefined)
 
   const dspRaw = profileId === 'all' ? dspOrders : dspOrders.filter((d) => d.profileId === profileId)
-  const dspScaled = useMemo(() => scaleForRange(dspRaw, rangeResolved).rows, [dspRaw, rangeResolved])
+  const { rows: dspScaled, prev: dspPrev } = useMemo(() => scaleForRange(dspRaw, rangeResolved), [dspRaw, rangeResolved])
   const dspSpend = dspScaled.reduce((s, d) => s + d.spend, 0)
   const dspSales = dspScaled.reduce((s, d) => s + d.sales, 0)
-  const shelf = profileId === 'all' ? digitalShelf : digitalShelf.filter((d) => d.profileId === profileId)
-  const shelfRows = shelf.length ? shelf : digitalShelf
+  const dspPrevRows = dspScaled.map((d) => dspPrev[d.id]).filter(Boolean)
+  const dspSpendPrev = dspPrevRows.reduce((s, d) => s + d.spend, 0)
+  const dspSalesPrev = dspPrevRows.reduce((s, d) => s + d.sales, 0)
+  const shelfRows = profileId === 'all' ? digitalShelf : digitalShelf.filter((d) => d.profileId === profileId)
+  const shelfEnabled = shelfRows.length > 0
   const oosCount = shelfRows.filter((d) => !d.inStock).length
-  const buyBoxAvg = shelfRows.reduce((s, d) => s + d.buyBox, 0) / shelfRows.length
+  const buyBoxAvg = shelfEnabled ? shelfRows.reduce((s, d) => s + d.buyBox, 0) / shelfRows.length : null
   const organicBase = 380000 * (rangeResolved.days / 30)
   const tacos = ((a.spend + dspSpend) / (a.sales + dspSales + organicBase)) * 100
-  const pTacos = p ? ((p.spend + dspSpend) / (p.sales + dspSales + organicBase)) * 100 : null
+  const pTacos = p ? ((p.spend + dspSpendPrev) / (p.sales + dspSalesPrev + organicBase)) * 100 : null
 
   const chanSum = (match) => {
-    const rows = camps.filter((c) => match(c.type || ''))
+    const rows = camps.filter((c) => match(c.campaignType || ''))
     return { spend: rows.reduce((s, c) => s + c.spend, 0), sales: rows.reduce((s, c) => s + c.sales, 0) }
   }
-  const sp = chanSum((t) => t.startsWith('SP') || t === 'PAT')
+  const sp = chanSum((t) => t.startsWith('SP'))
   const sb = chanSum((t) => t.startsWith('SB'))
   const sd = chanSum((t) => t.startsWith('SD'))
   const channelData = [
@@ -2311,6 +2322,7 @@ function Overview() {
     { label: 'DSP', spend: Math.round(dspSpend / 100) * 100, sales: Math.round(dspSales / 100) * 100, color: '#1aa260' },
   ]
   const trendData = useMemo(() => timeseries.slice(-Math.max(2, Math.min(30, rangeResolved.days))), [rangeResolved])
+  const trendLabel = rangeResolved.days > 30 ? 'last 30 days' : rangeResolved.label
 
   return (
     <>
@@ -2331,14 +2343,14 @@ function Overview() {
         <Kpi label="Ad Sales" value={money(a.sales)} delta={dl(a.sales, p?.sales)} />
         <Kpi label="ACoS" value={pct(a.acos)} delta={dl(a.acos, p?.acos)} deltaGood={(dl(a.acos, p?.acos) || 0) <= 0} />
         <Kpi label="ROAS" value={dec2(a.roas)} delta={dl(a.roas, p?.roas)} />
-        <Kpi label="TACoS" value={pct(tacos)} delta={pTacos ? ((tacos - pTacos) / Math.abs(pTacos)) * 100 : undefined} deltaGood={pTacos ? tacos <= pTacos : undefined} />
+        <Kpi label="TACoS" value={pct(tacos)} delta={!allTime && pTacos ? ((tacos - pTacos) / Math.abs(pTacos)) * 100 : undefined} deltaGood={!allTime && pTacos ? tacos <= pTacos : undefined} />
         <Kpi label="Impressions" value={compact(a.impr)} delta={dl(a.impr, p?.impr)} />
         <Kpi label="Orders" value={compact(a.orders)} delta={dl(a.orders, p?.orders)} />
-        <Kpi label="Avg Buy Box" value={pct(buyBoxAvg)} />
+        <Kpi label="Avg Buy Box" value={shelfEnabled ? pct(buyBoxAvg) : '—'} />
       </KpiGrid>
 
       <div className="grid-2" style={{ marginBottom: 16 }}>
-        <Card title="Performance trend" sub={`Spend vs Sales · ${rangeResolved.label}`}
+        <Card title="Performance trend" sub={`Spend vs Sales · ${trendLabel}`}
           actions={<Btn sm ghost icon="download">CSV</Btn>}>
           <PerfChart data={trendData} />
         </Card>
@@ -2348,7 +2360,7 @@ function Overview() {
       </div>
 
       <div className="grid-3">
-        <Card title="Action center" sub={`${alerts.filter(x => !x.read).length} need attention`}
+        <Card title="Action center" sub={`${alerts.filter(x => !x.read && !alertReads.includes(x.id)).length} need attention`}
           actions={<Link to="/alerts" className="btn sm ghost">View all</Link>}>
           {alerts.slice(0, 4).map((al) => (
             <div key={al.id} className="lrow" style={{ padding: '11px 0', borderColor: 'var(--border)' }}>
@@ -2366,7 +2378,7 @@ function Overview() {
 
         <Card title="Budget pacing" sub="Month-to-date vs target"
           actions={<Link to="/budgets" className="btn sm ghost">Manage</Link>}>
-          {budgets.map((b) => (
+          {budgets.filter((b) => profileId === 'all' || b.profileId === profileId).map((b) => (
             <div key={b.profileId} style={{ marginBottom: 16 }}>
               <div className="flex between items-center" style={{ marginBottom: 6 }}>
                 <b style={{ fontSize: 12.5 }}>{b.profile}</b>
@@ -2385,10 +2397,14 @@ function Overview() {
 
         <Card title="Digital shelf health" sub="Retail signals affecting ads"
           actions={<Link to="/commerce/shelf" className="btn sm ghost">Open</Link>}>
-          <ShelfStat label="ASINs out of stock" value={oosCount} tone={oosCount ? 'red' : 'green'} icon="box" note="Ads auto-paused by Rule R5" />
-          <ShelfStat label="Avg Buy Box ownership" value={pct(buyBoxAvg)} tone={buyBoxAvg > 70 ? 'green' : 'amber'} icon="shield" note="ASIN-level monitoring" />
-          <ShelfStat label="Listings with content issues" value={digitalShelf.filter(d => d.contentIssues > 0).length} tone="amber" icon="file" note="Title / image / A+ gaps" />
-          <ShelfStat label="Avg rating" value={(digitalShelf.reduce((s, d) => s + d.rating, 0) / digitalShelf.length).toFixed(2) + '★'} tone="green" icon="star" note="Across catalog" />
+          {shelfEnabled ? <>
+            <ShelfStat label="ASINs out of stock" value={oosCount} tone={oosCount ? 'red' : 'green'} icon="box" note="Ads auto-paused by Rule R5" />
+            <ShelfStat label="Avg Buy Box ownership" value={pct(buyBoxAvg)} tone={buyBoxAvg > 70 ? 'green' : 'amber'} icon="shield" note="ASIN-level monitoring" />
+            <ShelfStat label="Listings with content issues" value={shelfRows.filter(d => d.contentIssues > 0).length} tone="amber" icon="file" note="Title / image / A+ gaps" />
+            <ShelfStat label="Avg rating" value={(shelfRows.reduce((s, d) => s + d.rating, 0) / shelfRows.length).toFixed(2) + '★'} tone="green" icon="star" note="Across catalog" />
+          </> : (
+            <div className="muted" style={{ padding: '28px 0', textAlign: 'center', fontSize: 12.5 }}>Shelf tracking not enabled for this profile</div>
+          )}
         </Card>
       </div>
     </>
@@ -2419,6 +2435,13 @@ const symA = (pid) => profileById[pid]?.currency || '$'
 const typeTone = (t) => (t.startsWith('SP') ? 'blue' : t.startsWith('SB') ? 'purple' : 'amber')
 const symOf = (rs) => (rs[0] ? symA(rs[0].profileId) : '$')
 const sumKey = (k) => (rs) => rs.reduce((a, b) => a + (b[k] || 0), 0)
+/* SA-R7: mixed-currency money aggregates — when rows span currencies (profile = All),
+   convert to USD via fxUSD() and flag the figure as an estimate. */
+const adsMixedCur = (rs) => new Set(rs.map((r) => symA(r.profileId))).size > 1
+const adsUsdSum = (rs, k) => rs.reduce((a, r) => a + (r[k] || 0) * fxUSD(r.profileId), 0)
+const adsMoneyFoot = (k, dec = 0) => (rs) => (adsMixedCur(rs)
+  ? `${cur(adsUsdSum(rs, k), '$', dec)} (USD est.)`
+  : cur(sumKey(k)(rs), symOf(rs), dec))
 
 const CAMPAIGN_FIELDS = [
   { key: 'name', label: 'Campaign Name', type: 'text' },
@@ -2460,7 +2483,7 @@ const ADGROUP_FIELDS = [
 const TARGETING_FIELDS = [
   { key: 'keyword', label: 'Targeting', type: 'text' },
   { key: 'campaign', label: 'Campaign', type: 'text' },
-  { key: 'matchType', label: 'Match Type', type: 'enum', options: ['Broad', 'Phrase', 'Exact'] },
+  { key: 'matchType', label: 'Match Type', type: 'enum', options: ['Broad', 'Phrase', 'Exact', 'PAT', 'Negative Exact'] },
   { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused', 'Archived'] },
   { key: 'bid', label: 'Bid', type: 'number' },
   { key: 'sugBid', label: 'Suggested Bid', type: 'number' },
@@ -2503,22 +2526,26 @@ function useProfileFilter(rows) {
   return useMemo(() => (profileId === 'all' ? rows : rows.filter((r) => r.profileId === profileId)), [rows, profileId])
 }
 
-/* ---- bulk bid / budget math ---- */
+/* ---- bulk bid / budget math (results floored: bids ≥ $0.02, budgets ≥ $1) ---- */
 const round2 = (n) => Math.round(n * 100) / 100
+const MIN_BID = 0.02
+const MIN_BUDGET = 1
 const applyBidOp = (cur, suggested, mode, amt) => {
-  if (mode === 'set') return round2(amt)
-  if (mode === 'inc') return round2(cur * (1 + amt / 100))
-  if (mode === 'dec') return round2(cur * (1 - amt / 100))
-  if (mode === 'suggested') return round2(suggested)
-  if (mode === 'ceiling') return round2(Math.min(cur, amt))
-  if (mode === 'floor') return round2(Math.max(cur, amt))
-  return cur
+  let n = cur
+  if (mode === 'set') n = amt
+  else if (mode === 'inc') n = cur * (1 + amt / 100)
+  else if (mode === 'dec') n = cur * (1 - amt / 100)
+  else if (mode === 'suggested') n = suggested
+  else if (mode === 'ceiling') n = Math.min(cur, amt)
+  else if (mode === 'floor') n = Math.max(cur, amt)
+  return Math.max(MIN_BID, round2(n))
 }
 const applyBudgetOp = (cur, mode, amt) => {
-  if (mode === 'set') return round2(amt)
-  if (mode === 'inc') return round2(cur * (1 + amt / 100))
-  if (mode === 'dec') return round2(cur * (1 - amt / 100))
-  return cur
+  let n = cur
+  if (mode === 'set') n = amt
+  else if (mode === 'inc') n = cur * (1 + amt / 100)
+  else if (mode === 'dec') n = cur * (1 - amt / 100)
+  return Math.max(MIN_BUDGET, round2(n))
 }
 
 function BulkBidModal({ count, currency, onApply, onClose, suggestedLabel = 'suggested', initialMode = 'set' }) {
@@ -2634,7 +2661,8 @@ const WIZ_THEMES = [
   { v: 'Competitor', s: 'Competitor brand / ASIN terms — conquest.' },
 ]
 
-function CreateCampaignWizard({ products, profileId, currency = '$', onClose, onLaunch }) {
+function CreateCampaignWizard({ products, profileId, onClose, onLaunch }) {
+  const currency = symA(profileId)
   const [step, setStep] = useState(0)
   const today = new Date().toISOString().slice(0, 10)
   const [f, setF] = useState({
@@ -2674,8 +2702,8 @@ function CreateCampaignWizard({ products, profileId, currency = '$', onClose, on
         id: 'CNEW' + (Date.now() + i).toString().slice(-7),
         name: sampleName(asin), asin, product: p.title || asin, profileId,
         state: 'Enabled', status: 'Enabled', campaignType: f.type, targetingType: tgt,
-        adGroups: { active: groupCount, total: groupCount }, dailyBudget: Number(f.dailyBudget),
-        actlBid: Number(f.maxBid) || 1, avlBid: round2((Number(f.maxBid) || 1) * 1.3),
+        adGroups: { active: groupCount, total: groupCount }, dailyBudget: Math.max(MIN_BUDGET, Number(f.dailyBudget)),
+        actlBid: Math.max(MIN_BID, Number(f.maxBid) || 1), avlBid: round2(Math.max(MIN_BID, Number(f.maxBid) || 1) * 1.3),
         portfolio: 'New Launch', bidStrategy: 'Dynamic - down only',
         tag: 'NEW', startDate: f.startDate, endDate: f.endDate, ai: f.ai, ...zero,
       }
@@ -2784,7 +2812,7 @@ function CreateCampaignWizard({ products, profileId, currency = '$', onClose, on
     )
   }
   return (
-    <Modal width={640} title="Create Campaign" sub="Super Wizard — build one or many campaigns" onClose={onClose}
+    <Modal width={640} title="Create Campaign" sub="Super Wizard — build one or many campaigns" onClose={onClose} confirmClose
       footer={<>
         {step > 0 && <Btn ghost onClick={() => setStep(step - 1)}>Back</Btn>}
         <div style={{ flex: 1 }} />
@@ -2847,7 +2875,7 @@ function ChooseCampaignType({ onClose, onContinue }) {
 }
 
 const AUTO_GROUPS = ['Close match', 'Loose match', 'Substitutes', 'Complements']
-function SingleCampaignFlow({ type, products, profiles, profileId, currency = '$', onClose, onLaunch }) {
+function SingleCampaignFlow({ type, products, profiles, profileId, onClose, onLaunch }) {
   const [step, setStep] = useState(0)
   const today = new Date().toISOString().slice(0, 10)
   const typeLabel = CC_TYPES.find((t) => t.v === type)?.t || type
@@ -2861,12 +2889,14 @@ function SingleCampaignFlow({ type, products, profiles, profileId, currency = '$
     negatives: [], negInput: '', negMatch: 'Negative Exact',
   })
   const set = (patch) => setF((x) => ({ ...x, ...patch }))
+  const currency = symA(f.profile === 'all' ? 'us' : f.profile)
   const steps = ['Campaign', 'Adgroup and Ads', 'Targeting', 'Negative Targeting', 'Complete']
   const last = steps.length - 1
   const canNext = () => {
     if (step === 0) return f.name.trim().length > 0 && f.name.length <= 128 && Number(f.dailyBudget) > 0 && (f.dateMode === 'Any Date Range' || !!f.startDate)
     if (step === 1) return f.adgroupName.trim().length > 0 && f.ads.length > 0
-    if (step === 2) return f.targeting === 'Automatic' ? AUTO_GROUPS.some((g) => f.autoGroups[g]) : f.keywords.length > 0
+    // Only SP campaigns have an Automatic mode — every other type must add ≥1 keyword/target.
+    if (step === 2) return (type === 'SP' && f.targeting === 'Automatic') ? AUTO_GROUPS.some((g) => f.autoGroups[g]) : f.keywords.length > 0
     return true
   }
   const addKw = () => { const t = f.kwInput.trim(); if (!t) return; set({ keywords: [...f.keywords, { text: t, match: f.kwMatch, bid: f.kwBid }], kwInput: '' }) }
@@ -2880,8 +2910,8 @@ function SingleCampaignFlow({ type, products, profiles, profileId, currency = '$
       id: 'CNEW' + Date.now().toString().slice(-7),
       name: f.name.trim(), asin: f.ads[0], product: firstAd.title || f.ads[0], profileId: f.profile === 'all' ? 'us' : f.profile,
       state: f.state, status: f.state, campaignType, targetingType,
-      adGroups: { active: 1, total: 1 }, dailyBudget: Number(f.dailyBudget),
-      actlBid: Number(f.defaultBid) || 1, avlBid: round2((Number(f.defaultBid) || 1) * 1.3),
+      adGroups: { active: 1, total: 1 }, dailyBudget: Math.max(MIN_BUDGET, Number(f.dailyBudget)),
+      actlBid: Math.max(MIN_BID, Number(f.defaultBid) || 1), avlBid: round2(Math.max(MIN_BID, Number(f.defaultBid) || 1) * 1.3),
       portfolio: 'New Launch', bidStrategy: 'Dynamic - down only', tag: 'NEW',
       startDate: f.dateMode === 'Any Date Range' ? today : f.startDate,
       endDate: f.dateMode === 'Any Date Range' ? '' : f.endDate, ...zero,
@@ -2993,7 +3023,7 @@ function SingleCampaignFlow({ type, products, profiles, profileId, currency = '$
     )
   }
   return (
-    <Modal width={640} title={`Create Campaign — ${typeLabel}`} sub="Single campaign flow" onClose={onClose}
+    <Modal width={640} title={`Create Campaign — ${typeLabel}`} sub="Single campaign flow" onClose={onClose} confirmClose
       footer={<>
         {step > 0 && <Btn ghost onClick={() => setStep(step - 1)}>Previous</Btn>}
         <div style={{ flex: 1 }} />
@@ -3101,16 +3131,21 @@ function TrackKeywordModal({ onClose, onCreate }) {
 }
 
 function KpiRow({ rows, prev }) {
-  const a = aggregate(rows)
-  const p = prev && prev.length ? aggregate(prev) : null
+  // SA-R7: when the row set spans currencies, aggregate money in USD estimates.
+  const mixed = adsMixedCur(rows)
+  const toUsd = (rs) => (mixed ? rs.map((r) => ({ ...r, spend: (r.spend || 0) * fxUSD(r.profileId), sales: (r.sales || 0) * fxUSD(r.profileId) })) : rs)
+  const a = aggregate(toUsd(rows))
+  const prevRows = (prev || []).filter(Boolean)
+  const p = prevRows.length ? aggregate(toUsd(prevRows)) : null
+  const est = (v) => (mixed ? `${v} (USD est.)` : v)
   const dl = (cur, prv) => (p && prv ? ((cur - prv) / Math.abs(prv)) * 100 : undefined)
   return (
     <KpiGrid>
       <Kpi label="Impressions" value={compact(a.impr)} delta={dl(a.impr, p?.impr)} />
       <Kpi label="Clicks" value={compact(a.clk)} delta={dl(a.clk, p?.clk)} />
       <Kpi label="CTR" value={pct(a.ctr, 2)} delta={dl(a.ctr, p?.ctr)} />
-      <Kpi label="Spend" value={money(a.spend)} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
-      <Kpi label="Sales" value={money(a.sales)} delta={dl(a.sales, p?.sales)} />
+      <Kpi label="Spend" value={est(money(a.spend))} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
+      <Kpi label="Sales" value={est(money(a.sales))} delta={dl(a.sales, p?.sales)} />
       <Kpi label="ACoS" value={pct(a.acos)} delta={dl(a.acos, p?.acos)} deltaGood={(dl(a.acos, p?.acos) || 0) <= 0} />
       <Kpi label="ROAS" value={dec2(a.roas)} delta={dl(a.roas, p?.roas)} />
       <Kpi label="Orders" value={compact(a.orders)} delta={dl(a.orders, p?.orders)} />
@@ -3128,6 +3163,7 @@ function Campaigns() {
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ads-campaigns'))
   const [sel, setSel] = useState(new Set())
+  useEffect(() => { setSel(new Set()) }, [profileId]) // SA-R1: selection ids belong to the previous profile's rows
 
   const [modal, setModal] = useState(null) // 'bid' | 'budget' | 'tag' | 'daypart' | 'rule'
   const [wizard, setWizard] = useState(false)
@@ -3165,12 +3201,13 @@ function Campaigns() {
   const setState = (id, st) => merge(id, { state: st, status: statusFor(st) })
   const byId = Object.fromEntries(data.map((c) => [c.id, c]))
 
-  const bulkState = (st) => { const ids = [...sel]; mergeMany(ids, () => ({ state: st, status: statusFor(st) })); setSel(new Set()); toast(`${ids.length} campaign${ids.length === 1 ? '' : 's'} ${st.toLowerCase()}`) }
-  const applyBulkBid = (mode, amt) => { const ids = [...sel]; mergeMany(ids, (id) => ({ actlBid: applyBidOp(byId[id].actlBid, byId[id].avlBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} campaign${ids.length === 1 ? '' : 's'} — all succeeded`) }
-  const applyBulkBudget = (mode, amt) => { const ids = [...sel]; mergeMany(ids, (id) => ({ dailyBudget: applyBudgetOp(byId[id].dailyBudget, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated daily budget on ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
-  const applyBulkTag = (tag) => { const ids = [...sel]; mergeMany(ids, () => ({ tag })); setSel(new Set()); setModal(null); toast(`Tagged ${ids.length} campaign${ids.length === 1 ? '' : 's'} “${tag}”`) }
-  const applyBulkDaypart = (sched) => { const ids = [...sel]; mergeMany(ids, () => ({ daypart: sched })); setSel(new Set()); setModal(null); toast(`Dayparting “${sched}” applied to ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
-  const applyBulkRule = (rule) => { const ids = [...sel]; mergeMany(ids, () => ({ appliedRule: rule.name })); setSel(new Set()); setModal(null); toast(`Rule “${rule.name}” applied to ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
+  const selIds = () => [...sel].filter((id) => byId[id]) // SA-R1: skip ids no longer in the visible row set
+  const bulkState = (st) => { const ids = selIds(); mergeMany(ids, () => ({ state: st, status: statusFor(st) })); setSel(new Set()); toast(`${ids.length} campaign${ids.length === 1 ? '' : 's'} ${st.toLowerCase()}`) }
+  const applyBulkBid = (mode, amt) => { const ids = selIds(); mergeMany(ids, (id) => ({ actlBid: applyBidOp(byId[id].actlBid, byId[id].avlBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} campaign${ids.length === 1 ? '' : 's'} — all succeeded`) }
+  const applyBulkBudget = (mode, amt) => { const ids = selIds(); mergeMany(ids, (id) => ({ dailyBudget: applyBudgetOp(byId[id].dailyBudget, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated daily budget on ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
+  const applyBulkTag = (tag) => { const ids = selIds(); mergeMany(ids, () => ({ tag })); setSel(new Set()); setModal(null); toast(`Tagged ${ids.length} campaign${ids.length === 1 ? '' : 's'} “${tag}”`) }
+  const applyBulkDaypart = (sched) => { const ids = selIds(); mergeMany(ids, () => ({ daypart: sched })); setSel(new Set()); setModal(null); toast(`Dayparting “${sched}” applied to ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
+  const applyBulkRule = (rule) => { const ids = selIds(); mergeMany(ids, () => ({ appliedRule: rule.name })); setSel(new Set()); setModal(null); toast(`Rule “${rule.name}” applied to ${ids.length} campaign${ids.length === 1 ? '' : 's'}`) }
 
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
@@ -3185,15 +3222,15 @@ function Campaigns() {
     { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
     { key: 'campaignType', label: 'Type', render: (r) => <span className={`pill ${typeTone(r.campaignType)}`} style={{ borderRadius: 5 }}>{r.campaignType}</span> },
     { key: 'adGroups', label: 'Ad Groups', num: true, sort: false, render: (r) => <span className="muted">{r.adGroups.active}/{r.adGroups.total}</span> },
-    { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: (rs) => cur(sumKey('dailyBudget')(rs), symOf(rs), 0), render: (r) => (
-      <EditableNum value={r.dailyBudget} prefix={symA(r.profileId)} dec={0} onCommit={(v) => { merge(r.id, { dailyBudget: v }); toast(`Daily budget set to ${cur(v, symA(r.profileId), 0)}`) }} />) },
+    { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: adsMoneyFoot('dailyBudget'), render: (r) => (
+      <EditableNum value={r.dailyBudget} prefix={symA(r.profileId)} dec={0} min={MIN_BUDGET} onCommit={(v) => { merge(r.id, { dailyBudget: v }); toast(`Daily budget set to ${cur(v, symA(r.profileId), 0)}`) }} />) },
     { key: 'bid', label: 'Bid (Act/Avl)', num: true, sort: false, render: (r) => <span className="muted">{r.actlBid} / {r.avlBid}</span> },
     { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
     { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
     { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
-    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
     { key: 'cpc', label: 'CPC', num: true, foot: (rs) => cur(aggregate(rs).cpc, symOf(rs), 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
-    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
     { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
     { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
     { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
@@ -3244,8 +3281,8 @@ function Campaigns() {
           <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
         </div>
       )}
-      {modal === 'bid' && <BulkBidModal count={sel.size} currency="$" suggestedLabel="available bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
-      {modal === 'budget' && <BulkBudgetModal count={sel.size} currency="$" onApply={applyBulkBudget} onClose={() => setModal(null)} />}
+      {modal === 'bid' && <BulkBidModal count={sel.size} currency={symA(profileId)} suggestedLabel="available bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
+      {modal === 'budget' && <BulkBudgetModal count={sel.size} currency={symA(profileId)} onApply={applyBulkBudget} onClose={() => setModal(null)} />}
       {modal === 'tag' && <BulkTagModal count={sel.size} onApply={applyBulkTag} onClose={() => setModal(null)} />}
       {modal === 'daypart' && <BulkDaypartModal count={sel.size} onApply={applyBulkDaypart} onClose={() => setModal(null)} />}
       {modal === 'rule' && <ApplyRuleModal count={sel.size} rules={allRules} onApply={applyBulkRule} onClose={() => setModal(null)} />}
@@ -3302,22 +3339,20 @@ function adGroupsForCampaign(c) {
   })
 }
 function AdGroups() {
-  const { rangeResolved } = useApp()
+  const { profileId, rangeResolved } = useApp()
   const loc = useLocation()
   const campId = new URLSearchParams(loc.search || '').get('camp')
   const allCamps = useMemo(() => [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS], [])
   const drillCamp = campId ? allCamps.find((c) => c.id === campId) : null
-  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const base = useProfileFilter(allCamps)
   const [created, setCreated] = useState(() => createdStore.get('adgroups'))
   const [showNew, setShowNew] = useState(false)
   const createdRows = useMemo(() => created
     .filter((g) => !campId || g.campaignId === campId)
     .map((g) => ({ ...ZERO_METRICS, id: g.id, name: g.name, campaign: g.campaign, campaignId: g.campaignId, profileId: g.profileId, state: g.state, defaultBid: g.defaultBid, targets: 0 })), [created, campId])
-  const seedRows = drillCamp ? adGroupsForCampaign(drillCamp) : base.slice(0, 30).map((c, i) => ({
-    id: c.id + '-ag', name: c.name.split('-').slice(0, 2).join('-') + ' · Ad Group ' + (1 + (i % 3)),
-    campaign: c.name, campaignId: c.id, profileId: c.profileId, state: c.state, defaultBid: c.actlBid,
-    targets: 4 + (i % 9), impr: c.impr, clk: c.clk, spend: c.spend, sales: c.sales, orders: c.orders, acos: c.acos, roas: c.roas, ctr: c.ctr,
-  }))
+  // SA-R6: the flat view derives ad groups from the same adGroupsForCampaign() weights/ids
+  // as the drill view, so metrics and overrides agree between the two paths.
+  const seedRows = drillCamp ? adGroupsForCampaign(drillCamp) : base.flatMap((c) => adGroupsForCampaign(c))
   const rawRows = [...createdRows, ...seedRows]
   const createNewGroup = (g) => { const row = { id: 'AGNEW' + Date.now().toString().slice(-7), ...g }; const next = [row, ...created]; createdStore.set('adgroups', next); setCreated(next); setShowNew(false); toast(`Ad group "${g.name}" created`) }
   const [overrides, setOverrides] = usePersistentOverrides('ads-adgroups')
@@ -3327,25 +3362,46 @@ function AdGroups() {
   const filtered = applyFilters(rows, filters, ADGROUP_FIELDS)
   const prevFiltered = filtered.map((r) => prev[r.id])
   const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
+  const mergeMany = (ids, fn) => setOverrides((o) => { const n = { ...o }; ids.forEach((id) => { n[id] = { ...n[id], ...fn(id) } }); return n })
+  const byId = Object.fromEntries(rows.map((r) => [r.id, r]))
+  const [sel, setSel] = useState(new Set())
+  useEffect(() => { setSel(new Set()) }, [profileId, campId]) // SA-R1: drop stale selections
+  const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
+  const bulkState = (st) => { const ids = [...sel].filter((id) => byId[id]); mergeMany(ids, () => ({ state: st })); setSel(new Set()); toast(`${ids.length} ad group${ids.length === 1 ? '' : 's'} ${st.toLowerCase()}`) }
   const columns = [
     { key: 'name', label: 'Ad Group', sticky: true, width: 300, render: (r) => <div className="cellname">{r.name}<small>{r.campaign}</small></div> },
     { key: 'state', label: 'State', render: (r) => <StateSelect value={r.state === 'Enabled' ? 'Enabled' : 'Paused'} options={['Enabled', 'Paused']} onChange={(st) => { merge(r.id, { state: st }); toast(`Ad group ${st.toLowerCase()}`) }} /> },
     { key: 'defaultBid', label: 'Default Bid', num: true, render: (r) => <EditableNum value={r.defaultBid} prefix={symA(r.profileId)} dec={2} onCommit={(v) => { merge(r.id, { defaultBid: v }); toast(`Default bid set to ${cur(v, symA(r.profileId), 2)}`) }} /> },
     { key: 'targets', label: 'Targets', num: true, foot: (rs) => int(sumKey('targets')(rs)) },
-    { key: 'impr', label: 'Impr.', num: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
-    { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
     { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
-    { key: 'spend', label: 'Spend', num: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'sales', label: 'Sales', num: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
-    { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
-    { key: 'acos', label: 'ACoS', num: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => pct(r.acos) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => pct(r.acos) },
     { key: 'roas', label: 'ROAS', num: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
   ]
+  const agPresets = {
+    'Default Plan': ['name', 'state', 'defaultBid', 'targets', 'impr', 'clk', 'ctr', 'spend', 'sales', 'orders', 'acos', 'roas'],
+    Performance: ['name', 'state', 'impr', 'clk', 'ctr', 'spend', 'sales', 'orders', 'acos', 'roas'],
+    'Bid Management': ['name', 'state', 'defaultBid', 'targets', 'spend', 'acos', 'roas'],
+  }
   return (
     <>
       <AdsHead title="Ad Groups" sub={drillCamp ? `${filtered.length} ad groups in this campaign` : `${filtered.length} ad groups · ${rangeResolved.label}`}>
         <ExportMenu name="ad-groups" fields={ADGROUP_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setShowNew(true)}>New Ad Group</Btn>
       </AdsHead>
+      {sel.size > 0 && (
+        <div className="bulkbar">
+          <span className="sel">{sel.size} selected</span>
+          <Btn sm icon="play" onClick={() => bulkState('Enabled')}>Enable</Btn>
+          <Btn sm icon="pause" onClick={() => bulkState('Paused')}>Pause</Btn>
+          <div style={{ flex: 1 }} />
+          <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
+        </div>
+      )}
       {showNew && <NewAdGroupModal camps={allCamps} defaultCampId={campId} currency={drillCamp ? symA(drillCamp.profileId) : '$'} onClose={() => setShowNew(false)} onCreate={createNewGroup} />}
       {drillCamp && (
         <div className="drillbar">
@@ -3360,8 +3416,17 @@ function AdGroups() {
         columns={columns}
         rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }}
+        presets={agPresets}
+        defaultPreset="Default Plan"
         dimensions={[{ key: 'profileId', label: 'Profile' }, { key: 'state', label: 'State' }]}
         totals
+        compare
+        comparePrev={prev}
+        compareDisabled={rangeResolved.label === 'All time'}
+        selectable
+        selected={sel}
+        onToggle={toggleSel}
+        onToggleAll={toggleAll}
         toolbarLeft={<FilterBar id="ads-adgroups" fields={ADGROUP_FIELDS} value={filters} onChange={setFilters} />}
       />
     </>
@@ -3370,31 +3435,63 @@ function AdGroups() {
 
 /* ============================ TARGETING (Keywords) ============================ */
 function Targeting() {
-  const { rangeResolved } = useApp()
+  const { profileId, rangeResolved } = useApp()
   const [created, setCreated] = useState(() => createdStore.get('keywords'))
   const [showAdd, setShowAdd] = useState(false)
   const allCamps = useMemo(() => [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS], [])
-  const allKeywords = useMemo(() => [...created, ...keywords], [created])
+  // SA-R3: mock keywords in "-PAT-" campaigns become product-target rows (ASIN / category
+  // expressions, matchType PAT) so the Product Targets tab has a real, deterministic partition.
+  const allKeywords = useMemo(() => {
+    const campById = Object.fromEntries(ALL_CAMPAIGNS.map((c) => [c.id, c]))
+    const seeded = keywords.map((k) => {
+      if (!/-PAT-/.test(k.campaign)) return k
+      const target = /PAT-Category/.test(k.campaign) ? `Category: ${k.keyword}` : `ASIN: ${campById[k.campaignId]?.asin || k.keyword}`
+      return { ...k, matchType: 'PAT', keyword: target }
+    })
+    return [...created, ...seeded]
+  }, [created])
   const base = useProfileFilter(allKeywords)
+  // SA-R3 / SA-R9: Negatives = search terms the user negated + negatives created from this grid.
+  const [stActs] = usePersistentOverrides('ads-searchterms-acts')
+  const [createdNegs, setCreatedNegs] = useState(() => createdStore.get('negatives'))
+  const negAll = useMemo(() => [
+    ...createdNegs,
+    ...searchTerms.filter((s) => stActs[s.id] === 'negate').map((s) => ({
+      ...ZERO_METRICS, id: 'NEG-' + s.id, keyword: s.term, campaign: s.campaign, profileId: s.profileId,
+      matchType: 'Negative Exact', state: 'Enabled', bid: 0, sugBid: 0, topOfSearchIS: 0,
+    })),
+  ], [createdNegs, stActs])
+  const negRows = useProfileFilter(negAll)
   const addKeywords = (rows) => {
     const stamped = rows.map((r, i) => ({ ...ZERO_METRICS, id: 'KNEW' + (Date.now() + i).toString().slice(-7), keyword: r.keyword, campaignId: r.campaignId, campaign: r.campaign, profileId: r.profileId, matchType: r.matchType, state: 'Enabled', bid: r.bid, sugBid: r.bid, topOfSearchIS: 0 }))
     const next = [...stamped, ...created]; createdStore.set('keywords', next); setCreated(next); setShowAdd(false); toast(`Added ${rows.length} keyword${rows.length === 1 ? '' : 's'} — added to the grid`)
   }
   const [tab, setTab] = useState('Keywords')
   const [sel, setSel] = useState(new Set())
+  useEffect(() => { setSel(new Set()) }, [profileId, tab]) // SA-R1: drop stale selections
   const [overrides, setOverrides] = usePersistentOverrides('ads-targeting')
   const [modal, setModal] = useState(null) // 'set' | 'inc' | 'dec'
   const [filters, setFilters] = useState(() => loadFilterModel('ads-targeting'))
   const withEdits = base.map((k) => (overrides[k.id] ? { ...k, ...overrides[k.id] } : k))
   const { rows: data, prev } = useMemo(() => scaleForRange(withEdits, rangeResolved), [withEdits, rangeResolved])
-  const filtered = applyFilters(data, filters, TARGETING_FIELDS)
-  const byId = Object.fromEntries(data.map((k) => [k.id, k]))
+  // SA-R3: real tab partition — Keywords / Product Targets (PAT) / Negatives.
+  const kwRows = data.filter((r) => r.matchType !== 'PAT')
+  const patRows = data.filter((r) => r.matchType === 'PAT')
+  const tabRows = tab === 'Keywords' ? kwRows : tab === 'Product Targets' ? patRows : negRows
+  const filtered = applyFilters(tabRows, filters, TARGETING_FIELDS)
+  const byId = Object.fromEntries([...data, ...negRows].map((k) => [k.id, k]))
   const merge = (id, patch) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...patch } }))
   const mergeMany = (ids, fn) => setOverrides((o) => { const n = { ...o }; ids.forEach((id) => { n[id] = { ...n[id], ...fn(id) } }); return n })
   const setState = (id, st) => merge(id, { state: st })
-  const applyBulkBid = (mode, amt) => { const ids = [...sel]; mergeMany(ids, (id) => ({ bid: applyBidOp(byId[id].bid, byId[id].sugBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} target${ids.length === 1 ? '' : 's'} — all succeeded`) }
-  const bulkPause = () => { const ids = [...sel]; mergeMany(ids, () => ({ state: 'Paused' })); setSel(new Set()); toast(`Paused ${ids.length} target${ids.length === 1 ? '' : 's'}`) }
-  const bulkNegative = () => { const n = sel.size; setSel(new Set()); toast(`Added ${n} term${n === 1 ? '' : 's'} as negative exact`) }
+  const selIds = () => [...sel].filter((id) => byId[id]) // SA-R1: skip ids no longer in the row set
+  const applyBulkBid = (mode, amt) => { const ids = selIds(); mergeMany(ids, (id) => ({ bid: applyBidOp(byId[id].bid, byId[id].sugBid, mode, amt) })); setSel(new Set()); setModal(null); toast(`Updated bids on ${ids.length} target${ids.length === 1 ? '' : 's'} — all succeeded`) }
+  const bulkPause = () => { const ids = selIds(); mergeMany(ids, () => ({ state: 'Paused' })); setSel(new Set()); toast(`Paused ${ids.length} target${ids.length === 1 ? '' : 's'}`) }
+  const bulkNegative = () => {
+    const rows = selIds().map((id) => byId[id])
+    const stamped = rows.map((r, i) => ({ ...ZERO_METRICS, id: 'NEGNEW' + (Date.now() + i).toString().slice(-7), keyword: r.keyword, campaign: r.campaign, profileId: r.profileId, matchType: 'Negative Exact', state: 'Enabled', bid: 0, sugBid: 0, topOfSearchIS: 0 }))
+    const next = [...stamped, ...createdNegs]; createdStore.set('negatives', next); setCreatedNegs(next)
+    setSel(new Set()); toast(`Added ${stamped.length} term${stamped.length === 1 ? '' : 's'} as negative exact — see the Negatives tab`)
+  }
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleAll = () => setSel((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))
   const columns = [
@@ -3406,8 +3503,8 @@ function Targeting() {
     { key: 'topOfSearchIS', label: 'Top-of-Search IS', num: true, render: (r) => pct(r.topOfSearchIS) },
     { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
     { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
-    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
     { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
     { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : 'inherit' }}>{pct(r.acos)}</span> },
     { key: 'roas', label: 'ROAS', num: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
@@ -3415,9 +3512,11 @@ function Targeting() {
   return (
     <>
       <AdsHead title="Targeting" sub={`Keywords & product targets · ${rangeResolved.label}`}><ExportMenu name="targeting" fields={TARGETING_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setShowAdd(true)}>Add Keywords</Btn></AdsHead>
-      {showAdd && <AddKeywordsModal camps={allCamps} onClose={() => setShowAdd(false)} onCreate={addKeywords} />}
-      <div className="viewtabs" style={{ maxWidth: 360 }}>
-        {['Keywords', 'Product Targets', 'Negatives'].map((t) => <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</div>)}
+      {showAdd && <AddKeywordsModal camps={allCamps} currency={symA(profileId)} onClose={() => setShowAdd(false)} onCreate={addKeywords} />}
+      <div className="viewtabs" style={{ maxWidth: 420 }}>
+        {[['Keywords', kwRows.length], ['Product Targets', patRows.length], ['Negatives', negRows.length]].map(([t, n]) => (
+          <div key={t} className={`viewtab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t} ({n})</div>
+        ))}
       </div>
       {sel.size > 0 && (
         <div className="bulkbar">
@@ -3426,11 +3525,11 @@ function Targeting() {
           <Btn sm icon="trendUp" onClick={() => setModal('inc')}>Bid +%</Btn>
           <Btn sm icon="trendDown" onClick={() => setModal('dec')}>Bid −%</Btn>
           <Btn sm icon="pause" onClick={bulkPause}>Pause</Btn>
-          <Btn sm icon="x" onClick={bulkNegative}>Add as Negative</Btn>
+          {tab !== 'Negatives' && <Btn sm icon="x" onClick={bulkNegative}>Add as Negative</Btn>}
           <div style={{ flex: 1 }} /><Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
         </div>
       )}
-      {modal && <BulkBidModal count={sel.size} currency="$" initialMode={modal} suggestedLabel="suggested bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
+      {modal && <BulkBidModal count={sel.size} currency={symA(profileId)} initialMode={modal} suggestedLabel="suggested bid" onApply={applyBulkBid} onClose={() => setModal(null)} />}
       <DataGrid
         id="ads-targeting"
         columns={columns}
@@ -3455,12 +3554,24 @@ function Targeting() {
 /* ============================ SEARCH TERMS (harvesting) ============================ */
 function SearchTerms() {
   const { rangeResolved } = useApp()
+  const nav = useNavigate()
   const baseRaw = useProfileFilter(searchTerms)
-  const base = useMemo(() => scaleForRange(baseRaw, rangeResolved).rows, [baseRaw, rangeResolved])
+  // SA-R9: recompute the recommendation from the SCALED metrics (mirrors the mock's
+  // criteria: ACoS < 30 && orders > 6 → harvest; ACoS > 80 → negate; else monitor).
+  const base = useMemo(() => scaleForRange(baseRaw, rangeResolved).rows.map((r) => ({
+    ...r, recommend: r.acos < 30 && r.orders > 6 ? 'harvest' : r.acos > 80 ? 'negate' : 'monitor',
+  })), [baseRaw, rangeResolved])
   const [filter, setFilter] = useState('All')
   const [acts, setActs] = usePersistentOverrides('ads-searchterms-acts')
-  const harvest = (id) => { setActs((o) => ({ ...o, [id]: 'harvest' })); toast('Harvested to manual campaign') }
-  const negate = (id) => { setActs((o) => ({ ...o, [id]: 'negate' })); toast('Added as negative exact') }
+  const harvest = (r) => {
+    if (acts[r.id] !== 'harvest') { // add the term as a keyword target so it shows up in Targeting
+      const camp = ALL_CAMPAIGNS.find((c) => c.name === r.campaign)
+      const bid = Math.max(MIN_BID, round2(r.cpc || 0.75))
+      createdStore.add('keywords', { ...ZERO_METRICS, id: 'KNEW' + Date.now().toString().slice(-7), keyword: r.term, campaignId: camp?.id || '', campaign: r.campaign, profileId: r.profileId, matchType: 'Exact', state: 'Enabled', bid, sugBid: bid, topOfSearchIS: 0 })
+    }
+    setActs((o) => ({ ...o, [r.id]: 'harvest' })); toast('Harvested to manual campaign — keyword added to Targeting')
+  }
+  const negate = (id) => { setActs((o) => ({ ...o, [id]: 'negate' })); toast('Added as negative exact — see Targeting › Negatives') }
   const [filters, setFilters] = useState(() => loadFilterModel('ads-searchterms'))
   const recTone = { harvest: 'green', negate: 'red', monitor: 'gray' }
   const chipFiltered = base.filter((r) => filter === 'All' || r.recommend === filter.toLowerCase())
@@ -3471,23 +3582,23 @@ function SearchTerms() {
     { key: 'campaign', label: 'Campaign', render: (r) => <span className="muted">{r.campaign.split('-').slice(0, 2).join('-')}</span> },
     { key: 'impr', label: 'Impr.', num: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
     { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
-    { key: 'spend', label: 'Spend', num: true, foot: (rs) => cur(aggregate(rs).spend, symOf(rs)), render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'sales', label: 'Sales', num: true, foot: (rs) => cur(aggregate(rs).sales, symOf(rs)), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'spend', label: 'Spend', num: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'sales', label: 'Sales', num: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
     { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
     { key: 'acos', label: 'ACoS', num: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => pct(r.acos) },
     { key: 'recommend', label: 'Recommendation', render: (r) => <Pill tone={recTone[r.recommend]}>{r.recommend}</Pill> },
     { key: 'act', label: '', sort: false, render: (r) => (r.recommend === 'harvest'
-      ? <Btn sm primary icon={acts[r.id] === 'harvest' ? 'check' : 'plus'} onClick={() => harvest(r.id)}>{acts[r.id] === 'harvest' ? 'Harvested' : 'Harvest'}</Btn>
+      ? <Btn sm primary icon={acts[r.id] === 'harvest' ? 'check' : 'plus'} onClick={() => harvest(r)}>{acts[r.id] === 'harvest' ? 'Harvested' : 'Harvest'}</Btn>
       : r.recommend === 'negate'
         ? <Btn sm icon={acts[r.id] === 'negate' ? 'check' : 'x'} onClick={() => negate(r.id)}>{acts[r.id] === 'negate' ? 'Negated' : 'Negate'}</Btn>
         : <span className="muted">—</span>) },
   ]
   return (
     <>
-      <AdsHead title="Search Terms" sub="Auto-harvest winners into manual campaigns · negate wasted spend"><ExportMenu name="search-terms" fields={SEARCHTERM_FIELDS} rows={filtered} /><Btn icon="sliders" primary>Harvesting Rules</Btn></AdsHead>
+      <AdsHead title="Search Terms" sub="Auto-harvest winners into manual campaigns · negate wasted spend"><ExportMenu name="search-terms" fields={SEARCHTERM_FIELDS} rows={filtered} /><Btn icon="sliders" primary onClick={() => nav('/rules')}>Harvesting Rules</Btn></AdsHead>
       <div className="hint" style={{ marginBottom: 14 }}>
         <Icon name="bulb" size={16} />
-        <div><b>{counts.harvest} terms</b> qualify for harvesting (Orders ≥ 6, ACoS ≤ 30%) and <b>{counts.negate} terms</b> are flagged to negate. Rule R3 runs nightly to auto-apply.</div>
+        <div><b>{counts.harvest} terms</b> qualify for harvesting (Orders &gt; 6, ACoS &lt; 30%) and <b>{counts.negate} terms</b> are flagged to negate. Rule R3 runs nightly to auto-apply.</div>
       </div>
       <DataGrid
         id="ads-searchterms"
@@ -3536,9 +3647,9 @@ function ShareOfVoice() {
       <AdsHead title="Share of Voice" sub="Paid + organic visibility on priority keywords vs competitors"><ExportMenu name="share-of-voice" fields={SOV_FIELDS} rows={filtered} /><Btn icon="plus" primary onClick={() => setShowTrack(true)}>Track Keyword</Btn></AdsHead>
       {showTrack && <TrackKeywordModal onClose={() => setShowTrack(false)} onCreate={trackKeyword} />}
       <KpiGrid>
-        <Kpi label="Avg Paid SOV" value={pct(avgPaid)} delta={3.2} />
-        <Kpi label="Avg Organic SOV" value={pct(avgOrg)} delta={-1.1} deltaGood={false} />
-        <Kpi label="Avg Total SOV" value={pct(avgPaid + avgOrg)} delta={1.8} />
+        <Kpi label="Avg Paid SOV" value={pct(avgPaid)} />
+        <Kpi label="Avg Organic SOV" value={pct(avgOrg)} />
+        <Kpi label="Avg Total SOV" value={pct(avgPaid + avgOrg)} />
         <Kpi label="Keywords Tracked" value={filtered.length} />
         <Kpi label="#1 Rank Keywords" value={filtered.filter((r) => r.yourRank === 1).length} />
       </KpiGrid>
@@ -3547,6 +3658,7 @@ function ShareOfVoice() {
         columns={columns}
         rows={filtered}
         initialSort={{ key: 'searchVolume', dir: 'desc' }}
+        totals
         dimensions={[{ key: 'topCompetitor', label: 'Top Competitor' }]}
         toolbarLeft={<FilterBar id="ads-sov" fields={SOV_FIELDS} value={filters} onChange={setFilters} />}
       />
@@ -3666,6 +3778,17 @@ const XL_FIELDS = {
   'Campaign Tag Target Setting': [{ key: 'tag', label: 'Tag Name' }, { key: 'target', label: 'Target' }, { key: 'bid', label: 'Bid' }],
   'Upload Campaign Mapping': [{ key: 'name', label: 'Campaign Name' }, { key: 'group', label: 'Mapping Group' }],
 }
+// Map the Campaign Type dropdown to the campaignType prefixes used in the mock rows.
+const XL_TYPE_PREFIX = { 'Sponsored Products': 'SP', 'Sponsored Brands': 'SB', 'Sponsored Display': 'SD', 'Sponsored TV': 'STV' }
+// Amazon bulk-file style column headers (vs the Pacvue-style labels above).
+const XL_AMZ_LABELS = {
+  name: 'Campaign', campaignType: 'Ad Type', state: 'Campaign Status', dailyBudget: 'Daily Budget',
+  startDate: 'Campaign Start Date', endDate: 'Campaign End Date', targetingType: 'Targeting Type',
+  actlBid: 'Ad Group Default Bid', setting: 'Operation', newValue: 'Value', adGroup: 'Ad Group Name',
+  target: 'Keyword or Product Targeting', matchType: 'Match Type', bid: 'Max Bid', tag: 'Label', group: 'Portfolio Name',
+}
+// Target/keyword uploads are capped at 1,000 keywords; everything else at 10,000 rows.
+const XL_KW_TABS = ['Campaign Target Setting', 'Campaign Tag Target Setting']
 
 function BulkOperations() {
   const { profiles } = useApp()
@@ -3677,12 +3800,18 @@ function BulkOperations() {
   const [history, setHistory] = useState(() => createdStore.get('bulkops'))
   const fileRef = useRef(null)
   const fields = XL_FIELDS[tab]
+  // SA-R11: Pacvue vs Amazon format changes the exported column headers, not just the filename.
+  const fmtFields = fmt === 'Amazon' ? fields.map((f) => ({ ...f, label: XL_AMZ_LABELS[f.key] || f.label })) : fields
   const stamp = new Date().toISOString().slice(0, 10)
   const fname = (kind) => `${fmt.toLowerCase()}-${tab.toLowerCase().replace(/[^a-z]+/g, '-')}-${kind}-${stamp}.csv`
-  const downloadTemplate = () => { exportCSV(fname('template'), fields, []); toast(`${fmt} template downloaded — fill it in, then Upload`) }
+  const downloadTemplate = () => { exportCSV(fname('template'), fmtFields, []); toast(`${fmt} template downloaded — fill it in, then Upload`) }
   const downloadExisting = () => {
-    const rows = ALL_CAMPAIGNS.filter((c) => c.profileId === profile || profile === 'all').map((c) => ({ ...c, setting: quick, newValue: '', adGroup: '', target: '', matchType: '', bid: c.actlBid, tag: c.tag || '', group: '' }))
-    exportCSV(fname('existing-data'), fields, rows); toast(`Exported ${rows.length} rows for editing`)
+    const prefix = XL_TYPE_PREFIX[ctype] || ''
+    const rows = ALL_CAMPAIGNS
+      .filter((c) => (c.profileId === profile || profile === 'all') && c.campaignType.startsWith(prefix))
+      .map((c) => ({ ...c, setting: quick, newValue: '', adGroup: '', target: '', matchType: '', bid: c.actlBid, tag: c.tag || '', group: '' }))
+    if (!rows.length) { toast(`No ${ctype} campaigns on this profile`, 'error'); return }
+    exportCSV(fname('existing-data'), fmtFields, rows); toast(`Exported ${rows.length} ${ctype} row${rows.length === 1 ? '' : 's'} for editing`)
   }
   const onUpload = (e) => {
     const file = e.target.files?.[0]; if (!file) return
@@ -3690,9 +3819,13 @@ function BulkOperations() {
     reader.onload = () => {
       const lines = String(reader.result).split(/\r?\n/).filter((l) => l.trim())
       const n = Math.max(0, lines.length - 1)
-      const rec = { id: 'BO' + Date.now().toString().slice(-6), tab, setting: tab === 'Quick Campaign Edits' ? quick : '—', file: file.name, rows: n, format: fmt, status: n > 10000 ? 'Rejected — over 10,000 row limit' : 'Processed', when: new Date().toLocaleString() }
+      const isKw = XL_KW_TABS.includes(tab) || (tab === 'Quick Campaign Edits' && quick.includes('Targeting'))
+      const limit = isKw ? 1000 : 10000
+      const status = n > limit ? `Rejected — over ${limit.toLocaleString()} ${isKw ? 'keyword' : 'row'} limit` : 'Processed'
+      const rec = { id: 'BO' + Date.now().toString().slice(-6), tab, setting: tab === 'Quick Campaign Edits' ? quick : '—', file: file.name, rows: n, format: fmt, status, when: new Date().toLocaleString() }
       const next = [rec, ...createdStore.get('bulkops')]; createdStore.set('bulkops', next); setHistory(next)
-      toast(rec.status === 'Processed' ? `Processed ${n} row${n === 1 ? '' : 's'} from ${file.name}` : rec.status)
+      if (status === 'Processed') toast(`Processed ${n} row${n === 1 ? '' : 's'} from ${file.name}`)
+      else toast(status, 'error')
     }
     reader.readAsText(file); e.target.value = ''
   }
@@ -3731,7 +3864,7 @@ function BulkOperations() {
           </tbody></table>
         )}
       </Card>
-      <div className="footnote">Pick a tab per operation type. Quick Campaign Edits supports: {XL_QUICK.join(' · ')}. Files over 10,000 campaign rows are rejected, matching live limits.</div>
+      <div className="footnote">Pick a tab per operation type. Quick Campaign Edits supports: {XL_QUICK.join(' · ')}. Files over 10,000 campaign rows (or 1,000 keyword rows for target files) are rejected, matching live limits.</div>
     </>
   )
 }
@@ -3743,6 +3876,8 @@ const symD = (pid) => profileById[pid]?.currency || '$'
 const symOfD = (rs) => symD(rs[0]?.profileId)
 const dSum = (rs, k) => rs.reduce((a, b) => a + (b[k] || 0), 0)
 const dAvg = (rs, k) => (rs.length ? dSum(rs, k) / rs.length : 0)
+const dspUsdSum = (rs, k) => rs.reduce((a, b) => a + (b[k] || 0) * fxUSD(b.profileId), 0)
+const dspWavg = (rs, k, wk) => { const w = dSum(rs, wk); return w ? rs.reduce((a, b) => a + (b[k] || 0) * (b[wk] || 0), 0) / w : 0 }
 
 function DspHead({ title, sub, children }) {
   return <div className="page-head"><div><div className="page-title">{title}</div><div className="page-sub">{sub}</div></div><div className="page-actions">{children}</div></div>
@@ -3784,24 +3919,27 @@ function Dsp() {
   const filtered = applyFilters(searched, filters, DSP_FIELDS)
   const prevFiltered = filtered.map((r) => prev[r.id])
 
-  const a = { spend: dSum(filtered, 'spend'), sales: dSum(filtered, 'sales'), impr: dSum(filtered, 'impr'), purchases: dSum(filtered, 'purchases'), ntb: dAvg(filtered, 'ntbPct') }
-  const p = prevFiltered.length ? { spend: dSum(prevFiltered, 'spend'), sales: dSum(prevFiltered, 'sales'), impr: dSum(prevFiltered, 'impr'), purchases: dSum(prevFiltered, 'purchases') } : null
-  const dl = (cur, prv) => (p && prv ? ((cur - prv) / Math.abs(prv)) * 100 : undefined)
+  const mixed = profileId === 'all' // mixed currencies → aggregate money in USD (est.)
+  const mSum = (rs, k) => (mixed ? dspUsdSum(rs, k) : dSum(rs, k))
+  const mSym = mixed ? '$' : symD(profileId)
+  const a = { spend: mSum(filtered, 'spend'), sales: mSum(filtered, 'sales'), impr: dSum(filtered, 'impr'), purchases: dSum(filtered, 'purchases'), ntb: dspWavg(filtered, 'ntbPct', 'purchases') }
+  const p = prevFiltered.length ? { spend: mSum(prevFiltered, 'spend'), sales: mSum(prevFiltered, 'sales'), impr: dSum(prevFiltered, 'impr'), purchases: dSum(prevFiltered, 'purchases') } : null
+  const dl = (cur, prv) => (!allTime && p && prv ? ((cur - prv) / Math.abs(prv)) * 100 : undefined)
 
   const columns = [
     { key: 'name', label: 'Order / Line Item', sticky: true, width: 280, sortVal: (r) => r.name, render: (r) => <div>{r.name}<small>{r.tactic} · {r.profileId.toUpperCase()}</small></div> },
     { key: 'status', label: 'Status', render: (r) => <Pill>{r.status}</Pill> },
-    { key: 'budget', label: 'Budget', num: true, foot: (rs) => money(dSum(rs, 'budget'), symOfD(rs)), render: (r) => money(r.budget, symD(r.profileId)) },
-    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => money(dSum(rs, 'spend'), symOfD(rs)), render: (r) => money(r.spend, symD(r.profileId)) },
+    { key: 'budget', label: 'Budget', num: true, foot: (rs) => money(mSum(rs, 'budget'), mixed ? '$' : symOfD(rs)), render: (r) => money(r.budget, symD(r.profileId)) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => money(mSum(rs, 'spend'), mixed ? '$' : symOfD(rs)), render: (r) => money(r.spend, symD(r.profileId)) },
     { key: 'impr', label: 'Impressions', num: true, delta: true, foot: (rs) => compact(dSum(rs, 'impr')), render: (r) => compact(r.impr) },
     { key: 'clicks', label: 'Clicks', num: true, delta: true, foot: (rs) => int(dSum(rs, 'clicks')), render: (r) => int(r.clicks) },
     { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(dSum(rs, 'impr') ? (dSum(rs, 'clicks') / dSum(rs, 'impr')) * 100 : 0, 2), render: (r) => pct(r.ctr, 2) },
-    { key: 'cpm', label: 'CPM', num: true, foot: (rs) => money(dSum(rs, 'impr') ? (dSum(rs, 'spend') / dSum(rs, 'impr')) * 1000 : 0, symOfD(rs)), render: (r) => money(r.cpm, symD(r.profileId)) },
-    { key: 'dpvr', label: 'DPVR', num: true, foot: (rs) => pct(dAvg(rs, 'dpvr'), 1), render: (r) => pct(r.dpvr, 1) },
+    { key: 'cpm', label: 'CPM', num: true, foot: (rs) => money(dSum(rs, 'impr') ? (mSum(rs, 'spend') / dSum(rs, 'impr')) * 1000 : 0, mixed ? '$' : symOfD(rs)), render: (r) => money(r.cpm, symD(r.profileId)) },
+    { key: 'dpvr', label: 'DPVR', num: true, foot: (rs) => pct(dspWavg(rs, 'dpvr', 'impr'), 1), render: (r) => pct(r.dpvr, 1) },
     { key: 'purchases', label: 'Purchases', num: true, delta: true, foot: (rs) => int(dSum(rs, 'purchases')), render: (r) => int(r.purchases) },
-    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => money(dSum(rs, 'sales'), symOfD(rs)), render: (r) => money(r.sales, symD(r.profileId)) },
-    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(dSum(rs, 'spend') ? dSum(rs, 'sales') / dSum(rs, 'spend') : 0), render: (r) => <b style={{ color: r.roas >= 5 ? 'var(--green)' : 'inherit' }}>{dec2(r.roas)}</b> },
-    { key: 'ntbPct', label: 'NTB %', num: true, foot: (rs) => pct(dAvg(rs, 'ntbPct'), 0), render: (r) => pct(r.ntbPct, 0) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => money(mSum(rs, 'sales'), mixed ? '$' : symOfD(rs)), render: (r) => money(r.sales, symD(r.profileId)) },
+    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(mSum(rs, 'spend') ? mSum(rs, 'sales') / mSum(rs, 'spend') : 0), render: (r) => <b style={{ color: r.roas >= 5 ? 'var(--green)' : 'inherit' }}>{dec2(r.roas)}</b> },
+    { key: 'ntbPct', label: 'NTB %', num: true, foot: (rs) => pct(dspWavg(rs, 'ntbPct', 'purchases'), 0), render: (r) => pct(r.ntbPct, 0) },
   ]
   const presets = {
     Default: ['name', 'status', 'budget', 'spend', 'impr', 'clicks', 'ctr', 'cpm', 'dpvr', 'purchases', 'sales', 'roas', 'ntbPct'],
@@ -3815,8 +3953,8 @@ function Dsp() {
         <ExportMenu name="dsp-campaigns" fields={DSP_FIELDS} rows={filtered} /><Btn icon="plus" primary>New DSP Order</Btn>
       </DspHead>
       <KpiGrid>
-        <Kpi label="DSP Spend" value={money(a.spend)} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
-        <Kpi label="DSP Sales" value={money(a.sales)} delta={dl(a.sales, p?.sales)} />
+        <Kpi label={mixed ? 'DSP Spend (USD est.)' : 'DSP Spend'} value={money(a.spend, mSym)} delta={dl(a.spend, p?.spend)} deltaGood={(dl(a.spend, p?.spend) || 0) <= 0} />
+        <Kpi label={mixed ? 'DSP Sales (USD est.)' : 'DSP Sales'} value={money(a.sales, mSym)} delta={dl(a.sales, p?.sales)} />
         <Kpi label="ROAS" value={dec2(a.spend ? a.sales / a.spend : 0)} delta={dl(a.spend ? a.sales / a.spend : 0, p ? (p.spend ? p.sales / p.spend : 0) : undefined)} />
         <Kpi label="Impressions" value={compact(a.impr)} delta={dl(a.impr, p?.impr)} />
         <Kpi label="Purchases" value={compact(a.purchases)} delta={dl(a.purchases, p?.purchases)} />
@@ -3839,7 +3977,7 @@ function Dsp() {
           <FilterBar id="dsp-orders" fields={DSP_FIELDS} value={filters} onChange={setFilters} />
         </>}
       />
-      <div className="footnote">DPVR = Detail Page View Rate · CPM = cost per 1,000 impressions · NTB = New-to-Brand. Filter and save Plans, group by tactic, and export the current view. AMC audiences and DSP dayparting auto-apply from the Audience Builder & Rule Manager.</div>
+      <div className="footnote">DPVR = Detail Page View Rate · CPM = cost per 1,000 impressions · NTB = New-to-Brand.{mixed ? ' With All profiles selected, money totals are converted to USD (est.).' : ''} Filter and save Plans, group by tactic, and export the current view. AMC audiences and DSP dayparting auto-apply from the Audience Builder & Rule Manager.</div>
     </>
   )
 }
@@ -3948,7 +4086,7 @@ function Amc() {
       <DspHead title="Amazon Marketing Cloud" sub="Run instructional queries, schedule refreshes, and activate AMC audiences into DSP"><ExportMenu name="dsp-amc" fields={AMC_FIELDS} rows={filtered} /><Btn icon="refresh" ghost>Refresh All</Btn><Btn icon="plus" primary>New Query</Btn></DspHead>
       <KpiGrid>
         <Kpi label="Saved Queries" value={amcQueries.length} />
-        <Kpi label="AMC Audiences" value={2} />
+        <Kpi label="AMC Audiences" value={amcAudiences.length} />
         <Kpi label="Scheduled Refreshes" value={amcQueries.filter((x) => x.schedule !== 'Ad hoc').length} />
         <Kpi label="Avg Conversion Lift" value="+18%" delta={4.0} />
       </KpiGrid>
@@ -4022,8 +4160,22 @@ function useCommerceData() {
       aplusLabel: r.aplus ? 'Yes' : 'No',
       videoLabel: r.video ? 'Yes' : 'No',
     })
-    return { rows: rows.map(decorate), prev, allTime: rangeResolved.label === 'All time', range: rangeResolved }
+    return {
+      rows: rows.map(decorate), prev, allTime: rangeResolved.label === 'All time', range: rangeResolved,
+      profileId, noShelf: base.length === 0, marketName: profileById[profileId]?.market,
+    }
   }, [profileId, rangeResolved])
+}
+
+/* Empty state shown when the selected profile has no shelf tracking (e.g. Amazon UK). */
+function CmShelfEmpty({ market }) {
+  return (
+    <div className="card" style={{ padding: '44px 20px', textAlign: 'center' }}>
+      <div className="icobox" style={{ margin: '0 auto 10px', background: 'var(--brand-soft)', color: 'var(--brand)' }}><Icon name="box" size={18} /></div>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>Shelf tracking not enabled{market ? ` for ${market}` : ' for this profile'}</div>
+      <div className="muted" style={{ fontSize: 12.5 }}>Enable retail data for this profile to monitor availability, Buy Box, pricing and content health.</div>
+    </div>
+  )
 }
 
 const CATEGORIES = ['Pet Treats', 'Snacks', 'Pet Food', 'Supplements']
@@ -4073,7 +4225,8 @@ const PRODUCT_FIELDS = [
 
 /* ============================ DIGITAL SHELF ============================ */
 function DigitalShelf() {
-  const { rows: data, prev, allTime, range } = useCommerceData()
+  const { rows: data, prev, allTime, range, noShelf, marketName } = useCommerceData()
+  const kv = (v) => (noShelf ? '—' : v)
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('commerce-shelf'))
   const searched = data.filter((d) => d.title.toLowerCase().includes(q.toLowerCase()) || d.asin.toLowerCase().includes(q.toLowerCase()))
@@ -4107,18 +4260,18 @@ function DigitalShelf() {
         <ExportMenu name="digital-shelf" fields={SHELF_FIELDS} rows={filtered} /><Btn icon="refresh" ghost>Recrawl</Btn>
       </CommerceHead>
       <KpiGrid>
-        <Kpi label="ASINs Monitored" value={filtered.length} />
-        <Kpi label="Out of Stock" value={oos} />
-        <Kpi label="Buy Box < 80%" value={lowBB} />
-        <Kpi label="Content Issues" value={contentGaps} />
-        <Kpi label="Avg Content Score" value={filtered.length ? Math.round(cAvg(filtered, 'listingScore')) : 0} />
-        <Kpi label="Avg Rating" value={cAvg(filtered, 'rating').toFixed(2) + '★'} />
+        <Kpi label="ASINs Monitored" value={kv(filtered.length)} />
+        <Kpi label="Out of Stock" value={kv(oos)} />
+        <Kpi label="Buy Box < 80%" value={kv(lowBB)} />
+        <Kpi label="Content Issues" value={kv(contentGaps)} />
+        <Kpi label="Avg Content Score" value={kv(filtered.length ? Math.round(cAvg(filtered, 'listingScore')) : 0)} />
+        <Kpi label="Avg Rating" value={kv(cAvg(filtered, 'rating').toFixed(2) + '★')} />
       </KpiGrid>
       <div className="hint" style={{ marginBottom: 14 }}>
         <Icon name="link" size={16} />
         <div>Retail signals are wired into advertising automation: out-of-stock or Buy Box loss triggers <b>auto-pause</b> (Rule R5) to stop wasted ad spend on unavailable products.</div>
       </div>
-      <DataGrid
+      {noShelf ? <CmShelfEmpty market={marketName} /> : <DataGrid
         id="commerce-shelf"
         columns={columns}
         rows={filtered}
@@ -4134,7 +4287,7 @@ function DigitalShelf() {
           <SearchBox value={q} onChange={setQ} placeholder="Search products / ASIN…" />
           <FilterBar id="commerce-shelf" fields={SHELF_FIELDS} value={filters} onChange={setFilters} />
         </>}
-      />
+      />}
       <div className="footnote">Build multi-condition filters across content score, Buy Box, availability and pricing, save them as <b>Plans</b>, group by category or marketplace, and export the current view.</div>
     </>
   )
@@ -4142,7 +4295,8 @@ function DigitalShelf() {
 
 /* ============================ BUY BOX & INVENTORY ============================ */
 function BuyBox() {
-  const { rows: data, range } = useCommerceData()
+  const { rows: data, range, noShelf, marketName } = useCommerceData()
+  const kv = (v) => (noShelf ? '—' : v)
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('commerce-buybox'))
   const searched = data.filter((d) => d.title.toLowerCase().includes(q.toLowerCase()) || d.asin.toLowerCase().includes(q.toLowerCase()))
@@ -4163,13 +4317,13 @@ function BuyBox() {
         <ExportMenu name="buy-box-inventory" fields={BUYBOX_FIELDS} rows={filtered} /><Btn icon="sliders" primary>Automation Rules</Btn>
       </CommerceHead>
       <KpiGrid>
-        <Kpi label="Avg Buy Box" value={pct(cAvg(filtered, 'buyBox'))} />
-        <Kpi label="ASINs Losing BB" value={filtered.filter((d) => d.buyBox < 80).length} />
-        <Kpi label="Out of Stock" value={filtered.filter((d) => !d.inStock).length} />
-        <Kpi label="MAP Violations" value={filtered.filter((d) => d.mapViolation).length} />
-        <Kpi label="Ads Auto-Paused" value={filtered.filter((d) => !d.inStock || d.buyBox < 50).length} />
+        <Kpi label="Avg Buy Box" value={kv(pct(cAvg(filtered, 'buyBox')))} />
+        <Kpi label="ASINs Losing BB" value={kv(filtered.filter((d) => d.buyBox < 80).length)} />
+        <Kpi label="Out of Stock" value={kv(filtered.filter((d) => !d.inStock).length)} />
+        <Kpi label="MAP Violations" value={kv(filtered.filter((d) => d.mapViolation).length)} />
+        <Kpi label="Ads Auto-Paused" value={kv(filtered.filter((d) => !d.inStock || d.buyBox < 50).length)} />
       </KpiGrid>
-      <DataGrid
+      {noShelf ? <CmShelfEmpty market={marketName} /> : <DataGrid
         id="commerce-buybox"
         columns={columns}
         rows={filtered}
@@ -4180,7 +4334,7 @@ function BuyBox() {
           <SearchBox value={q} onChange={setQ} placeholder="Search products / ASIN…" />
           <FilterBar id="commerce-buybox" fields={BUYBOX_FIELDS} value={filters} onChange={setFilters} />
         </>}
-      />
+      />}
       <div className="footnote">When Buy Box drops below threshold or stock runs out, advertising is automatically paused for that ASIN and resumed on recovery.</div>
     </>
   )
@@ -4188,12 +4342,28 @@ function BuyBox() {
 
 /* ============================ PRODUCT CENTER ============================ */
 function Products() {
-  const { rows: data, prev, allTime, range } = useCommerceData()
+  const { rows: data, prev, allTime, range, profileId, noShelf, marketName } = useCommerceData()
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('commerce-products'))
-  // de-dupe by ASIN (catalog-level content view)
-  const byAsin = Object.values(data.reduce((m, d) => { m[d.asin] = m[d.asin] || d; return m }, {}))
-  const prevByAsin = {}; byAsin.forEach((r) => { prevByAsin[r.asin] = prev[r.id] })
+  const kv = (v) => (noShelf ? '—' : v)
+  // de-dupe by ASIN (catalog-level content view): sum cumulative metrics across
+  // marketplaces (converting revenue to USD when profiles differ); keep the first
+  // row's state/quality fields (price, rating, Buy Box, content score…).
+  const cmMixed = profileId === 'all'
+  const cmFx = (pid) => (cmMixed ? fxUSD(pid) : 1)
+  const byAsin = Object.values(data.reduce((m, d) => {
+    const t = m[d.asin]
+    if (!t) m[d.asin] = { ...d, orderedRevenue: d.orderedRevenue * cmFx(d.profileId) }
+    else { t.glanceViews += d.glanceViews; t.orderedRevenue += d.orderedRevenue * cmFx(d.profileId); t.reviews += d.reviews }
+    return m
+  }, {}))
+  const prevByAsin = {}
+  data.forEach((d) => {
+    const pr = prev[d.id]; if (!pr) return
+    const t = prevByAsin[d.asin]
+    if (!t) prevByAsin[d.asin] = { ...pr, orderedRevenue: pr.orderedRevenue * cmFx(d.profileId) }
+    else { t.glanceViews += pr.glanceViews; t.orderedRevenue += pr.orderedRevenue * cmFx(d.profileId); t.reviews += pr.reviews }
+  })
   const searched = byAsin.filter((d) => d.title.toLowerCase().includes(q.toLowerCase()) || d.asin.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, PRODUCT_FIELDS)
   const columns = [
@@ -4205,7 +4375,7 @@ function Products() {
     { key: 'rating', label: 'Rating', num: true, foot: (rs) => cAvg(rs, 'rating').toFixed(2) + '★', render: (r) => `${r.rating.toFixed(1)}★` },
     { key: 'reviews', label: 'Reviews', num: true, foot: (rs) => compact(cSum('reviews')(rs)), render: (r) => compact(r.reviews) },
     { key: 'conversion', label: 'CVR', num: true, foot: (rs) => pct(cAvg(rs, 'conversion')), render: (r) => pct(r.conversion) },
-    { key: 'orderedRevenue', label: 'Ordered Rev.', num: true, delta: true, foot: (rs) => money(cSum('orderedRevenue')(rs)), render: (r) => money(r.orderedRevenue) },
+    { key: 'orderedRevenue', label: 'Ordered Rev.', num: true, delta: true, foot: (rs) => money(cSum('orderedRevenue')(rs), cmMixed ? '$' : symOfC(rs)), render: (r) => money(r.orderedRevenue, cmMixed ? '$' : sym(r.profileId)) },
   ]
   const presets = {
     Default: ['title', 'images', 'aplusLabel', 'videoLabel', 'listingScore', 'rating', 'reviews', 'conversion', 'orderedRevenue'],
@@ -4219,13 +4389,13 @@ function Products() {
         <ExportMenu name="product-center" fields={PRODUCT_FIELDS} rows={filtered} /><Btn icon="plus" primary>Bulk Edit Content</Btn>
       </CommerceHead>
       <KpiGrid>
-        <Kpi label="Products" value={filtered.length} />
-        <Kpi label="Missing A+" value={filtered.filter((d) => !d.aplus).length} />
-        <Kpi label="No Video" value={filtered.filter((d) => !d.video).length} />
-        <Kpi label="Content Score < 75" value={filtered.filter((d) => d.listingScore < 75).length} />
-        <Kpi label="Avg Rating" value={cAvg(filtered, 'rating').toFixed(2) + '★'} />
+        <Kpi label="Products" value={kv(filtered.length)} />
+        <Kpi label="Missing A+" value={kv(filtered.filter((d) => !d.aplus).length)} />
+        <Kpi label="No Video" value={kv(filtered.filter((d) => !d.video).length)} />
+        <Kpi label="Content Score < 75" value={kv(filtered.filter((d) => d.listingScore < 75).length)} />
+        <Kpi label="Avg Rating" value={kv(cAvg(filtered, 'rating').toFixed(2) + '★')} />
       </KpiGrid>
-      <DataGrid
+      {noShelf ? <CmShelfEmpty market={marketName} /> : <DataGrid
         id="commerce-products"
         columns={columns}
         rows={filtered}
@@ -4242,7 +4412,7 @@ function Products() {
           <SearchBox value={q} onChange={setQ} placeholder="Search products / ASIN…" />
           <FilterBar id="commerce-products" fields={PRODUCT_FIELDS} value={filters} onChange={setFilters} />
         </>}
-      />
+      />}
     </>
   )
 }
@@ -4291,7 +4461,7 @@ const actionStr = (b) => {
 }
 const buildTrigger = (f) => {
   const b = f.blocks[0]
-  const parts = b.conditions.filter((c) => c.value !== '' || c.op === 'between').map(condStr)
+  const parts = b.conditions.filter((c) => c.value !== '' && (c.op !== 'between' || c.value2 !== '')).map(condStr)
   let s = parts.join(` ${b.join} `)
   const gates = []
   if (f.minClicks) gates.push(`min ${f.minClicks} clicks`)
@@ -4389,7 +4559,8 @@ function RuleBuilder({ onClose, onSave, onSaveTemplate, initial }) {
   const addBlock = () => upd({ blocks: [...f.blocks, blankBlock()] })
   const delBlock = (bi) => upd({ blocks: f.blocks.filter((b, j) => j !== bi) })
   const step1Ok = f.name.trim().length > 0 && f.name.length <= 150
-  const blocksOk = f.blocks.every((b) => b.conditions.some((c) => c.value !== '') && (!RB_NEEDS_VAL.has(b.action) || b.actionValue !== ''))
+  const condOk = (c) => c.value !== '' && (c.op !== 'between' || c.value2 !== '')
+  const blocksOk = f.blocks.every((b) => b.conditions.some(condOk) && b.conditions.every((c) => c.op !== 'between' || c.value === '' || c.value2 !== '') && (!RB_NEEDS_VAL.has(b.action) || b.actionValue !== ''))
   const canSave = step1Ok && blocksOk
   const cleanForm = () => {
     const { name, ruleType, type, scope, timezone, mode, runStart, runEnd, excludeDates, sendEmail, blocks, lookback, excludeLatest, excludeDays, minClicks, minSpend, frequency } = f
@@ -4497,7 +4668,7 @@ function RuleBuilder({ onClose, onSave, onSaveTemplate, initial }) {
       </div>
       <div style={{ width: 190, flex: '0 0 auto', borderLeft: '1px solid var(--border)', paddingLeft: 12 }}>
         <div className="cm-head" style={{ padding: '0 0 8px' }}>Rule Kickstart</div>
-        {RULE_TEMPLATES.map((t) => (
+        {[...RULE_TEMPLATES, ...createdStore.get('ruleTemplates')].map((t) => (
           <div key={t.key} className="tmpl-card" style={{ padding: 8, marginBottom: 6, cursor: 'pointer' }} onClick={() => { setF(normForm(t.form)); setPreview(null); toast(`Loaded “${t.title}”`) }}>
             <div className="grow"><div className="title" style={{ fontSize: 12 }}>{t.title}</div><div className="desc" style={{ fontSize: 11 }}>{t.desc}</div></div>
           </div>
@@ -4566,21 +4737,36 @@ const fallbackForm = (r) => ({
   scope: RB_SCOPES.includes(r.scope) ? r.scope : 'All SP campaigns',
   frequency: RB_FREQ.includes(r.runs) ? r.runs : 'Every 6 hours',
 })
+// Persisted overrides for seeded rules (edits + status toggles) — keyed by rule id.
+const seedRuleStore = {
+  get() { try { return JSON.parse(localStorage.getItem('chedits:auto-rules-seed')) || {} } catch (e) { return {} } },
+  set(v) { try { localStorage.setItem('chedits:auto-rules-seed', JSON.stringify(v)) } catch (e) { /* ignore */ } },
+}
 function Rules() {
-  const [rules, setRules] = useState(() => [...createdStore.get('rules'), ...RULES])
+  const [rules, setRules] = useState(() => { const ov = seedRuleStore.get(); return [...createdStore.get('rules'), ...RULES.map((r) => (ov[r.id] ? { ...r, ...ov[r.id] } : r))] })
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('auto-rules'))
   const [builder, setBuilder] = useState(false)
   const [edit, setEdit] = useState(null) // carries an existing rule's form (edit) OR a template form (create, no _id)
   const [picker, setPicker] = useState(false)
   const [typeChooser, setTypeChooser] = useState(false)
-  const onSaveTemplate = (tmpl) => createdStore.add('ruleTemplates', tmpl)
+  const onSaveTemplate = (tmpl) => {
+    const existing = createdStore.get('ruleTemplates')
+    const i = existing.findIndex((t) => t.title === tmpl.title)
+    if (i >= 0) createdStore.set('ruleTemplates', existing.map((t, j) => (j === i ? { ...tmpl, key: t.key } : t)))
+    else createdStore.add('ruleTemplates', tmpl)
+  }
   const onSave = (rule) => {
     const created = createdStore.get('rules')
-    const isEdit = created.some((x) => x.id === rule.id)
-    if (isEdit) {
+    if (created.some((x) => x.id === rule.id)) {
       createdStore.set('rules', created.map((x) => x.id === rule.id ? rule : x))
       setRules((rs) => rs.map((x) => x.id === rule.id ? rule : x))
+      toast(`Rule “${rule.name}” updated`)
+    } else if (RULES.some((x) => x.id === rule.id)) {
+      // Seeded rule edited — replace in place via the override store (never prepend a duplicate id).
+      const { created: _omit, ...patch } = rule
+      seedRuleStore.set({ ...seedRuleStore.get(), [rule.id]: patch })
+      setRules((rs) => rs.map((x) => x.id === rule.id ? { ...x, ...patch } : x))
       toast(`Rule “${rule.name}” updated`)
     } else {
       createdStore.set('rules', [rule, ...created])
@@ -4592,7 +4778,13 @@ function Rules() {
   const toggle = (id) => {
     setRules((rs) => rs.map((r) => r.id === id ? { ...r, status: r.status === 'Active' ? 'Paused' : 'Active' } : r))
     const created = createdStore.get('rules')
-    if (created.some((x) => x.id === id)) createdStore.set('rules', created.map((x) => x.id === id ? { ...x, status: x.status === 'Active' ? 'Paused' : 'Active' } : x))
+    if (created.some((x) => x.id === id)) {
+      createdStore.set('rules', created.map((x) => x.id === id ? { ...x, status: x.status === 'Active' ? 'Paused' : 'Active' } : x))
+    } else if (RULES.some((x) => x.id === id)) {
+      const ov = seedRuleStore.get()
+      const curStatus = (ov[id] && ov[id].status) || RULES.find((x) => x.id === id).status
+      seedRuleStore.set({ ...ov, [id]: { ...ov[id], status: curStatus === 'Active' ? 'Paused' : 'Active' } })
+    }
   }
   const openEdit = (r) => setEdit({ ...(r._f || fallbackForm(r)), _id: r.id, _status: r.status, _affected: r.affected })
   const duplicate = (r) => {
@@ -4605,6 +4797,8 @@ function Rules() {
   const filtered = applyFilters(searched, filters, RM_FIELDS)
   const active = rules.filter((r) => r.status === 'Active').length
   const affected = rules.reduce((s, r) => s + r.affected, 0)
+  const actions24h = rules.filter((r) => r.status === 'Active' && r.lastRun !== '—').reduce((s, r) => s + r.affected, 0)
+  const typesInUse = new Set(rules.filter((r) => r.status === 'Active').map((r) => r.type)).size
   const columns = [
     { key: 'name', label: 'Rule', sticky: true, width: 240, sortVal: (r) => r.name, render: (r) => (
       <div className="flex items-center gap-8">
@@ -4634,8 +4828,8 @@ function Rules() {
         <Kpi label="Active Rules" value={active} />
         <Kpi label="Total Rules" value={rules.length} />
         <Kpi label="Line Items Managed" value={affected.toLocaleString()} />
-        <Kpi label="Actions (24h)" value="1,284" />
-        <Kpi label="Est. Spend Saved (30d)" value="$8.4K" delta={6.2} />
+        <Kpi label="Actions (24h)" value={int(actions24h)} />
+        <Kpi label="Rule Types in Use" value={typesInUse} />
       </KpiGrid>
       <DataGrid
         id="auto-rules"
@@ -4669,7 +4863,7 @@ const BM_FIELDS = [
   { key: 'forecast', label: 'Forecast EOM', type: 'number' },
   { key: 'pacePct', label: 'Pace %', type: 'number' },
 ]
-const BM_DAY = 20, BM_DAYS = 30
+const BM_DAY = new Date().getDate(), BM_DAYS = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
 const capStore = {
   get() { try { return JSON.parse(localStorage.getItem('chbudgetcaps')) || {} } catch (e) { return {} } },
   set(v) { try { localStorage.setItem('chbudgetcaps', JSON.stringify(v)) } catch (e) { /* ignore */ } },
@@ -4749,7 +4943,7 @@ function tagMonth(pid, tag, mk, mi, goals, curr) {
   const hasDefault = h % 4 !== 0 && mi === 0 // current month: 3 of 4 tags have budgets; future months mostly unset
   const override = goals[key]
   const budget = override != null ? override : (hasDefault ? (2000 + (h % 9) * 1000) : null)
-  const dayOfMonth = new Date().getDate(), daysIn = 30
+  const dayOfMonth = BM_DAY, daysIn = BM_DAYS
   const spendPct = mi === 0 ? 0.55 + (h % 30) / 100 : 0
   const spend = budget && mi === 0 ? Math.round(budget * spendPct) : 0
   const pct = budget ? (spend / budget) * 100 : 0
@@ -4761,9 +4955,15 @@ function tagMonth(pid, tag, mk, mi, goals, curr) {
   return { key, budget, spend, pct, planned, delivery, est, roas, yday, curr }
 }
 
-function AllocModal({ tag, onClose }) {
-  const [tmpl, setTmpl] = useState(false)
-  const [mode, setMode] = useState('Even Amount')
+// Persisted daily-budget-allocation choices, keyed `profileId|tag`.
+const allocStore = {
+  get() { try { return JSON.parse(localStorage.getItem('challoc')) || {} } catch (e) { return {} } },
+  set(v) { try { localStorage.setItem('challoc', JSON.stringify(v)) } catch (e) { /* ignore */ } },
+}
+function AllocModal({ pid, tag, onClose }) {
+  const allocKey = `${pid}|${tag}`
+  const [tmpl, setTmpl] = useState(() => !!allocStore.get()[allocKey]?.tmpl)
+  const [mode, setMode] = useState(() => allocStore.get()[allocKey]?.mode || 'Even Amount')
   const [metric, setMetric] = useState('Impression')
   const h = gHash(tag + metric)
   const dow = Array.from({ length: 7 }, (_, i) => 60 + ((h >> i) % 40))
@@ -4771,7 +4971,7 @@ function AllocModal({ tag, onClose }) {
   const W = 300, H = 110
   return (
     <Modal width={720} title="Edit Daily Budget Allocation" sub={`${tag} — how the monthly budget goal spreads across days`} onClose={onClose}
-      footer={<><div style={{ flex: 1 }} /><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="check" onClick={() => { toast(`Allocation saved — ${mode}`); onClose() }}>Confirm</Btn></>}>
+      footer={<><div style={{ flex: 1 }} /><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="check" onClick={() => { allocStore.set({ ...allocStore.get(), [allocKey]: { mode, tmpl } }); toast(`Allocation saved — ${mode}`); onClose() }}>Confirm</Btn></>}>
       <label className="rb-check" style={{ marginBottom: 12 }}><Toggle on={tmpl} onClick={() => setTmpl(!tmpl)} /> Use Template</label>
       <div className="fld"><span>Daily Budget Mode</span>
         <div className="seg" style={{ marginTop: 4 }}>
@@ -4812,11 +5012,24 @@ function Budgets() {
   const [goals, setGoals] = useState(() => goalStore.get())
   const [toggles, setToggles] = useState(() => { try { return JSON.parse(localStorage.getItem('chgoaltoggles')) || {} } catch (e) { return {} } })
   const [expanded, setExpanded] = useState(() => new Set(['ca']))
-  const [alloc, setAlloc] = useState(null) // tag name
+  const [alloc, setAlloc] = useState(null) // { pid, tag }
   const [editCell, setEditCell] = useState(null) // goal key being edited
   const [editVal, setEditVal] = useState('')
   const months = monthKeys(3)
-  const saveGoal = (key, v) => { const next = { ...goals, [key]: Number(v) || null }; goalStore.set(next); setGoals(next); setEditCell(null); toast('Budget goal saved') }
+  const saveGoal = (key, v, shown) => {
+    setEditCell(null)
+    const raw = String(v).trim()
+    const num = Number(raw)
+    if (raw === '' || !(num > 0)) { // '' = clear the override; 0 / invalid → clear too
+      if (goals[key] == null) return
+      const next = { ...goals }; delete next[key]
+      goalStore.set(next); setGoals(next); toast('Budget goal cleared')
+      return
+    }
+    if (num === (goals[key] != null ? goals[key] : shown)) return // unchanged on blur — skip save + toast
+    const next = { ...goals, [key]: num }
+    goalStore.set(next); setGoals(next); toast('Budget goal saved')
+  }
   const tglKey = (pid, tag, t) => `${pid}|${tag}|${t}`
   const tglOn = (pid, tag, t) => toggles[tglKey(pid, tag, t)] !== false // default on
   const flipTgl = (pid, tag, t) => setToggles((x) => { const n = { ...x, [tglKey(pid, tag, t)]: !tglOn(pid, tag, t) }; try { localStorage.setItem('chgoaltoggles', JSON.stringify(n)) } catch (e) { /* ignore */ } return n })
@@ -4865,7 +5078,7 @@ function Budgets() {
         <div>Set monthly caps per marketplace with <b>Set Budget Cap</b>. When a cap is reached, campaigns auto-pause until the budget refreshes next month. Pacing guard (Rule R7) throttles bids if daily pace runs hot.</div>
       </div>
       {capModal && <SetBudgetCapModal rows={data} onClose={() => setCapModal(false)} onSave={saveCap} />}
-      {alloc && <AllocModal tag={alloc} onClose={() => setAlloc(null)} />}
+      {alloc && <AllocModal pid={alloc.pid} tag={alloc.tag} onClose={() => setAlloc(null)} />}
       <Card title="Budget goals — by profile & tag" sub="Monthly budget goals with pacing, delivery & automation guardrails · click a Budget cell to set a goal · Calendar edits daily allocation">
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', minWidth: 1450, width: '100%', fontSize: 12.5 }}>
@@ -4905,7 +5118,7 @@ function Budgets() {
                     {open && tags.map((tag, ti) => (
                       <tr key={tag} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ padding: '7px 8px 7px 28px', whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'var(--bg, #fff)' }}><a style={{ color: 'var(--brand)', cursor: 'pointer' }}>{tag}</a></td>
-                        <td style={{ textAlign: 'center' }}><Btn sm ghost icon="clock" title="Edit Daily Budget Allocation" onClick={() => setAlloc(tag)} /></td>
+                        <td style={{ textAlign: 'center' }}><Btn sm ghost icon="clock" title="Edit Daily Budget Allocation" onClick={() => setAlloc({ pid: b.profileId, tag })} /></td>
                         {GOAL_TOGGLES.map((t) => {
                           const m0 = tagRows[ti][0]
                           return (
@@ -4920,8 +5133,8 @@ function Budgets() {
                             <td style={{ textAlign: 'right', borderLeft: '2px solid var(--border)', whiteSpace: 'nowrap' }}>
                               {editCell === m.key ? (
                                 <input autoFocus type="number" defaultValue={m.budget || ''} style={{ width: 80 }}
-                                  onKeyDown={(e) => { if (e.key === 'Enter') saveGoal(m.key, e.target.value); if (e.key === 'Escape') setEditCell(null) }}
-                                  onBlur={(e) => saveGoal(m.key, e.target.value)} />
+                                  onKeyDown={(e) => { if (e.key === 'Enter') saveGoal(m.key, e.target.value, m.budget); if (e.key === 'Escape') setEditCell(null) }}
+                                  onBlur={(e) => saveGoal(m.key, e.target.value, m.budget)} />
                               ) : (
                                 <span style={{ cursor: 'pointer' }} onClick={() => setEditCell(m.key)}>
                                   {m.budget ? cur(m.budget, b.currency) : <span className="muted">Not set ✎</span>}
@@ -4950,6 +5163,7 @@ function Budgets() {
       </Card>
       <DataGrid
         id="auto-budgets"
+        rowKey="profileId"
         columns={columns}
         rows={filtered}
         initialSort={{ key: 'pacePct', dir: 'desc' }}
@@ -5140,6 +5354,7 @@ function AlertSettingsModal({ onClose }) {
 }
 function Alerts() {
   const [showSettings, setShowSettings] = useState(false)
+  const [settings, setSettings] = useState(asLoad)
   const { alertReads, markAlertRead, markAlertsRead } = useApp()
   const alerts = ALERTS.map((x) => (alertReads.includes(x.id) ? { ...x, read: true } : x))
   const [q, setQ] = useState('')
@@ -5147,7 +5362,11 @@ function Alerts() {
   const markRead = (id) => markAlertRead(id)
   const markAll = () => markAlertsRead(ALERTS.map((x) => x.id))
   const decorated = alerts.map((a) => ({ ...a, sevLabel: { high: 'High', med: 'Med', low: 'Low' }[a.sev], status: a.read ? 'Read' : 'Unread' }))
-  const searched = decorated.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()) || a.body.toLowerCase().includes(q.toLowerCase()))
+  // Apply saved Alert Settings: category toggles + minimum severity.
+  const visible = decorated.filter((a) => (!a.cat || settings[a.cat] !== false) && sevRank[a.sev] >= sevRank[settings.minSev])
+  const hiddenCount = decorated.length - visible.length
+  const todayCount = visible.filter((a) => { const t = a.time.match(/^(\d+)([mh]) ago$/); return t && (t[2] === 'm' || Number(t[1]) < 24) }).length
+  const searched = visible.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()) || a.body.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, AL_FIELDS)
   const columns = [
     { key: 'title', label: 'Alert', sticky: true, width: 360, sortVal: (r) => r.title, render: (a) => (
@@ -5165,12 +5384,13 @@ function Alerts() {
   return (
     <>
       <InsHead title="Alerts" sub="Real-time notifications across ads, budget & retail signals"><ExportMenu name="alerts" fields={AL_FIELDS} rows={filtered} /><Btn icon="check" ghost onClick={markAll}>Mark all read</Btn><Btn icon="gear" primary onClick={() => setShowSettings(true)}>Alert Settings</Btn></InsHead>
-      {showSettings && <AlertSettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && <AlertSettingsModal onClose={() => { setShowSettings(false); setSettings(asLoad()) }} />}
       <KpiGrid>
-        <Kpi label="Unread" value={alerts.filter(a => !a.read).length} />
-        <Kpi label="High Severity" value={alerts.filter(a => a.sev === 'high').length} />
-        <Kpi label="Today" value={alerts.length} />
+        <Kpi label="Unread" value={visible.filter(a => !a.read).length} />
+        <Kpi label="High Severity" value={visible.filter(a => a.sev === 'high').length} />
+        <Kpi label="Today" value={todayCount} />
       </KpiGrid>
+      {hiddenCount > 0 && <div className="footnote" style={{ margin: '0 0 10px' }}>{hiddenCount} alert{hiddenCount > 1 ? 's' : ''} hidden by Alert Settings (category toggles / minimum severity).</div>}
       <DataGrid
         id="ins-alerts"
         columns={columns}
