@@ -2,7 +2,9 @@
 
 > **Purpose of this file:** a single source of truth so any session can pick up exactly where we left off.
 > Claude maintains this file — update it at the end of each working session (status, decisions, next steps).
-> **Last updated:** 2026-07-21 (session 11 — **D3 done, v1.0 GOAL CLOSED. Live at v0.12.2.**)
+> **Last updated:** 2026-07-21 (session 11 — **v1.0 GOAL CLOSED (D3 done) + full Pacvue nav re-review
+> + E1 Tagging SHIPPED. Live at v0.13.0.** Read the three sub-summaries below: 11 = D3 review fixes
+> v0.12.2, 11b = nav re-review → GOALS §E1–E8, 11b-cont. = E1 Tagging v0.13.0.)
 > Jim delegated the final review to Claude's testing ("robust in covering all the major fundamentals").
 > Ran 4 parallel agents: 3 adversarial per-surface code reviews + 1 Pacvue-fundamentals coverage audit.
 > **39 findings, 37 fixed same session** (full punch list + statuses: `tools/d3-review.md`). Highlights:
@@ -553,6 +555,6 @@ button now opens a real modal / persists; see §2.)
    verify) are saved in memory: see the "CommerceHub deploy process" memory.
 4. **Before deploying**, always run the verification routine in §2 (build invariants + `tsc` grep incl.
    `TS2448|TS2454`) and then eyeball the live site.
-5. Bump the sidebar version label (`.app-version` in `Layout.jsx`) when a phase ships — currently **v0.12.2**.
+5. Bump the sidebar version label (`.app-version` in `Layout.jsx`) when a phase ships — currently **v0.13.0**.
    (Note: since Phase 8 the build's `leftover export/import` line reads **`8 0`**, not `0 0` — the 8 are footnote
    text containing the word "export", not real ESM exports. Don't treat it as a regression.)
