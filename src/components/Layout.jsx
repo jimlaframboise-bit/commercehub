@@ -77,7 +77,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.12.1</span>
+        <span className="app-version" title="CommerceHub build">v0.12.2</span>
       </div>
     </aside>
   )
@@ -169,7 +169,6 @@ function Topbar() {
         )}
       </div>
 
-      <button className="topbar-ctrl"><Icon name="filter" size={15} />Filters<span className="badge">2</span></button>
       <NavLink to="/alerts" className="topbar-ctrl" style={{ position: 'relative' }}>
         <Icon name="bell" size={16} />
         {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--red)', color: '#fff', borderRadius: 9, fontSize: 9, padding: '1px 5px', fontWeight: 700 }}>{unread}</span>}

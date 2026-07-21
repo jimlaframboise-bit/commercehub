@@ -20,6 +20,10 @@ export function Kpi({ label, value, delta, deltaGood, hint }) {
 }
 export function KpiGrid({ children }) { return <div className="kpi-grid">{children}</div> }
 
+/* ---------------- FX rates — USD estimates for mixed-currency aggregates ---------------- */
+export const FX_USD = { us: 1, ca: 0.73, uk: 1.26 };
+export const fxUSD = (pid) => FX_USD[pid] ?? 1;
+
 /* ---------------- Status pill ---------------- */
 const STATUS_MAP = {
   Enabled: 'green', Active: 'green', Ready: 'green', 'On pace': 'green', 'In Stock': 'green',
@@ -194,15 +198,11 @@ function SortCaret({ active, dir }) {
   if (!active) return <Icon name="chevDown" size={11} className="caret" />
   return <Icon name={dir === 'asc' ? 'arrowUp' : 'arrowDown'} size={11} className="caret on" />
 }
-function DeltaChip({ row, ck, rk, prevRow }) {
-  let d
-  if (prevRow) {
-    const cur = Number(row[ck]); const prev = Number(prevRow[ck])
-    if (!isFinite(cur) || !isFinite(prev) || prev === 0) return null
-    d = (cur - prev) / Math.abs(prev)
-  } else {
-    d = (hashUnit(String(row[rk]) + ':' + ck) - 0.42) * 0.6 // fallback mock
-  }
+function DeltaChip({ row, ck, prevRow }) {
+  if (!prevRow) return null // no real prior period supplied — show nothing rather than a mock delta
+  const cur = Number(row[ck]); const prev = Number(prevRow[ck])
+  if (!isFinite(cur) || !isFinite(prev) || prev === 0) return null
+  const d = (cur - prev) / Math.abs(prev)
   const up = d >= 0
   return <span className={`gdelta ${up ? 'up' : 'down'}`}>{up ? '▲' : '▼'}{Math.abs(d * 100).toFixed(1)}%</span>
 }
@@ -643,7 +643,7 @@ export function FilterBar({ id, fields, value, onChange }) {
    ========================================================================== */
 
 /* Inline-editable numeric cell (click to edit, Enter/blur commit, Esc cancel). */
-export function EditableNum({ value, onCommit, prefix = '', dec = 0, align = 'flex-end' }) {
+export function EditableNum({ value, onCommit, prefix = '', dec = 0, align = 'flex-end', min = 0.02 }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(value)
   const editingRef = useRef(false)
@@ -652,7 +652,7 @@ export function EditableNum({ value, onCommit, prefix = '', dec = 0, align = 'fl
   const finish = (save) => {
     if (!editingRef.current) return
     editingRef.current = false; setEditing(false)
-    if (save) { const n = Number(val); if (!isNaN(n) && n !== value) onCommit(n) } else setVal(value)
+    if (save) { const n = Math.max(min, Number(val)); if (!isNaN(n) && n !== value) onCommit(n) } else setVal(value)
   }
   if (editing) {
     return (
@@ -689,17 +689,18 @@ export function StateSelect({ value, onChange, options = ['Enabled', 'Paused', '
 }
 
 /* Generic modal dialog. */
-export function Modal({ title, sub, onClose, children, footer, width = 440 }) {
+export function Modal({ title, sub, onClose, children, footer, width = 440, confirmClose }) {
+  const requestClose = () => { if (!confirmClose || window.confirm('Discard your changes?')) onClose() }
   useEffect(() => {
-    const k = (e) => { if (e.key === 'Escape') onClose() }
+    const k = (e) => { if (e.key === 'Escape') requestClose() }
     document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k)
-  }, [])
+  }, [confirmClose])
   return (
-    <div className="modal-ov" onMouseDown={onClose}>
+    <div className="modal-ov" onMouseDown={requestClose}>
       <div className="modal" style={{ width }} onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-h">
           <div><h3>{title}</h3>{sub && <div className="sub">{sub}</div>}</div>
-          <button className="gf-x" onClick={onClose}><Icon name="x" size={15} /></button>
+          <button className="gf-x" onClick={requestClose}><Icon name="x" size={15} /></button>
         </div>
         <div className="modal-b">{children}</div>
         {footer && <div className="modal-f">{footer}</div>}
