@@ -2,9 +2,48 @@
 
 > **Purpose of this file:** a single source of truth so any session can pick up exactly where we left off.
 > Claude maintains this file — update it at the end of each working session (status, decisions, next steps).
-> **Last updated:** 2026-07-21 (session 11 — **v1.0 GOAL CLOSED (D3 done) + full Pacvue nav re-review
-> + E1 Tagging SHIPPED. Live at v0.13.0.** Read the three sub-summaries below: 11 = D3 review fixes
-> v0.12.2, 11b = nav re-review → GOALS §E1–E8, 11b-cont. = E1 Tagging v0.13.0.)
+> **Last updated:** 2026-07-22 (session 12 — **E4 Profile grid + E5 grid family SHIPPED. Live at v0.14.0.**)
+>
+> **(session 12, 2026-07-22) — E4 + E5 SHIPPED as v0.14.0.** Built FIVE new Advertising grids in
+> `Ads.jsx`, all rollups over the date-range-scaled campaign set (shared helpers `adRollup`,
+> `adMetricCols` (cross-profile USD-normalized) and `adNativeMetricCols` (per-row native currency)):
+> **Profile** `/ads/profile` (account rollup per Amazon profile; per-row native currency + USD-est totals;
+> Monthly Cap + pacing from `budgets`; dims 1P·3P / pacing), **Portfolio** `/ads/portfolio` (rollup by
+> `portfolio`), **Placement** `/ads/placement` (SYNTHETIC split of the total into Top of Search / Product
+> Pages / Rest of Search by fixed per-metric weights that sum to 1.0 → realistic distinct per-placement
+> ACoS; Bid-Adjustment col +25%/+10%/—), **ASIN** `/ads/asin` (advertised-product rollup by `asin`,
+> Units + ASP), **Ads** `/ads/ads` (creatives, 1:1 with campaigns, Ad-Type pills SP/SB/SD, group-by Ad
+> Type). New routes in `App.jsx`; nav reordered in `Layout.jsx` to Pacvue's Advertising order
+> (Profile·Campaigns·Tagging·Portfolio·Placement·Ad Groups·Ads·Targeting·ASIN·Search Terms·SOV·
+> Dayparting·Bulk Ops) + CRUMBS entries; version → **v0.14.0**. Imported `budgets` into Ads.jsx (bare
+> name, safe).
+> **Verification (strong):** built single-file (dup decls `[]`, leftover `9 0` = benign — one new comment
+> word "export"); then rendered the bundle in the sandbox's **headless Chromium via Playwright** (React/
+> ReactDOM/Babel served from a local `npm install` because unpkg AND cdnjs both 403 from the sandbox) —
+> **0 console/page errors across all 21 routes**, correct row counts (Profile 3 / Portfolio 5 / Placement
+> 3 / ASIN 12 / Ads 40), compare-toggle deltas + group-by + sort all work; Node integrity test asserted
+> rollups sum to totals, placement weights = 1.0 per metric, no NaN.
+> **Bug caught LIVE + fixed:** the Ads-grid KPI cards read $828.6K vs the correct $880.6K — ad rows keep
+> `profileId` AND I'd pre-normalized them to USD, so `KpiRow.toUsd` double-converted. Fix: Ads uses
+> per-row native currency (`adNativeMetricCols` + `adsMoneyFoot`), NOT USD pre-normalization. Re-verified:
+> all six grids reconcile to $880.6K. (The other rollups are safe — their group rows drop `profileId`, so
+> KpiRow's single-currency path leaves the already-USD-normalized money alone.)
+> **⚠ DEPLOY GOTCHA (new, cost 2 extra commits):** `device_stage_files` re-staging the SAME device path to
+> the read-only `/mnt/user-data/uploads/...` path does NOT overwrite the cached staged copy — the tool
+> reports the new byte count but the browser `file_upload` keeps sending the OLD file. Symptom: commit
+> lands but GitHub/Vercel serve stale content. FIX: stage the new build to a FRESH device subpath (used
+> `.ch-deploy/index.html`) so it maps to a new, uncached uploads path, then upload that. Always verify the
+> deployed file post-commit via the **GitHub contents API** (`atob(content).includes(marker)`) and a
+> same-origin `fetch('/index.html')` from the live page (check `x-vercel-cache: MISS`). Left a `.ch-deploy/`
+> helper folder on the device — safe to delete.
+> Commits: `5e12e96` (v0.14.0), `058d4ac` (stale — superseded), `<v0.14.0b>` (correct index.html). Repo
+> `src/` sync for Ads.jsx/App.jsx/Layout.jsx + docs still to push (device copies are current).
+> **Next session:** E5 stretch (Explorer), then E2 Campaign AI / Product AI surfaces, then E6 report suite.
+> — Prior session 11 summary below.
+>
+> **(session 11 header) v1.0 GOAL CLOSED (D3 done) + full Pacvue nav re-review + E1 Tagging SHIPPED
+> (was v0.13.0).** Read the three sub-summaries below: 11 = D3 review fixes
+> v0.12.2, 11b = nav re-review → GOALS §E1–E8, 11b-cont. = E1 Tagging v0.13.0.
 > Jim delegated the final review to Claude's testing ("robust in covering all the major fundamentals").
 > Ran 4 parallel agents: 3 adversarial per-surface code reviews + 1 Pacvue-fundamentals coverage audit.
 > **39 findings, 37 fixed same session** (full punch list + statuses: `tools/d3-review.md`). Highlights:
@@ -555,6 +594,6 @@ button now opens a real modal / persists; see §2.)
    verify) are saved in memory: see the "CommerceHub deploy process" memory.
 4. **Before deploying**, always run the verification routine in §2 (build invariants + `tsc` grep incl.
    `TS2448|TS2454`) and then eyeball the live site.
-5. Bump the sidebar version label (`.app-version` in `Layout.jsx`) when a phase ships — currently **v0.13.0**.
+5. Bump the sidebar version label (`.app-version` in `Layout.jsx`) when a phase ships — currently **v0.14.0**.
    (Note: since Phase 8 the build's `leftover export/import` line reads **`8 0`**, not `0 0` — the 8 are footnote
    text containing the word "export", not real ESM exports. Don't treat it as a regression.)

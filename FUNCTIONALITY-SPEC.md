@@ -349,11 +349,11 @@ complete sidebar/topbar tree as deployed live (every group expanded, every flyou
 | Settings/User Mgmt | ◐ | /settings (static team list) |
 | **Tagging (Campaign/Keyword/Asin)** | ❌ | **GOALS E1** |
 | **Campaign AI / Product AI** | ❌ | **GOALS E2** |
-| **Profile grid** | ❌ | **GOALS E4** |
-| **Portfolio grid** | ❌ | **GOALS E5** |
-| **Placement grid** | ❌ (dimension only) | **GOALS E5** |
-| **ASIN (advertised product) grid** | ❌ | **GOALS E5** |
-| **Ads grid** | ❌ | **GOALS E5** |
+| **Profile grid** | ✅ v0.14.0 | /ads/profile (E4, session 12) |
+| **Portfolio grid** | ✅ v0.14.0 | /ads/portfolio (E5, session 12) |
+| **Placement grid** | ✅ v0.14.0 | /ads/placement (E5 — synthetic split, session 12) |
+| **ASIN (advertised product) grid** | ✅ v0.14.0 | /ads/asin (E5, session 12) |
+| **Ads grid** | ✅ v0.14.0 | /ads/ads (E5, session 12) |
 | Explorer | ❌ | E5 stretch |
 | SP Prompts + SP Prompt Analytics | ❌ | out of scope v1.x (very new, AI-prompt niche) |
 | Default Report / Custom Dashboard / Marketplace Dashboard / Brand Analysis | ❌ | **GOALS E6** |
