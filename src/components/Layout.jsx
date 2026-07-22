@@ -46,6 +46,8 @@ const NAV = [
     items: [
       { to: '/rules', label: 'Rule Manager', icon: 'sliders' },
       { to: '/budgets', label: 'Budget Manager', icon: 'wallet' },
+      { to: '/ai/campaign', label: 'Campaign AI', icon: 'spark' },
+      { to: '/ai/product', label: 'Product AI', icon: 'box' },
     ],
   },
   {
@@ -83,7 +85,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.14.0</span>
+        <span className="app-version" title="CommerceHub build">v0.15.0</span>
       </div>
     </aside>
   )
@@ -101,7 +103,9 @@ const CRUMBS = {
   '/dsp': 'DSP · Campaigns', '/dsp/audiences': 'DSP · Audience Builder', '/dsp/amc': 'DSP · Amazon Marketing Cloud',
   '/commerce/shelf': 'Commerce · Digital Shelf', '/commerce/buybox': 'Commerce · Buy Box & Inventory',
   '/commerce/products': 'Commerce · Product Center', '/rules': 'Automation · Rule Manager',
-  '/budgets': 'Automation · Budget Manager', '/reports': 'Insights · Report Center', '/alerts': 'Insights · Alerts',
+  '/budgets': 'Automation · Budget Manager', '/ai/campaign': 'Automation · Campaign AI',
+  '/ai/product': 'Automation · Product AI',
+  '/reports': 'Insights · Report Center', '/alerts': 'Insights · Alerts',
   '/settings': 'Settings',
 }
 
