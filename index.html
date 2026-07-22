@@ -4324,6 +4324,24 @@ function adMetricCols(sym, note) {
     { key: 'aov', label: 'AOV', num: true, foot: (rs) => M(aggregate(rs).aov, 2), render: (r) => M(r.aov, 2) },
   ]
 }
+// Per-row native-currency metric columns (for grids whose rows are each a single profile —
+// money renders in that row's currency; totals convert to USD est. across profiles via
+// adsMoneyFoot). Used by the Ads grid (rows are 1:1 with campaigns).
+function adNativeMetricCols() {
+  return [
+    { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'cpc', label: 'CPC', num: true, foot: (rs) => cur(aggregate(rs).cpc, symOf(rs), 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
+    { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
+    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
+    { key: 'aov', label: 'AOV', num: true, foot: (rs) => cur(aggregate(rs).aov, symOf(rs), 2), render: (r) => cur(r.aov, symA(r.profileId), 2) },
+  ]
+}
 
 /* ============================ PROFILE (E4) ============================ */
 const PROFILE_FIELDS = [
@@ -4617,14 +4635,14 @@ function AdsGrid() {
   const { profileId, rangeResolved } = useApp()
   const base = useProfileFilter(ALL_CAMPAIGNS)
   const mixed = adsMixedCur(base)
-  const dispSym = mixed ? '$' : symOf(base)
-  const note = mixed ? ' (USD est.)' : ''
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ads-ads'))
+  // Ad rows are 1:1 with campaigns, so each carries its own profileId/currency — keep money
+  // native per row (like the Campaigns grid) and let KpiRow + adsMoneyFoot convert totals to
+  // USD est. Do NOT pre-convert to USD here (that would double-convert in KpiRow).
   const { rows: scaled0, prev } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
-  const scaled = useMemo(() => (mixed ? adToUsd(scaled0) : scaled0), [scaled0, mixed])
-  const prevCamps = useMemo(() => { const p = scaled0.map((c) => prev[c.id]).filter(Boolean); return mixed ? adToUsd(p) : p }, [scaled0, prev, mixed])
-  const rows0 = useMemo(() => adRowsFrom(scaled), [scaled])
+  const prevCamps = useMemo(() => scaled0.map((c) => prev[c.id]).filter(Boolean), [scaled0, prev])
+  const rows0 = useMemo(() => adRowsFrom(scaled0), [scaled0])
   const prevMap = useMemo(() => Object.fromEntries(adRowsFrom(prevCamps).map((r) => [r.id, r])), [prevCamps])
   const searched = rows0.filter((r) => (r.adName + ' ' + r.campaign).toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, ADS_FIELDS)
@@ -4633,11 +4651,11 @@ function AdsGrid() {
 
   const columns = [
     { key: 'adName', label: 'Ad', sticky: true, width: 300, sortVal: (r) => r.adName, render: (r) => (
-      <div className="namecell"><div className="nc-top"><Link className="celllink" to={`/ads/adgroups?camp=${r.campId || r.id.replace('AD-', '')}`} title="Drill into ad groups">{r.adName}</Link></div><small>{r.profileId.toUpperCase()} · {r.campaign?.split('-').slice(0, 2).join('-')}</small></div>) },
+      <div className="namecell"><div className="nc-top"><Link className="celllink" to={`/ads/adgroups?camp=${r.id.replace('AD-', '')}`} title="Drill into ad groups">{r.adName}</Link></div><small>{r.profileId.toUpperCase()} · {r.campaign?.split('-').slice(0, 2).join('-')}</small></div>) },
     { key: 'adType', label: 'Ad Type', render: (r) => <span className={`pill ${typeTone2(r.adType)}`} style={{ borderRadius: 5 }}>{r.adType}</span> },
     { key: 'state', label: 'State', render: (r) => <Pill>{r.state}</Pill> },
     { key: 'asin', label: 'ASIN', sort: false, render: (r) => <span className="muted">{r.asin}</span> },
-    ...adMetricCols(dispSym, note),
+    ...adNativeMetricCols(),
   ]
   const presets = {
     Performance: ['adName', 'adType', 'state', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas'],
