@@ -5,7 +5,7 @@ import Overview from './pages/Overview.jsx'
 import { Campaigns, AdGroups, Targeting, SearchTerms, ShareOfVoice, Dayparting, BulkOperations, Tagging, ProfileGrid, PortfolioGrid, PlacementGrid, AsinGrid, AdsGrid } from './pages/Ads.jsx'
 import { Dsp, Audiences, Amc } from './pages/Dsp.jsx'
 import { DigitalShelf, BuyBox, Products } from './pages/Commerce.jsx'
-import { Rules, Budgets } from './pages/Automation.jsx'
+import { Rules, Budgets, CampaignAI, ProductAI } from './pages/Automation.jsx'
 import { Reports, Alerts, Settings } from './pages/Insights.jsx'
 
 export default function App() {
@@ -35,6 +35,8 @@ export default function App() {
           <Route path="/commerce/products" element={<Products />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/budgets" element={<Budgets />} />
+          <Route path="/ai/campaign" element={<CampaignAI />} />
+          <Route path="/ai/product" element={<ProductAI />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/settings" element={<Settings />} />
