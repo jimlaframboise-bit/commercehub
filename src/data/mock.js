@@ -457,3 +457,91 @@ export const asinTags = [
   { id: 'AT4', name: 'Grain-Free', owner: 'jim@brightleaf.co', sub: ['Kibble', 'Puppy'], matchRule: { contains: ['Grain-Free', 'Puppy'], notContains: [] }, members: [] },
   { id: 'AT5', name: 'Catch All', owner: 'jim@brightleaf.co', sub: [], matchRule: { contains: [], notContains: ['Calming', 'Salmon', 'Sweet Potato', 'Grain-Free', 'Puppy'] }, members: [] },
 ]
+
+// ---------------------------------------------------------------------------
+// Optimization › AI (E2 — spec §13). Two AI-management surfaces that mirror
+// product.pacvue.com's /Optimization/AutomationAI + /Optimization/ASINAI:
+//   • Campaign AI — automated bid + budget + keyword-harvesting AI applied at
+//     the TAG or CAMPAIGN level. Core inputs: Target ROAS + Max Bid, optional
+//     Budget Control cap, optional auto keyword harvesting. Tracks ROAS (last
+//     30 days) and the count of keywords the AI harvested.
+//   • Product AI — per-ASIN automation driven by a launch Strategy (More
+//     Conversion / More Traffic / More Efficiency) toward a Target ROAS. Emits
+//     "managed events" (bid up / bid down / add targeting / pause targeting)
+//     and a weekly ROAS trend under "Auto" bidding.
+// All data fictional (Brightleaf).
+// ---------------------------------------------------------------------------
+export const AI_OWNERS = ['jim@brightleaf.co', 'a.rivera@brightleaf.co', 'm.chen@brightleaf.co']
+export const AI_STRATEGIES = ['More Conversion', 'More Traffic', 'More Efficiency']
+const _AI_AGO = ['1h ago', '2h ago', '3h ago', '5h ago', '6h ago', '9h ago', '11h ago']
+function _aiDate(daysAgo) {
+  const dt = new Date('2026-06-19'); dt.setDate(dt.getDate() - daysAgo)
+  return `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}/${dt.getFullYear()}`
+}
+
+export const campaignAI = (() => {
+  const out = []
+  // Tag-level AI settings (map onto the campaign tags, minus Catch All)
+  const tagPool = campaignTags.filter((t) => t.name !== 'Catch All')
+  tagPool.forEach((t, i) => {
+    const active = i % 3 !== 2
+    const bc = i % 2 === 0
+    const p = profiles[i % 2]
+    out.push({
+      id: 'CAI-T' + (i + 1), level: 'tag', name: t.name, refId: t.id, profileId: p.id,
+      aiState: active ? 'Active' : 'Paused',
+      targetRoas: Math.round(range(2.8, 4.6) * 100) / 100,
+      maxBid: Math.round(range(1.4, 3.2) * 100) / 100,
+      budgetControl: bc ? 'On' : 'Off', budgetCap: bc ? irange(150, 600) : 0,
+      harvest: true, harvestKWs: irange(4, 52),
+      roas30: Math.round(range(2.4, 5.2) * 100) / 100,
+      lastRun: active ? pick(_AI_AGO) : '—',
+      creator: AI_OWNERS[i % 3], createTime: _aiDate(irange(20, 95)),
+    })
+  })
+  // Campaign-level AI settings (first SP campaigns)
+  const campPool = campaigns.filter((c) => c.campaignType.startsWith('SP')).slice(0, 6)
+  campPool.forEach((c, i) => {
+    const active = i % 4 !== 3
+    const bc = i % 2 === 1
+    const harv = i % 3 !== 0
+    out.push({
+      id: 'CAI-C' + (i + 1), level: 'campaign', name: c.name, refId: c.id, profileId: c.profileId,
+      aiState: active ? 'Active' : 'Paused',
+      targetRoas: Math.round(range(2.6, 4.8) * 100) / 100,
+      maxBid: Math.round(range(1.2, 3.4) * 100) / 100,
+      budgetControl: bc ? 'On' : 'Off', budgetCap: bc ? irange(120, 500) : 0,
+      harvest: harv, harvestKWs: harv ? irange(2, 44) : 0,
+      roas30: Math.round(range(2.0, 5.6) * 100) / 100,
+      lastRun: active ? pick(_AI_AGO) : '—',
+      creator: AI_OWNERS[i % 3], createTime: _aiDate(irange(12, 120)),
+    })
+  })
+  return out
+})()
+
+export const productAI = (() => {
+  const out = []
+  let n = 1
+  for (const p of profiles.slice(0, 2)) {
+    const prods = PRODUCTS.slice(0, p.id === 'us' ? 8 : 6)
+    for (const prod of prods) {
+      const m = metricBlock(p.id === 'us' ? 1 : 0.7)
+      const active = rnd() > 0.5
+      const dailyBudget = pick([500, 1000, 1500, 2000])
+      const dailySpend = active ? Math.round(dailyBudget * range(0.02, 0.34) * 100) / 100 : 0
+      const trend = Array.from({ length: 8 }, (_, k) => ({ w: 'W' + (k + 1), roas: Math.round(range(2, 6) * 100) / 100 }))
+      out.push({
+        id: 'PAI-' + String(n++).padStart(3, '0'), asin: prod[0], title: prod[1], profileId: p.id,
+        state: active ? 'Enabled' : 'Paused', bidMode: 'Auto',
+        strategy: pick(AI_STRATEGIES), targetRoas: Math.round(range(2.5, 4.5) * 100) / 100,
+        budgetType: 'Daily', dailyBudget, dailySpend,
+        lastRunStart: _aiDate(irange(30, 62)), lastRunEnd: _aiDate(irange(1, 28)),
+        targets: irange(12, 240), owner: AI_OWNERS[irange(0, 2)], trend,
+        evIncBid: irange(0, 40), evDecBid: irange(0, 28), evAddTgt: irange(0, 24), evPauseTgt: irange(0, 16),
+        ...m,
+      })
+    }
+  }
+  return out
+})()
