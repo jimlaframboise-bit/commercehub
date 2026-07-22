@@ -36,8 +36,10 @@
 > deployed file post-commit via the **GitHub contents API** (`atob(content).includes(marker)`) and a
 > same-origin `fetch('/index.html')` from the live page (check `x-vercel-cache: MISS`). Left a `.ch-deploy/`
 > helper folder on the device — safe to delete.
-> Commits: `5e12e96` (v0.14.0), `058d4ac` (stale — superseded), `<v0.14.0b>` (correct index.html). Repo
-> `src/` sync for Ads.jsx/App.jsx/Layout.jsx + docs still to push (device copies are current).
+> Commits (all on `main`, Verified): `5e12e96` v0.14.0 (first, stale index) → `058d4ac` v0.14.0a (fix, but
+> uploaded stale index) → `17901d0` v0.14.0b (**correct deployed index.html**) → `6397ddb` src Ads.jsx →
+> `5e28666` src App.jsx → `4bec98d` src Layout.jsx → `db4ee9c` docs (GOALS/HANDOFF/SPEC). **Repo is fully
+> in sync** with the deployed build (index.html + all changed src + docs). Device copies all current.
 > **Next session:** E5 stretch (Explorer), then E2 Campaign AI / Product AI surfaces, then E6 report suite.
 > — Prior session 11 summary below.
 >
