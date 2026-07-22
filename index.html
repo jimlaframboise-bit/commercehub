@@ -497,6 +497,21 @@ table.dt tr.grow td.sticky-l { background: var(--brand-soft); }
 .tmpl-card { display:flex; align-items:center; gap:11px; border:1px solid var(--border); border-radius:10px; padding:11px 13px; cursor:pointer; transition:border-color .12s, background .12s; }
 .tmpl-card:hover { border-color:var(--brand); background:var(--brand-soft); }
 
+/* ---------------- Optimization › AI (E2): Product AI managed-events dashboard ---------------- */
+.ai-dash { display: grid; grid-template-columns: minmax(260px, 320px) 1fr; gap: 16px; margin-bottom: 18px; align-items: start; }
+.ai-dash .kpi-grid { margin-bottom: 0; }
+.ai-events { display: flex; flex-direction: column; }
+.ai-event { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.ai-event:first-child { border-top: none; }
+.ai-ev-ico { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; }
+.ai-ev-ico.green { background: var(--green-soft); color: #0f7a47; }
+.ai-ev-ico.amber { background: var(--amber-soft); color: #9a6300; }
+.ai-ev-ico.blue { background: var(--brand-soft); color: var(--brand); }
+.ai-ev-ico.red { background: var(--red-soft); color: var(--red); }
+.ai-ev-n { font-size: 19px; font-weight: 750; letter-spacing: -.3px; }
+.ai-ev-l { font-size: 11.5px; color: var(--text-2); }
+@media (max-width: 900px) { .ai-dash { grid-template-columns: 1fr; } }
+
 #boot { position:fixed; inset:0; display:grid; place-items:center; font-family:sans-serif; color:#5b6577; }
 </style>
 </head>
@@ -1121,6 +1136,94 @@ const asinTags = [
   { id: 'AT4', name: 'Grain-Free', owner: 'jim@brightleaf.co', sub: ['Kibble', 'Puppy'], matchRule: { contains: ['Grain-Free', 'Puppy'], notContains: [] }, members: [] },
   { id: 'AT5', name: 'Catch All', owner: 'jim@brightleaf.co', sub: [], matchRule: { contains: [], notContains: ['Calming', 'Salmon', 'Sweet Potato', 'Grain-Free', 'Puppy'] }, members: [] },
 ]
+
+// ---------------------------------------------------------------------------
+// Optimization › AI (E2 — spec §13). Two AI-management surfaces that mirror
+// product.pacvue.com's /Optimization/AutomationAI + /Optimization/ASINAI:
+//   • Campaign AI — automated bid + budget + keyword-harvesting AI applied at
+//     the TAG or CAMPAIGN level. Core inputs: Target ROAS + Max Bid, optional
+//     Budget Control cap, optional auto keyword harvesting. Tracks ROAS (last
+//     30 days) and the count of keywords the AI harvested.
+//   • Product AI — per-ASIN automation driven by a launch Strategy (More
+//     Conversion / More Traffic / More Efficiency) toward a Target ROAS. Emits
+//     "managed events" (bid up / bid down / add targeting / pause targeting)
+//     and a weekly ROAS trend under "Auto" bidding.
+// All data fictional (Brightleaf).
+// ---------------------------------------------------------------------------
+const AI_OWNERS = ['jim@brightleaf.co', 'a.rivera@brightleaf.co', 'm.chen@brightleaf.co']
+const AI_STRATEGIES = ['More Conversion', 'More Traffic', 'More Efficiency']
+const _AI_AGO = ['1h ago', '2h ago', '3h ago', '5h ago', '6h ago', '9h ago', '11h ago']
+function _aiDate(daysAgo) {
+  const dt = new Date('2026-06-19'); dt.setDate(dt.getDate() - daysAgo)
+  return `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}/${dt.getFullYear()}`
+}
+
+const campaignAI = (() => {
+  const out = []
+  // Tag-level AI settings (map onto the campaign tags, minus Catch All)
+  const tagPool = campaignTags.filter((t) => t.name !== 'Catch All')
+  tagPool.forEach((t, i) => {
+    const active = i % 3 !== 2
+    const bc = i % 2 === 0
+    const p = profiles[i % 2]
+    out.push({
+      id: 'CAI-T' + (i + 1), level: 'tag', name: t.name, refId: t.id, profileId: p.id,
+      aiState: active ? 'Active' : 'Paused',
+      targetRoas: Math.round(range(2.8, 4.6) * 100) / 100,
+      maxBid: Math.round(range(1.4, 3.2) * 100) / 100,
+      budgetControl: bc ? 'On' : 'Off', budgetCap: bc ? irange(150, 600) : 0,
+      harvest: true, harvestKWs: irange(4, 52),
+      roas30: Math.round(range(2.4, 5.2) * 100) / 100,
+      lastRun: active ? pick(_AI_AGO) : '—',
+      creator: AI_OWNERS[i % 3], createTime: _aiDate(irange(20, 95)),
+    })
+  })
+  // Campaign-level AI settings (first SP campaigns)
+  const campPool = campaigns.filter((c) => c.campaignType.startsWith('SP')).slice(0, 6)
+  campPool.forEach((c, i) => {
+    const active = i % 4 !== 3
+    const bc = i % 2 === 1
+    const harv = i % 3 !== 0
+    out.push({
+      id: 'CAI-C' + (i + 1), level: 'campaign', name: c.name, refId: c.id, profileId: c.profileId,
+      aiState: active ? 'Active' : 'Paused',
+      targetRoas: Math.round(range(2.6, 4.8) * 100) / 100,
+      maxBid: Math.round(range(1.2, 3.4) * 100) / 100,
+      budgetControl: bc ? 'On' : 'Off', budgetCap: bc ? irange(120, 500) : 0,
+      harvest: harv, harvestKWs: harv ? irange(2, 44) : 0,
+      roas30: Math.round(range(2.0, 5.6) * 100) / 100,
+      lastRun: active ? pick(_AI_AGO) : '—',
+      creator: AI_OWNERS[i % 3], createTime: _aiDate(irange(12, 120)),
+    })
+  })
+  return out
+})()
+
+const productAI = (() => {
+  const out = []
+  let n = 1
+  for (const p of profiles.slice(0, 2)) {
+    const prods = PRODUCTS.slice(0, p.id === 'us' ? 8 : 6)
+    for (const prod of prods) {
+      const m = metricBlock(p.id === 'us' ? 1 : 0.7)
+      const active = rnd() > 0.5
+      const dailyBudget = pick([500, 1000, 1500, 2000])
+      const dailySpend = active ? Math.round(dailyBudget * range(0.02, 0.34) * 100) / 100 : 0
+      const trend = Array.from({ length: 8 }, (_, k) => ({ w: 'W' + (k + 1), roas: Math.round(range(2, 6) * 100) / 100 }))
+      out.push({
+        id: 'PAI-' + String(n++).padStart(3, '0'), asin: prod[0], title: prod[1], profileId: p.id,
+        state: active ? 'Enabled' : 'Paused', bidMode: 'Auto',
+        strategy: pick(AI_STRATEGIES), targetRoas: Math.round(range(2.5, 4.5) * 100) / 100,
+        budgetType: 'Daily', dailyBudget, dailySpend,
+        lastRunStart: _aiDate(irange(30, 62)), lastRunEnd: _aiDate(irange(1, 28)),
+        targets: irange(12, 240), owner: AI_OWNERS[irange(0, 2)], trend,
+        evIncBid: irange(0, 40), evDecBid: irange(0, 28), evAddTgt: irange(0, 24), evPauseTgt: irange(0, 16),
+        ...m,
+      })
+    }
+  }
+  return out
+})()
 
 
 /* ===================== src/components/Icon.jsx ===================== */
@@ -2146,6 +2249,8 @@ const NAV = [
     items: [
       { to: '/rules', label: 'Rule Manager', icon: 'sliders' },
       { to: '/budgets', label: 'Budget Manager', icon: 'wallet' },
+      { to: '/ai/campaign', label: 'Campaign AI', icon: 'spark' },
+      { to: '/ai/product', label: 'Product AI', icon: 'box' },
     ],
   },
   {
@@ -2183,7 +2288,7 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.14.0</span>
+        <span className="app-version" title="CommerceHub build">v0.15.0</span>
       </div>
     </aside>
   )
@@ -2201,7 +2306,9 @@ const CRUMBS = {
   '/dsp': 'DSP · Campaigns', '/dsp/audiences': 'DSP · Audience Builder', '/dsp/amc': 'DSP · Amazon Marketing Cloud',
   '/commerce/shelf': 'Commerce · Digital Shelf', '/commerce/buybox': 'Commerce · Buy Box & Inventory',
   '/commerce/products': 'Commerce · Product Center', '/rules': 'Automation · Rule Manager',
-  '/budgets': 'Automation · Budget Manager', '/reports': 'Insights · Report Center', '/alerts': 'Insights · Alerts',
+  '/budgets': 'Automation · Budget Manager', '/ai/campaign': 'Automation · Campaign AI',
+  '/ai/product': 'Automation · Product AI',
+  '/reports': 'Insights · Report Center', '/alerts': 'Insights · Alerts',
   '/settings': 'Settings',
 }
 
@@ -5992,6 +6099,308 @@ function Budgets() {
   )
 }
 
+/* ============================ CAMPAIGN AI (E2 — spec §13) ============================ */
+// Automated bid + budget + keyword-harvesting AI applied at the Tag or Campaign
+// level. Two tabs (Tag Level / Campaign Level) mirror Pacvue's Campaign AI grid;
+// the launch flow captures the core inputs (Target ROAS, Max Bid, Budget Control,
+// auto-harvest). AI State is a per-row toggle persisted to localStorage.
+const CAMPAI_FIELDS = [
+  { key: 'name', label: 'Name', type: 'text' },
+  { key: 'aiState', label: 'AI State', type: 'enum', options: ['Active', 'Paused'] },
+  { key: 'market', label: 'Profile', type: 'enum', options: ['Amazon USA', 'Amazon Canada', 'Amazon UK'] },
+  { key: 'budgetControl', label: 'Budget Control', type: 'enum', options: ['On', 'Off'] },
+  { key: 'targetRoas', label: 'Target ROAS', type: 'number' },
+  { key: 'roas30', label: 'ROAS (30d)', type: 'number' },
+  { key: 'harvestKWs', label: 'Harvest KWs', type: 'number' },
+  { key: 'creator', label: 'Creator', type: 'text' },
+]
+function LaunchCampaignAIModal({ level, onClose, onLaunch }) {
+  const pool = level === 'tag' ? campaignTags : campaigns.filter((c) => c.campaignType.startsWith('SP'))
+  const [refId, setRefId] = useState(pool[0] ? pool[0].id : '')
+  const [targetRoas, setTargetRoas] = useState('3.5')
+  const [maxBid, setMaxBid] = useState('2.00')
+  const [budgetOn, setBudgetOn] = useState(true)
+  const [budgetCap, setBudgetCap] = useState('300')
+  const [harvest, setHarvest] = useState(true)
+  const sel = pool.find((x) => x.id === refId) || {}
+  const pid = level === 'tag' ? 'us' : (sel.profileId || 'us')
+  const submit = () => {
+    onLaunch({
+      id: 'CAI-N' + Date.now().toString().slice(-7), level, name: sel.name || sel.id || 'New', refId,
+      profileId: pid, aiState: 'Active',
+      targetRoas: +targetRoas || 3.5, maxBid: +maxBid || 2,
+      budgetControl: budgetOn ? 'On' : 'Off', budgetCap: budgetOn ? (+budgetCap || 0) : 0,
+      harvest, harvestKWs: 0, roas30: 0, lastRun: 'just now',
+      creator: 'jim@brightleaf.co', createTime: new Date().toISOString().slice(0, 10),
+    })
+  }
+  return (
+    <Modal title={`Launch AI for a Single ${level === 'tag' ? 'Tag' : 'Campaign'}`} sub="Set a Target ROAS and Max Bid — the AI paces bids toward it and harvests converting search terms automatically." onClose={onClose} width={480}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" onClick={submit}>Launch AI</Btn></>}>
+      <label className="fld">{level === 'tag' ? 'Tag' : 'Campaign'}
+        <select value={refId} onChange={(e) => setRefId(e.target.value)}>
+          {pool.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </select>
+      </label>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <label className="fld" style={{ flex: 1 }}>Target ROAS<input type="number" step="0.1" value={targetRoas} onChange={(e) => setTargetRoas(e.target.value)} /></label>
+        <label className="fld" style={{ flex: 1 }}>Max Bid ($)<input type="number" step="0.05" value={maxBid} onChange={(e) => setMaxBid(e.target.value)} /></label>
+      </div>
+      <label className="fld" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Toggle on={budgetOn} onClick={() => setBudgetOn((v) => !v)} /><span>Budget Control</span>
+        {budgetOn && <input type="number" style={{ width: 120, marginLeft: 'auto' }} value={budgetCap} onChange={(e) => setBudgetCap(e.target.value)} placeholder="Daily cap" />}
+      </label>
+      <label className="fld" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Toggle on={harvest} onClick={() => setHarvest((v) => !v)} /><span>Auto keyword harvesting</span>
+      </label>
+      <div className="modal-note"><Icon name="bulb" size={14} /><span>Campaign AI is an automated alternative to manual rules — a good default when you want Pacvue to manage bids toward efficiency without hand-tuning.</span></div>
+    </Modal>
+  )
+}
+function CampaignAI() {
+  const { profileId } = useApp()
+  const [tab, setTab] = useState('Tag Level')
+  const level = tab === 'Tag Level' ? 'tag' : 'campaign'
+  const [created, setCreated] = useState(() => createdStore.get('campaign-ai'))
+  const [stateOv, setStateOv] = usePersistentOverrides('campaign-ai-state')
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('campaign-ai'))
+  const [launch, setLaunch] = useState(false)
+
+  const all = useMemo(() => [...created, ...campaignAI], [created])
+  const rows0 = useMemo(() => all
+    .filter((r) => r.level === level)
+    .filter((r) => profileId === 'all' || r.profileId === profileId)
+    .map((r) => {
+      const p = profileById[r.profileId] || {}
+      const st = (stateOv[r.id] && stateOv[r.id].aiState) || r.aiState
+      return { ...r, aiState: st, market: p.market || r.profileId, currency: p.currency || '$' }
+    }), [all, level, profileId, stateOv])
+  const searched = rows0.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, CAMPAI_FIELDS)
+
+  const toggleAI = (r) => {
+    const next = r.aiState === 'Active' ? 'Paused' : 'Active'
+    setStateOv((o) => ({ ...o, [r.id]: { ...o[r.id], aiState: next } }))
+    toast(`AI ${next === 'Active' ? 'resumed' : 'paused'} for “${r.name}”`)
+  }
+  const onLaunch = (setting) => {
+    const next = [setting, ...created]; createdStore.set('campaign-ai', next); setCreated(next)
+    setLaunch(false); toast(`Launched Campaign AI for “${setting.name}”`)
+  }
+
+  const activeN = filtered.filter((r) => r.aiState === 'Active').length
+  const avgTgt = filtered.length ? filtered.reduce((a, r) => a + r.targetRoas, 0) / filtered.length : 0
+  const totHarvest = filtered.reduce((a, r) => a + (r.harvestKWs || 0), 0)
+  const avgRoas = filtered.length ? filtered.reduce((a, r) => a + r.roas30, 0) / filtered.length : 0
+
+  const columns = [
+    { key: 'name', label: level === 'tag' ? 'Tag' : 'Campaign', sticky: true, width: 300, sortVal: (r) => r.name, render: (r) => (
+      <div className="namecell"><div className="nc-top"><b>{r.name}</b>{r.level === 'tag' && <span className="tag" style={{ marginLeft: 6 }}>Tag</span>}</div><small>Target ROAS {dec2(r.targetRoas)} · Max bid {cur(r.maxBid, r.currency, 2)}{r.harvest ? ' · auto-harvest' : ''}</small></div>) },
+    { key: 'aiState', label: 'AI State', sortVal: (r) => r.aiState, render: (r) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Pill>{r.aiState}</Pill><Toggle on={r.aiState === 'Active'} onClick={() => toggleAI(r)} /></span> },
+    { key: 'market', label: 'Profile', sortVal: (r) => r.market, render: (r) => <span>{r.market}</span> },
+    { key: 'budgetControl', label: 'Budget Control', sortVal: (r) => r.budgetControl, render: (r) => r.budgetControl === 'On' ? <span className="muted">Daily {cur(r.budgetCap, r.currency)}</span> : <span className="muted">—</span> },
+    { key: 'roas30', label: 'ROAS (Last 30 Days)', num: true, sortVal: (r) => r.roas30, foot: (rs) => dec2(rs.reduce((a, r) => a + r.roas30, 0) / (rs.length || 1)), render: (r) => <span style={{ color: r.roas30 >= r.targetRoas ? 'var(--green)' : r.roas30 < r.targetRoas * 0.8 ? 'var(--red)' : 'inherit', fontWeight: 600 }}>{dec2(r.roas30)}</span> },
+    { key: 'harvestKWs', label: 'Harvest KWs', num: true, sortVal: (r) => r.harvestKWs, foot: (rs) => int(rs.reduce((a, r) => a + (r.harvestKWs || 0), 0)), render: (r) => int(r.harvestKWs) },
+    { key: 'lastRun', label: 'Last Run', sortVal: (r) => r.lastRun, render: (r) => <span className="muted">{r.lastRun}</span> },
+    { key: 'creator', label: 'Creator', sortVal: (r) => r.creator, render: (r) => <span className="muted">{r.creator}</span> },
+    { key: 'createTime', label: 'Create Time', sortVal: (r) => r.createTime, render: (r) => <span className="muted">{r.createTime}</span> },
+  ]
+  const dims = [{ key: 'aiState', label: 'AI State' }, { key: 'budgetControl', label: 'Budget Control' }, { key: 'market', label: 'Profile' }]
+  return (
+    <>
+      <AutoHead title="Campaign AI" sub="Automated bid, budget & keyword-harvesting AI at the tag or campaign level — set a Target ROAS and Max Bid, the AI paces toward it.">
+        <ExportMenu name="campaign-ai" fields={CAMPAI_FIELDS} rows={filtered} />
+        <Btn icon="spark" primary onClick={() => setLaunch(true)}>Launch AI for {level === 'tag' ? 'Tag' : 'Campaign'}</Btn>
+      </AutoHead>
+      <KpiGrid>
+        <Kpi label={`AI ${level === 'tag' ? 'Tags' : 'Campaigns'} · Active`} value={`${activeN}/${filtered.length}`} />
+        <Kpi label="Avg Target ROAS" value={dec2(avgTgt)} />
+        <Kpi label="Avg ROAS (30d)" value={dec2(avgRoas)} deltaGood />
+        <Kpi label="Keywords Harvested" value={int(totHarvest)} />
+      </KpiGrid>
+      <ViewTabs tabs={['Tag Level', 'Campaign Level']} active={tab} onChange={setTab} />
+      <DataGrid
+        id={`campaign-ai-${level}`} columns={columns} rows={filtered}
+        initialSort={{ key: 'roas30', dir: 'desc' }} dimensions={dims} totals
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder={`Search ${level === 'tag' ? 'tags' : 'campaigns'}…`} />
+          <FilterBar id="campaign-ai" fields={CAMPAI_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Campaign AI is Pacvue's alternative to manual rules — give it a Target ROAS and a Max Bid and it auto-adjusts bids, controls budget, and harvests converting search terms. Toggle AI State per row; ROAS (Last 30 Days) is colour-coded against each row's target. Launch new AI for a tag or campaign from the top-right button.</div>
+      {launch && <LaunchCampaignAIModal level={level} onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
+    </>
+  )
+}
+
+/* ============================ PRODUCT AI (E2 — spec §13) ============================ */
+// Per-ASIN automation driven by a launch Strategy toward a Target ROAS. Renders
+// the Managed-Events panel + KPI tiles + a performance chart above an ASIN grid
+// (Weekly ROAS Trend under "Auto" bidding, Strategy, Spend/Budget, targets).
+const PRODAI_FIELDS = [
+  { key: 'asin', label: 'ASIN', type: 'text' },
+  { key: 'title', label: 'Name', type: 'text' },
+  { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused'] },
+  { key: 'market', label: 'Profile', type: 'enum', options: ['Amazon USA', 'Amazon Canada', 'Amazon UK'] },
+  { key: 'strategy', label: 'Strategy', type: 'enum', options: ['More Conversion', 'More Traffic', 'More Efficiency'] },
+  { key: 'budgetType', label: 'Budget Type', type: 'enum', options: ['Daily'] },
+  { key: 'targetRoas', label: 'Target ROAS', type: 'number' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+]
+const PRODAI_EVENTS = [
+  { key: 'evIncBid', label: 'Increase Bid', icon: 'trendUp', tone: 'green' },
+  { key: 'evDecBid', label: 'Decrease Bid', icon: 'trendDown', tone: 'amber' },
+  { key: 'evAddTgt', label: 'Add Targeting', icon: 'target', tone: 'blue' },
+  { key: 'evPauseTgt', label: 'Pause Targeting', icon: 'pause', tone: 'red' },
+]
+function ManagedEvents({ rows, days }) {
+  const f = days / 30
+  return (
+    <div className="ai-events">
+      {PRODAI_EVENTS.map((e) => {
+        const total = Math.round(rows.reduce((a, r) => a + (r[e.key] || 0), 0) * f)
+        return (
+          <div key={e.key} className="ai-event">
+            <div className={`ai-ev-ico ${e.tone}`}><Icon name={e.icon} size={16} /></div>
+            <div><div className="ai-ev-n">{int(total)}</div><div className="ai-ev-l">{e.label}</div></div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+function LaunchProductAIModal({ onClose, onLaunch }) {
+  const catalog = useMemo(() => [...new Map(productAI.map((r) => [r.asin, r])).values()], [])
+  const [asin, setAsin] = useState(catalog[0] ? catalog[0].asin : '')
+  const [strategy, setStrategy] = useState(AI_STRATEGIES[0])
+  const [targetRoas, setTargetRoas] = useState('3.5')
+  const [dailyBudget, setDailyBudget] = useState('1000')
+  const sel = catalog.find((x) => x.asin === asin) || {}
+  const submit = () => {
+    const tr = +targetRoas || 3.5
+    onLaunch([{
+      id: 'PAI-N' + Date.now().toString().slice(-7), asin, title: sel.title || asin, profileId: sel.profileId || 'us',
+      state: 'Enabled', bidMode: 'Auto', strategy, targetRoas: tr,
+      budgetType: 'Daily', dailyBudget: +dailyBudget || 1000, dailySpend: 0,
+      lastRunStart: new Date().toISOString().slice(0, 10), lastRunEnd: 'pending',
+      targets: 0, owner: 'jim@brightleaf.co',
+      trend: Array.from({ length: 8 }, (_, k) => ({ w: 'W' + (k + 1), roas: tr })),
+      evIncBid: 0, evDecBid: 0, evAddTgt: 0, evPauseTgt: 0,
+      impr: 0, clk: 0, ctr: 0, cpc: 0, spend: 0, cvr: 0, orders: 0, sales: 0, units: 0, acos: 0, roas: 0, cpa: 0, aov: 0,
+    }])
+  }
+  return (
+    <Modal title="Launch a Single Product AI" sub="Choose a launch Strategy and Target ROAS — the AI manages bids and targeting for this ASIN." onClose={onClose} width={500}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" onClick={submit}>Launch AI</Btn></>}>
+      <label className="fld">Product (ASIN)
+        <select value={asin} onChange={(e) => setAsin(e.target.value)}>
+          {catalog.map((x) => <option key={x.asin} value={x.asin}>{(x.title || '').split('—')[0].trim()} · {x.asin}</option>)}
+        </select>
+      </label>
+      <label className="fld">Strategy
+        <select value={strategy} onChange={(e) => setStrategy(e.target.value)}>
+          {AI_STRATEGIES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </label>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <label className="fld" style={{ flex: 1 }}>Target ROAS<input type="number" step="0.1" value={targetRoas} onChange={(e) => setTargetRoas(e.target.value)} /></label>
+        <label className="fld" style={{ flex: 1 }}>Daily Budget ($)<input type="number" step="50" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} /></label>
+      </div>
+      <div className="modal-note"><Icon name="bulb" size={14} /><span><b>More Conversion</b> maximizes orders at target ROAS · <b>More Traffic</b> grows impressions &amp; clicks · <b>More Efficiency</b> protects ROAS and trims wasted spend.</span></div>
+    </Modal>
+  )
+}
+function ProductAI() {
+  const { profileId, rangeResolved } = useApp()
+  const [created, setCreated] = useState(() => createdStore.get('product-ai'))
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('product-ai'))
+  const [launch, setLaunch] = useState(false)
+
+  const base = useMemo(() => [...created, ...productAI].filter((r) => profileId === 'all' || r.profileId === profileId), [created, profileId])
+  const { rows: scaled } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
+  const rows0 = useMemo(() => scaled.map((r) => { const p = profileById[r.profileId] || {}; return { ...r, market: p.market || r.profileId, currency: p.currency || '$' } }), [scaled])
+  const searched = rows0.filter((r) => (r.asin + ' ' + r.title).toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, PRODAI_FIELDS)
+
+  const mixed = new Set(filtered.map((r) => r.profileId)).size > 1
+  const note = mixed ? ' (USD est.)' : ''
+  const dispSym = mixed ? '$' : (filtered[0] ? filtered[0].currency : '$')
+  const toUsd = (r) => (mixed ? { ...r, spend: (r.spend || 0) * fxUSD(r.profileId), sales: (r.sales || 0) * fxUSD(r.profileId) } : r)
+  const moneyFoot = (key) => (rs) => cur(rs.reduce((a, r) => a + (r[key] || 0) * (mixed ? fxUSD(r.profileId) : 1), 0), dispSym) + note
+  const agg = aggregate(filtered.map(toUsd))
+
+  const onLaunch = (rowset) => { const next = [...rowset, ...created]; createdStore.set('product-ai', next); setCreated(next); setLaunch(false); toast(`Launched Product AI on ${rowset.length} ASIN${rowset.length === 1 ? '' : 's'}`) }
+
+  const columns = [
+    { key: 'asin', label: 'ASIN', sticky: true, width: 300, sortVal: (r) => r.title, render: (r) => (
+      <div className="namecell"><div className="nc-top"><b>{(r.title || '').split('—')[0].trim()}</b></div><small>ASIN {r.asin} · {r.market}</small></div>) },
+    { key: 'state', label: 'State', sortVal: (r) => r.state, render: (r) => <Pill>{r.state}</Pill> },
+    { key: 'trend', label: 'Weekly ROAS Trend', sort: false, width: 170, render: (r) => (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span className="tag" style={{ color: 'var(--brand)' }}>{r.bidMode}</span><div style={{ width: 92 }}><MiniLine data={r.trend} dataKey="roas" color="#6b4fd6" height={28} /></div></div>) },
+    { key: 'strategy', label: 'Strategy', sortVal: (r) => r.strategy, render: (r) => <Pill tone="blue">{r.strategy}</Pill> },
+    { key: 'spendBudget', label: 'Spend/Budget', num: true, sort: false, render: (r) => { const pc = r.dailyBudget ? (r.dailySpend / r.dailyBudget) * 100 : 0; return <div style={{ textAlign: 'right' }}><b>{Math.round(pc)}%</b><div className="muted" style={{ fontSize: 11 }}>{r.budgetType}: {cur(r.dailySpend, r.currency)} / {cur(r.dailyBudget, r.currency)}</div></div> } },
+    { key: 'targets', label: 'Targets', num: true, sortVal: (r) => r.targets, foot: (rs) => int(rs.reduce((a, r) => a + (r.targets || 0), 0)), render: (r) => <span className="muted">{int(r.targets)} targets</span> },
+    { key: 'lastRunEnd', label: 'Last Run', sort: false, render: (r) => <span className="muted" style={{ fontSize: 11 }}>{r.lastRunStart} ~ {r.lastRunEnd}</span> },
+    { key: 'owner', label: 'Owner', sortVal: (r) => r.owner, render: (r) => <span className="muted">{r.owner}</span> },
+    { key: 'targetRoas', label: 'Target ROAS', num: true, sortVal: (r) => r.targetRoas, render: (r) => dec2(r.targetRoas) },
+    { key: 'sales', label: 'Sales', num: true, foot: moneyFoot('sales'), render: (r) => cur(r.sales, r.currency) },
+    { key: 'spend', label: 'Spend', num: true, foot: moneyFoot('spend'), render: (r) => cur(r.spend, r.currency) },
+    { key: 'roas', label: 'ROAS', num: true, foot: (rs) => dec2(aggregate(rs.map(toUsd)).roas), render: (r) => dec2(r.roas) },
+    { key: 'acos', label: 'ACoS', num: true, foot: (rs) => pct(aggregate(rs.map(toUsd)).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
+    { key: 'impr', label: 'Impr.', num: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
+    { key: 'orders', label: 'Orders', num: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+  ]
+  const presets = {
+    'Default Columns': ['asin', 'state', 'trend', 'strategy', 'spendBudget', 'targets', 'lastRunEnd', 'owner', 'sales', 'spend', 'roas', 'acos'],
+    Performance: ['asin', 'strategy', 'sales', 'spend', 'roas', 'acos', 'impr', 'clk', 'cvr', 'orders'],
+  }
+  const dims = [{ key: 'strategy', label: 'Strategy' }, { key: 'state', label: 'State' }, { key: 'market', label: 'Profile' }]
+  return (
+    <>
+      <AutoHead title="Product AI" sub={`ASIN-level automation · ${rangeResolved.label}${mixed ? ' · USD est.' : ''} — pick a launch Strategy toward a Target ROAS; the AI manages bids & targeting per product.`}>
+        <ExportMenu name="product-ai" fields={PRODAI_FIELDS} rows={filtered} />
+        <Btn icon="spark" primary onClick={() => setLaunch(true)}>Launch AI</Btn>
+      </AutoHead>
+      <div className="ai-dash">
+        <Card title="Managed Events" sub={`AI actions · ${rangeResolved.label}`} pad={false}>
+          <ManagedEvents rows={filtered} days={rangeResolved.days} />
+        </Card>
+        <KpiGrid>
+          <Kpi label="Impressions" value={compact(agg.impr)} />
+          <Kpi label="Clicks" value={compact(agg.clk)} />
+          <Kpi label="Orders" value={compact(agg.orders)} />
+          <Kpi label="Spend" value={money(agg.spend, dispSym) + note} />
+          <Kpi label="Sales" value={money(agg.sales, dispSym) + note} />
+          <Kpi label="ACoS" value={pct(agg.acos)} />
+          <Kpi label="ROAS" value={dec2(agg.roas)} />
+          <Kpi label="CVR" value={pct(agg.cvr)} />
+        </KpiGrid>
+      </div>
+      <Card title="Performance" sub={`Spend vs Sales · ${rangeResolved.label}`}>
+        <PerfChart data={timeseries} />
+      </Card>
+      <DataGrid
+        id="product-ai" columns={columns} rows={filtered}
+        initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Columns"
+        dimensions={dims} totals
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search ASIN or product…" />
+          <FilterBar id="product-ai" fields={PRODAI_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Product AI runs per-ASIN automation toward a Target ROAS using a launch Strategy (More Conversion / More Traffic / More Efficiency). The Managed Events panel counts the AI's bid and targeting actions in the selected range; Weekly ROAS Trend shows each product's trajectory under "Auto" bidding. Money totals across profiles are USD estimates.</div>
+      {launch && <LaunchProductAIModal onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
+    </>
+  )
+}
+
 
 /* ===================== src/pages/Insights.jsx ===================== */
 
@@ -6330,6 +6739,8 @@ function App() {
           <Route path="/commerce/products" element={<Products />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/budgets" element={<Budgets />} />
+          <Route path="/ai/campaign" element={<CampaignAI />} />
+          <Route path="/ai/product" element={<ProductAI />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/settings" element={<Settings />} />
