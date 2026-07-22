@@ -367,6 +367,65 @@ complete sidebar/topbar tree as deployed live (every group expanded, every flyou
 
 ---
 
+## §13. Optimization › AI: Campaign AI + Product AI (2026-07-22, session 13 — Crump account, live audit)
+
+Audited the two Optimization AI surfaces (GOALS E2) live at product.pacvue.com. Both are under the
+**Optimization** nav group (URLs `/Optimization/AutomationAI` = Campaign AI, `/Optimization/ASINAI` =
+Product AI). Full Optimization group nav URLs captured: Dayparting `/Optimization/Dayparting`, Budget
+Scheduler `/Optimization/Schedule`, Rule `/Optimization/Rule`, Campaign AI `/Optimization/AutomationAI`,
+Product AI `/Optimization/ASINAI`, Recommendation `/recommendation`, Live Ad Momentum
+`/Optimization/LiveMomentum`, Bid Explorer `/Optimization/BidExplorer`, Automation Health
+`/Optimization/AutomationDashboard`.
+
+### 13.1 Campaign AI (`/Optimization/AutomationAI`)
+Automated bid + budget + keyword-harvesting AI — Pacvue's alternative to manual rules; you set a
+**Target ROAS** and **Max Bid** and it paces bids toward efficiency and auto-harvests converting search
+terms. Two tabs:
+- **Tag Level** — filters: **AI State · Applied Profile · Applied Tag · Creator** + Search + column
+  settings. Primary action **"Launch AI for Tag"** (split dropdown: *Launch AI for A single Tag* /
+  *Launch AI for Tag in Batches*) · **Bulk Operation** (disabled until row selection). Grid columns:
+  ☑ · **Tag · AI State · Profile · Budget Control** (w/ "Guide" link) **· ROAS (Last 30 Days) · Harvest
+  KWs · Last Run · Creator · Create Time**.
+- **Campaign Level** — same layout keyed by **Campaign**; filters swap Applied Tag → **Applied Campaign**;
+  action **"Launch AI for Campaign"**.
+- Crump account showed **"No data found"** for both tabs (not using Campaign AI). Launch-modal fields
+  captured from the columns + Pacvue's documented model: **Target ROAS + Max Bid** are the two core
+  inputs, plus **Budget Control** (optional daily cap) and **auto keyword harvesting** (drives the
+  Harvest-KWs count). NOTE: the "Launch AI" split-button dropdown renders **behind the grid scrollbar**
+  (z-index bug) — automated clicks/keypresses fell through to the scrollbar, so the modal body wasn't
+  openable via tooling; structure captured from the grid + docs.
+
+### 13.2 Product AI (`/Optimization/ASINAI`)
+Per-ASIN automation driven by a launch **Strategy** toward a **Target ROAS**. Page is a dashboard +
+grid (had live Crump data: 18 ASINs, all bid-mode "Auto", strategy "More Conversion", mostly Paused):
+- Top: date-range picker (full Pacvue preset list incl. the Exclude-latest-2-days variants).
+- **"Product AI — Managed Events"** panel: four event-type cards with counts + delta — **Increase Bid ·
+  Decrease Bid · Add Targeting · Pause Targeting** (the AI actions taken in range).
+- **KPI tiles:** Impressions · Sale Units · Clicks · ACOS · ROAS · Orders · Spend · Sales · CPC · CPA ·
+  CTR (+ add-widget tile). **Performance** chart below (Spend / Impressions / Clicks multi-axis).
+- **Filters:** Profile · Name (≤1000) · State · ASIN (≤1000) · Campaign State (Enabled) · Budget Type ·
+  **Strategy** · **Target ROAS** ("Is" · Min~Max $) · Owner + Search. Actions: **Launch AI** (dropdown:
+  *Launch a single AI* / *Launch AI in batches*) · Bulk Operation · Select Current.
+- **Grid columns:** ☑ · **ASIN** (thumb + product name + ASIN link) · **State · Profile · Weekly ROAS
+  Trend** (bid-mode "Auto" link + sparkline) · **Strategy · Spend/Budget** (% + "Daily: $spend / $budget")
+  · **Last Run** (date range) · [row expander: "N targets affect"] · **Owner** · Sales · Spend · ROAS ·
+  Impression · Click · CTR · CPC · CPA · CVR · Orders · Sale Units.
+- **Strategy** values = **More Conversion / More Traffic / More Efficiency** (the three launch strategies;
+  clone maps them to maximize-orders / grow-traffic / protect-ROAS).
+
+### 13.3 Clone build (v0.15.0)
+Built both surfaces in `src/pages/Automation.jsx` under the **Automation** nav group (the clone's
+equivalent of Pacvue's Optimization group): `CampaignAI` at **`/ai/campaign`**, `ProductAI` at
+**`/ai/product`**. Campaign AI = ViewTabs (Tag/Campaign Level) + KPI row + DataGrid (AI-State Pill +
+per-row Toggle, colour-coded ROAS-vs-target) + FilterBar + Launch-AI modal (Target ROAS · Max Bid ·
+Budget Control · auto-harvest). Product AI = Managed-Events panel (`.ai-events`, range-scaled counts) +
+KPI tiles + PerfChart + DataGrid (Weekly-ROAS-Trend MiniLine, Strategy pills, Spend/Budget, targets) +
+Launch-AI modal (Strategy · Target ROAS · Daily Budget). Seeds `campaignAI` (11) + `productAI` (14) +
+`AI_OWNERS` / `AI_STRATEGIES` in `mock.js`, Brightleaf only. AI-State toggles persist to
+`chedits:campaign-ai-state`; launches persist to `chcreated:campaign-ai` / `chcreated:product-ai`.
+
+---
+
 ## §12. Tagging (E1) — live audit findings (2026-07-21, session 11b)
 
 Audited live on the Crump account: /Campaign/CampaignTagging, /Campaign/KeywordTagging,

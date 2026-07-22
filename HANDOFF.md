@@ -2,7 +2,45 @@
 
 > **Purpose of this file:** a single source of truth so any session can pick up exactly where we left off.
 > Claude maintains this file — update it at the end of each working session (status, decisions, next steps).
-> **Last updated:** 2026-07-22 (session 12 — **E4 Profile grid + E5 grid family SHIPPED. Live at v0.14.0.**)
+> **Last updated:** 2026-07-22 (session 13 — **E2 Campaign AI + Product AI SHIPPED. Live at v0.15.0.**)
+>
+> **(session 13, 2026-07-22) — E2 Campaign AI + Product AI SHIPPED as v0.15.0.** Live-audited both real
+> Optimization AI surfaces on the Crump account (product.pacvue.com), then built faithful clones under the
+> **Automation** nav group. **Campaign AI** (`/ai/campaign`, real `/Optimization/AutomationAI`): **Tag Level /
+> Campaign Level** tabs, "Launch AI for Tag/Campaign" dropdown (single / in-batches), filters (AI State ·
+> Applied Profile · Applied Tag/Campaign · Creator), grid columns Tag/Campaign · AI State (Pill + per-row
+> Toggle) · Profile · Budget Control · **ROAS (Last 30 Days)** (colour-coded vs each row's target) · Harvest
+> KWs · Last Run · Creator · Create Time; a **Launch-AI modal** (Target ROAS + Max Bid + Budget Control cap +
+> auto-harvest). **Product AI** (`/ai/product`, real `/Optimization/ASINAI`): a **Managed-Events** dashboard
+> (Increase Bid / Decrease Bid / Add Targeting / Pause Targeting counts, range-scaled) + KPI tiles + Performance
+> chart + an ASIN grid (Weekly ROAS Trend "Auto" sparkline · **Strategy** = More Conversion/Traffic/Efficiency ·
+> Spend/Budget "Daily: $x/$cap" · N targets · Owner · full metrics); a **Launch-AI modal** (Strategy + Target
+> ROAS + Daily Budget). All in `src/pages/Automation.jsx` (new exports `CampaignAI` / `ProductAI`); seeds
+> `campaignAI` (11: 5 tag + 6 campaign) + `productAI` (14 ASINs, US+CA) + `AI_OWNERS` / `AI_STRATEGIES` in
+> `mock.js`; new nav items + CRUMBS + routes; new `.ai-dash`/`.ai-events` CSS; version → **v0.15.0**.
+> **Verification (strong):** built single-file (dup decls `[]`, leftover `9 0` benign); ran a Node data-integrity
+> check (11 CampaignAI + 14 ProductAI rows, valid enums, trend arrays len 8, no NaN, aggregate finite); then
+> rendered the bundle in the sandbox's **headless Chromium via Playwright** (React/ReactDOM/Babel **inlined** from
+> a local `npm install` — see gotcha below) — **0 console/page errors across all 27 routes**, plus AI interaction
+> checks (Campaign-Level tab switch, both Launch modals open, exactly 4 managed-event cards, correct row counts:
+> Campaign AI 5 tags / Product AI 14). Deployed `be2361f` (index.html); verified live via GitHub contents API
+> (v0.15.0 + markers) + Vercel `fetch` (`x-vercel-cache: MISS`) + screenshots of both live pages.
+> **⚠ RENDER-HARNESS GOTCHA (new, cost ~3 iterations):** to render the bundle locally you must **INLINE** the 3
+> vendor scripts (React/ReactDOM/Babel), NOT reference them via `<script src="./node_modules/…">` — a `file://`
+> origin blocks local `<script src>` by CORS ("origin null"), so React never defines. AND when inlining via
+> `String.replace(regex, content)`, pass a **function** replacement (`() => content`), because minified vendor
+> code contains `$&`/`$'`/`` $` `` sequences that `.replace` treats as special patterns and corrupts/duplicates
+> the insert. The working generator is `tools/gen-render-html.mjs` (+ `tools/render-check.mjs` walks routes,
+> `tools/data-check.mjs` asserts seed integrity). Playwright's bundled Chromium version may mismatch
+> `/opt/pw-browsers` (installed 1228 vs present 1194) — launch with
+> `executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'`.
+> **⚠ Pacvue audit note:** the real "Launch AI" split-button dropdown renders behind the grid scrollbar (z-index
+> bug) and ate every automated click/keypress — captured the launch flow from the grid columns + filters + docs
+> instead of the modal. Product AI page DID have live Crump data (18 ASINs, all "Auto"/"More Conversion"); Campaign
+> AI was empty ("No data found") on the account. Structure faithful; numbers are fictional Brightleaf.
+> Commits: `be2361f` v0.15.0 (index.html) + source-sync (Automation.jsx, mock.js, App.jsx, Layout.jsx, styles.css)
+> + docs (GOALS/HANDOFF/SPEC). **Next session:** E5 stretch (Explorer), then E6 report suite, then E7/E8 (stretch).
+> — Prior session 12 summary below.
 >
 > **(session 12, 2026-07-22) — E4 + E5 SHIPPED as v0.14.0.** Built FIVE new Advertising grids in
 > `Ads.jsx`, all rollups over the date-range-scaled campaign set (shared helpers `adRollup`,
