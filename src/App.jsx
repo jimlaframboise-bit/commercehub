@@ -2,7 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { AppProvider } from './state.jsx'
 import Layout from './components/Layout.jsx'
 import Overview from './pages/Overview.jsx'
-import { Campaigns, AdGroups, Targeting, SearchTerms, ShareOfVoice, Dayparting, BulkOperations, Tagging } from './pages/Ads.jsx'
+import { Campaigns, AdGroups, Targeting, SearchTerms, ShareOfVoice, Dayparting, BulkOperations, Tagging, ProfileGrid, PortfolioGrid, PlacementGrid, AsinGrid, AdsGrid } from './pages/Ads.jsx'
 import { Dsp, Audiences, Amc } from './pages/Dsp.jsx'
 import { DigitalShelf, BuyBox, Products } from './pages/Commerce.jsx'
 import { Rules, Budgets } from './pages/Automation.jsx'
@@ -14,9 +14,14 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Overview />} />
+          <Route path="/ads/profile" element={<ProfileGrid />} />
           <Route path="/ads/campaigns" element={<Campaigns />} />
           <Route path="/ads/tagging" element={<Tagging />} />
+          <Route path="/ads/portfolio" element={<PortfolioGrid />} />
+          <Route path="/ads/placement" element={<PlacementGrid />} />
           <Route path="/ads/adgroups" element={<AdGroups />} />
+          <Route path="/ads/ads" element={<AdsGrid />} />
+          <Route path="/ads/asin" element={<AsinGrid />} />
           <Route path="/ads/targeting" element={<Targeting />} />
           <Route path="/ads/search-terms" element={<SearchTerms />} />
           <Route path="/ads/sov" element={<ShareOfVoice />} />
