@@ -4,7 +4,7 @@ import { Kpi, KpiGrid, Card, Pill, Toggle, Check, DataGrid, FilterBar, applyFilt
 import Icon from '../components/Icon.jsx'
 import {
   campaigns as ALL_CAMPAIGNS, keywords, searchTerms, shareOfVoice, dayparting, DAYS,
-  aggregate, profileById, rules as RULES, campaignTags, keywordTags, asinTags,
+  aggregate, profileById, budgets, rules as RULES, campaignTags, keywordTags, asinTags,
 } from '../data/mock.js'
 import { compact, money, pct, dec2, cur, int } from '../lib/format.js'
 import { useApp } from '../state.jsx'
@@ -1821,5 +1821,399 @@ export function Tagging() {
         ))}
       </div>
     } />
+  )
+}
+
+/* ==================================================================================
+   ADVERTISING GRID FAMILY — Profile (E4) · Portfolio · Placement · ASIN · Ads (E5)
+   Faithful to product.pacvue.com Advertising nav (FUNCTIONALITY-SPEC §11). Each grid is
+   a rollup over the date-range-scaled campaign set, with real vs-prev deltas, saved Plans,
+   column presets, export, and mixed-currency USD estimates (profile = All).
+   ================================================================================== */
+
+// Roll a set of (already scaled) campaigns up by a key → one aggregate row per group.
+// meta(key, groupRows, agg) adds label/derived fields. Each row carries the additive base
+// metrics (impr/clk/spend/sales/orders/units) so DataGrid `foot` totals via aggregate().
+function adRollup(camps, keyOf, meta) {
+  const map = new Map()
+  for (const c of camps) { const k = keyOf(c); if (k == null) continue; if (!map.has(k)) map.set(k, []); map.get(k).push(c) }
+  return [...map.entries()].map(([k, rs]) => { const a = aggregate(rs); return { id: k, _n: rs.length, ...a, ...(meta ? meta(k, rs, a) : {}) } })
+}
+// Convert campaign money fields to USD — used when a rollup row spans currencies (profile = All).
+const adToUsd = (rs) => rs.map((r) => ({ ...r, spend: (r.spend || 0) * fxUSD(r.profileId), sales: (r.sales || 0) * fxUSD(r.profileId), dailyBudget: (r.dailyBudget || 0) * fxUSD(r.profileId) }))
+// Shared metric columns for the cross-profile rollup grids (money rendered in `sym`; `note`
+// appends "(USD est.)" on money totals when the set is mixed-currency).
+function adMetricCols(sym, note) {
+  const M = (v, dec) => cur(v, sym, dec || 0)
+  return [
+    { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: (rs) => M(aggregate(rs).spend) + (note || ''), render: (r) => M(r.spend) },
+    { key: 'cpc', label: 'CPC', num: true, foot: (rs) => M(aggregate(rs).cpc, 2), render: (r) => M(r.cpc, 2) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: (rs) => M(aggregate(rs).sales) + (note || ''), render: (r) => M(r.sales) },
+    { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
+    { key: 'cpa', label: 'CPA', num: true, foot: (rs) => M(aggregate(rs).cpa, 2), render: (r) => M(r.cpa, 2) },
+    { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
+    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
+    { key: 'aov', label: 'AOV', num: true, foot: (rs) => M(aggregate(rs).aov, 2), render: (r) => M(r.aov, 2) },
+  ]
+}
+// Per-row native-currency metric columns (for grids whose rows are each a single profile —
+// money renders in that row's currency; totals convert to USD est. across profiles via
+// adsMoneyFoot). Used by the Ads grid (rows are 1:1 with campaigns).
+function adNativeMetricCols() {
+  return [
+    { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'cpc', label: 'CPC', num: true, foot: (rs) => cur(aggregate(rs).cpc, symOf(rs), 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
+    { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
+    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
+    { key: 'aov', label: 'AOV', num: true, foot: (rs) => cur(aggregate(rs).aov, symOf(rs), 2), render: (r) => cur(r.aov, symA(r.profileId), 2) },
+  ]
+}
+
+/* ============================ PROFILE (E4) ============================ */
+const PROFILE_FIELDS = [
+  { key: 'market', label: 'Profile', type: 'text' },
+  { key: 'type', label: 'Account Type', type: 'enum', options: ['1P', '3P'] },
+  { key: 'pacing', label: 'Pacing', type: 'enum', options: ['On pace', 'Over pace', 'Under pace'] },
+  { key: 'dailyBudget', label: 'Daily Budget', type: 'number' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+  { key: 'orders', label: 'Orders', type: 'number' },
+  { key: 'impr', label: 'Impressions', type: 'number' },
+]
+export function ProfileGrid() {
+  const { profileId, rangeResolved } = useApp()
+  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-profile'))
+  const { rows: scaled, prev } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
+  const prevCamps = useMemo(() => scaled.map((c) => prev[c.id]).filter(Boolean), [scaled, prev])
+  const budgetBy = useMemo(() => Object.fromEntries(budgets.map((b) => [b.profileId, b])), [])
+  const meta = (pid, rs) => {
+    const p = profileById[pid] || {}; const b = budgetBy[pid] || {}
+    return {
+      profileId: pid, market: p.market || pid, type: p.type || '', cc: p.cc || String(pid).toUpperCase(), currency: p.currency || '$',
+      active: rs.filter((c) => c.state === 'Enabled').length, total: rs.length,
+      dailyBudget: rs.reduce((a, c) => a + (c.dailyBudget || 0), 0),
+      monthlyCap: b.monthlyCap || 0, pacing: b.status || '—',
+    }
+  }
+  const rows0 = useMemo(() => adRollup(scaled, (c) => c.profileId, meta), [scaled])
+  const prevRows = useMemo(() => adRollup(prevCamps, (c) => c.profileId, meta), [prevCamps])
+  const prevMap = useMemo(() => Object.fromEntries(prevRows.map((r) => [r.id, r])), [prevRows])
+  const searched = rows0.filter((r) => r.market.toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, PROFILE_FIELDS)
+  const prevFiltered = filtered.map((r) => prevMap[r.id])
+
+  const columns = [
+    { key: 'market', label: 'Profile', sticky: true, width: 260, sortVal: (r) => r.market, render: (r) => (
+      <div className="namecell"><div className="nc-top"><Link className="celllink" to="/ads/campaigns" title="View campaigns for this profile">{r.market}</Link><span className="tag">{r.type}</span></div><small>{r.cc} · {r.active}/{r.total} active · {r.currency}</small></div>) },
+    { key: 'campaigns', label: 'Campaigns', num: true, sort: false, foot: (rs) => int(rs.reduce((a, r) => a + (r.total || 0), 0)), render: (r) => <span className="muted">{r.active}/{r.total}</span> },
+    { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: adsMoneyFoot('dailyBudget'), render: (r) => cur(r.dailyBudget, symA(r.profileId)) },
+    { key: 'monthlyCap', label: 'Monthly Cap', num: true, foot: adsMoneyFoot('monthlyCap'), render: (r) => cur(r.monthlyCap, symA(r.profileId)) },
+    { key: 'impr', label: 'Impr.', num: true, delta: true, foot: (rs) => compact(aggregate(rs).impr), render: (r) => compact(r.impr) },
+    { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
+    { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
+    { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
+    { key: 'cpc', label: 'CPC', num: true, foot: (rs) => cur(aggregate(rs).cpc, symOf(rs), 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
+    { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
+    { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
+    { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
+    { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
+    { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
+    { key: 'aov', label: 'AOV', num: true, foot: (rs) => cur(aggregate(rs).aov, symOf(rs), 2), render: (r) => cur(r.aov, symA(r.profileId), 2) },
+    { key: 'pacing', label: 'Pacing', sort: false, render: (r) => <Pill>{r.pacing}</Pill> },
+  ]
+  const presets = {
+    Performance: ['market', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas'],
+    Budget: ['market', 'campaigns', 'dailyBudget', 'monthlyCap', 'spend', 'sales', 'acos', 'roas', 'pacing'],
+    'Default Plan': ['market', 'campaigns', 'dailyBudget', 'monthlyCap', 'impr', 'clk', 'spend', 'cpc', 'sales', 'orders', 'acos', 'roas', 'aov', 'pacing'],
+  }
+  const dims = [{ key: 'type', label: 'Account Type (1P/3P)' }, { key: 'pacing', label: 'Pacing Status' }]
+  return (
+    <>
+      <AdsHead title="Profile" sub={`${filtered.length} profile${filtered.length === 1 ? '' : 's'} · ${rangeResolved.label} · account-level rollup across all campaigns`}>
+        <ExportMenu name="profiles" fields={PROFILE_FIELDS} rows={filtered} />
+      </AdsHead>
+      <KpiRow rows={filtered} prev={prevFiltered} />
+      <DataGrid
+        id="ads-profile" columns={columns} rows={filtered}
+        initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Plan"
+        dimensions={dims} totals compare comparePrev={prevMap} compareDisabled={rangeResolved.label === 'All time'}
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search profiles…" />
+          <FilterBar id="ads-profile" fields={PROFILE_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Profile is the account/marketplace rollup — every campaign's spend, sales and efficiency aggregated per Amazon profile, with monthly budget caps and pacing status. Money totals across profiles are shown as USD estimates. Use the global Profile selector to scope, or the compare toggle for period-over-period deltas.</div>
+    </>
+  )
+}
+
+/* ============================ PORTFOLIO (E5) ============================ */
+const PORTFOLIO_FIELDS = [
+  { key: 'name', label: 'Portfolio', type: 'enum', options: ['Always-On', 'New Launch', 'Brand Defense', 'Competitor Conquest', 'Seasonal'] },
+  { key: 'dailyBudget', label: 'Daily Budget', type: 'number' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+  { key: 'orders', label: 'Orders', type: 'number' },
+]
+export function PortfolioGrid() {
+  const { profileId, rangeResolved } = useApp()
+  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const mixed = adsMixedCur(base)
+  const dispSym = mixed ? '$' : symOf(base)
+  const note = mixed ? ' (USD est.)' : ''
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-portfolio'))
+  const { rows: scaled0, prev } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
+  const scaled = useMemo(() => (mixed ? adToUsd(scaled0) : scaled0), [scaled0, mixed])
+  const prevCamps = useMemo(() => { const p = scaled0.map((c) => prev[c.id]).filter(Boolean); return mixed ? adToUsd(p) : p }, [scaled0, prev, mixed])
+  const meta = (k, rs) => ({ name: k, total: rs.length, dailyBudget: rs.reduce((a, c) => a + (c.dailyBudget || 0), 0) })
+  const rows0 = useMemo(() => adRollup(scaled, (c) => c.portfolio, meta), [scaled])
+  const prevRows = useMemo(() => adRollup(prevCamps, (c) => c.portfolio, meta), [prevCamps])
+  const prevMap = useMemo(() => Object.fromEntries(prevRows.map((r) => [r.id, r])), [prevRows])
+  const searched = rows0.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, PORTFOLIO_FIELDS)
+  const prevFiltered = filtered.map((r) => prevMap[r.id])
+
+  const columns = [
+    { key: 'name', label: 'Portfolio', sticky: true, width: 240, sortVal: (r) => r.name, render: (r) => (
+      <div className="namecell"><div className="nc-top"><Link className="celllink" to="/ads/campaigns" title="View campaigns">{r.name}</Link></div><small>{r.total} campaign{r.total === 1 ? '' : 's'}</small></div>) },
+    { key: 'campaigns', label: 'Campaigns', num: true, sort: false, foot: (rs) => int(rs.reduce((a, r) => a + (r.total || 0), 0)), render: (r) => <span className="muted">{r.total}</span> },
+    { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: (rs) => cur(rs.reduce((a, r) => a + (r.dailyBudget || 0), 0), dispSym) + note, render: (r) => cur(r.dailyBudget, dispSym) },
+    ...adMetricCols(dispSym, note),
+  ]
+  const presets = {
+    Performance: ['name', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas'],
+    'Default Plan': ['name', 'campaigns', 'dailyBudget', 'impr', 'clk', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'aov'],
+  }
+  return (
+    <>
+      <AdsHead title="Portfolio" sub={`${filtered.length} portfolio${filtered.length === 1 ? '' : 's'} · ${rangeResolved.label}${mixed ? ' · USD est.' : ''} · campaign groupings`}>
+        <ExportMenu name="portfolios" fields={PORTFOLIO_FIELDS} rows={filtered} />
+      </AdsHead>
+      <KpiRow rows={filtered} prev={prevFiltered} />
+      <DataGrid
+        id="ads-portfolio" columns={columns} rows={filtered}
+        initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Plan"
+        totals compare comparePrev={prevMap} compareDisabled={rangeResolved.label === 'All time'}
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search portfolios…" />
+          <FilterBar id="ads-portfolio" fields={PORTFOLIO_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Portfolios group campaigns for budgeting and reporting (Pacvue's alternative to Amazon portfolios). Each row aggregates its campaigns' performance for the selected date range. Save filter sets as Plans; toggle compare for period deltas.</div>
+    </>
+  )
+}
+
+/* ============================ PLACEMENT (E5) ============================ */
+// Synthetic placement breakdown of the campaign set (Top of Search / Product Pages / Rest
+// of Search), split by deterministic per-metric weights so each placement carries a
+// realistic distinct ACoS/CVR. Bid Adjustment = the placement modifier % applied.
+const PLACEMENTS_DEF = [
+  { key: 'Top of Search', bidAdj: 25, w: { impr: 0.40, clk: 0.46, spend: 0.45, sales: 0.55, orders: 0.55, units: 0.55 } },
+  { key: 'Product Pages', bidAdj: 10, w: { impr: 0.38, clk: 0.32, spend: 0.33, sales: 0.30, orders: 0.28, units: 0.28 } },
+  { key: 'Rest of Search', bidAdj: 0, w: { impr: 0.22, clk: 0.22, spend: 0.22, sales: 0.15, orders: 0.17, units: 0.17 } },
+]
+function placementRows(camps) {
+  const t = aggregate(camps)
+  return PLACEMENTS_DEF.map((pd) => {
+    const impr = Math.round((t.impr || 0) * pd.w.impr), clk = Math.round((t.clk || 0) * pd.w.clk)
+    const spend = (t.spend || 0) * pd.w.spend, sales = (t.sales || 0) * pd.w.sales
+    const orders = Math.round((t.orders || 0) * pd.w.orders), units = Math.round((t.units || 0) * pd.w.units)
+    return {
+      id: pd.key, name: pd.key, bidAdj: pd.bidAdj, impr, clk, spend, sales, orders, units,
+      ctr: impr ? (clk / impr) * 100 : 0, cpc: clk ? spend / clk : 0, acos: sales ? (spend / sales) * 100 : 0,
+      roas: spend ? sales / spend : 0, cvr: clk ? (orders / clk) * 100 : 0, cpa: orders ? spend / orders : 0, aov: orders ? sales / orders : 0,
+    }
+  })
+}
+const PLACEMENT_FIELDS = [
+  { key: 'name', label: 'Placement', type: 'enum', options: ['Top of Search', 'Product Pages', 'Rest of Search'] },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+]
+export function PlacementGrid() {
+  const { profileId, rangeResolved } = useApp()
+  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const mixed = adsMixedCur(base)
+  const dispSym = mixed ? '$' : symOf(base)
+  const note = mixed ? ' (USD est.)' : ''
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-placement'))
+  const { rows: scaled0, prev } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
+  const scaled = useMemo(() => (mixed ? adToUsd(scaled0) : scaled0), [scaled0, mixed])
+  const prevCamps = useMemo(() => { const p = scaled0.map((c) => prev[c.id]).filter(Boolean); return mixed ? adToUsd(p) : p }, [scaled0, prev, mixed])
+  const rows0 = useMemo(() => placementRows(scaled), [scaled])
+  const prevMap = useMemo(() => Object.fromEntries(placementRows(prevCamps).map((r) => [r.id, r])), [prevCamps])
+  const filtered = applyFilters(rows0, filters, PLACEMENT_FIELDS)
+  const prevFiltered = filtered.map((r) => prevMap[r.id])
+
+  const columns = [
+    { key: 'name', label: 'Placement', sticky: true, width: 200, sortVal: (r) => r.name, render: (r) => <b>{r.name}</b> },
+    { key: 'bidAdj', label: 'Bid Adjustment', num: true, sortVal: (r) => r.bidAdj, foot: () => '—', render: (r) => (r.bidAdj > 0 ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>+{r.bidAdj}%</span> : <span className="muted">—</span>) },
+    ...adMetricCols(dispSym, note),
+  ]
+  const presets = {
+    Performance: ['name', 'bidAdj', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas'],
+    'Default Plan': ['name', 'bidAdj', 'impr', 'clk', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'aov'],
+  }
+  return (
+    <>
+      <AdsHead title="Placement" sub={`Top of Search · Product Pages · Rest of Search · ${rangeResolved.label}${mixed ? ' · USD est.' : ''}`}>
+        <ExportMenu name="placements" fields={PLACEMENT_FIELDS} rows={filtered} />
+      </AdsHead>
+      <KpiRow rows={filtered} prev={prevFiltered} />
+      <DataGrid
+        id="ads-placement" columns={columns} rows={filtered}
+        initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Plan"
+        totals compare comparePrev={prevMap} compareDisabled={rangeResolved.label === 'All time'}
+        toolbarLeft={<FilterBar id="ads-placement" fields={PLACEMENT_FIELDS} value={filters} onChange={setFilters} />}
+      />
+      <div className="footnote">Placement shows where impressions served — Top of Search converts hardest and carries the placement bid multiplier. Adjust Top-of-Search / Product-Pages modifiers on the campaign to shift this mix. Money totals across profiles are USD estimates.</div>
+    </>
+  )
+}
+
+/* ============================ ASIN — advertised product (E5) ============================ */
+const ASIN_FIELDS = [
+  { key: 'asin', label: 'ASIN', type: 'text' },
+  { key: 'title', label: 'Product', type: 'text' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+  { key: 'orders', label: 'Orders', type: 'number' },
+]
+export function AsinGrid() {
+  const { profileId, rangeResolved } = useApp()
+  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const mixed = adsMixedCur(base)
+  const dispSym = mixed ? '$' : symOf(base)
+  const note = mixed ? ' (USD est.)' : ''
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-asin'))
+  const { rows: scaled0, prev } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
+  const scaled = useMemo(() => (mixed ? adToUsd(scaled0) : scaled0), [scaled0, mixed])
+  const prevCamps = useMemo(() => { const p = scaled0.map((c) => prev[c.id]).filter(Boolean); return mixed ? adToUsd(p) : p }, [scaled0, prev, mixed])
+  const meta = (k, rs, a) => ({ asin: k, title: rs[0].product || k, total: rs.length, asp: a.units ? a.sales / a.units : 0 })
+  const rows0 = useMemo(() => adRollup(scaled, (c) => c.asin, meta), [scaled])
+  const prevRows = useMemo(() => adRollup(prevCamps, (c) => c.asin, meta), [prevCamps])
+  const prevMap = useMemo(() => Object.fromEntries(prevRows.map((r) => [r.id, r])), [prevRows])
+  const searched = rows0.filter((r) => (r.asin + ' ' + r.title).toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, ASIN_FIELDS)
+  const prevFiltered = filtered.map((r) => prevMap[r.id])
+
+  const columns = [
+    { key: 'asin', label: 'Advertised Product', sticky: true, width: 320, sortVal: (r) => r.title, render: (r) => (
+      <div className="namecell"><div className="nc-top"><Link className="celllink" to="/commerce/products" title="Open in Product Center">{r.asin}</Link></div><small>{(r.title || '').split('—')[0].trim()} · {r.total} camp.</small></div>) },
+    ...adMetricCols(dispSym, note),
+    { key: 'units', label: 'Units', num: true, foot: (rs) => int(aggregate(rs).units), render: (r) => int(r.units) },
+    { key: 'asp', label: 'ASP', num: true, foot: (rs) => { const a = aggregate(rs); return cur(a.units ? a.sales / a.units : 0, dispSym, 2) }, render: (r) => cur(r.asp, dispSym, 2) },
+  ]
+  const presets = {
+    Performance: ['asin', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas'],
+    'Default Plan': ['asin', 'impr', 'clk', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas', 'units', 'asp'],
+  }
+  return (
+    <>
+      <AdsHead title="ASIN" sub={`${filtered.length} advertised product${filtered.length === 1 ? '' : 's'} · ${rangeResolved.label}${mixed ? ' · USD est.' : ''} · ad performance by product`}>
+        <ExportMenu name="asins" fields={ASIN_FIELDS} rows={filtered} />
+      </AdsHead>
+      <KpiRow rows={filtered} prev={prevFiltered} />
+      <DataGrid
+        id="ads-asin" columns={columns} rows={filtered}
+        initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Plan"
+        totals compare comparePrev={prevMap} compareDisabled={rangeResolved.label === 'All time'}
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search ASIN or product…" />
+          <FilterBar id="ads-asin" fields={ASIN_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">ASIN rolls advertising performance up to the advertised product — the same ASIN promoted across many campaigns, unified. Pair with Commerce → Product Center for the digital-shelf view. Money totals across profiles are USD estimates.</div>
+    </>
+  )
+}
+
+/* ============================ ADS — creatives (E5) ============================ */
+const AD_KIND = { 'SP-Auto': 'SP Product ad', 'SP-Manual': 'SP Product ad', SB: 'SB Headline', SBV: 'SB Video', 'SD-Product': 'SD Product ad', 'SD-Audience': 'SD Audience ad' }
+const ADS_FIELDS = [
+  { key: 'adName', label: 'Ad', type: 'text' },
+  { key: 'adType', label: 'Ad Type', type: 'enum', options: ['SP Product ad', 'SB Headline', 'SB Video', 'SD Product ad', 'SD Audience ad'] },
+  { key: 'state', label: 'State', type: 'enum', options: ['Enabled', 'Paused'] },
+  { key: 'asin', label: 'ASIN', type: 'text' },
+  { key: 'campaign', label: 'Campaign', type: 'text' },
+  { key: 'spend', label: 'Spend', type: 'number' },
+  { key: 'sales', label: 'Sales', type: 'number' },
+  { key: 'acos', label: 'ACoS %', type: 'number' },
+  { key: 'roas', label: 'ROAS', type: 'number' },
+]
+function adRowsFrom(camps) {
+  return camps.map((c) => ({ ...c, id: 'AD-' + c.id, adName: (c.product || '').split('—')[0].trim(), adType: AD_KIND[c.campaignType] || 'SP Product ad', campaign: c.name }))
+}
+export function AdsGrid() {
+  const { profileId, rangeResolved } = useApp()
+  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const mixed = adsMixedCur(base)
+  const [q, setQ] = useState('')
+  const [filters, setFilters] = useState(() => loadFilterModel('ads-ads'))
+  // Ad rows are 1:1 with campaigns, so each carries its own profileId/currency — keep money
+  // native per row (like the Campaigns grid) and let KpiRow + adsMoneyFoot convert totals to
+  // USD est. Do NOT pre-convert to USD here (that would double-convert in KpiRow).
+  const { rows: scaled0, prev } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
+  const prevCamps = useMemo(() => scaled0.map((c) => prev[c.id]).filter(Boolean), [scaled0, prev])
+  const rows0 = useMemo(() => adRowsFrom(scaled0), [scaled0])
+  const prevMap = useMemo(() => Object.fromEntries(adRowsFrom(prevCamps).map((r) => [r.id, r])), [prevCamps])
+  const searched = rows0.filter((r) => (r.adName + ' ' + r.campaign).toLowerCase().includes(q.toLowerCase()))
+  const filtered = applyFilters(searched, filters, ADS_FIELDS)
+  const prevFiltered = filtered.map((r) => prevMap[r.id])
+  const typeTone2 = (t) => (t.startsWith('SP') ? 'blue' : t.startsWith('SB') ? 'purple' : 'amber')
+
+  const columns = [
+    { key: 'adName', label: 'Ad', sticky: true, width: 300, sortVal: (r) => r.adName, render: (r) => (
+      <div className="namecell"><div className="nc-top"><Link className="celllink" to={`/ads/adgroups?camp=${r.id.replace('AD-', '')}`} title="Drill into ad groups">{r.adName}</Link></div><small>{r.profileId.toUpperCase()} · {r.campaign?.split('-').slice(0, 2).join('-')}</small></div>) },
+    { key: 'adType', label: 'Ad Type', render: (r) => <span className={`pill ${typeTone2(r.adType)}`} style={{ borderRadius: 5 }}>{r.adType}</span> },
+    { key: 'state', label: 'State', render: (r) => <Pill>{r.state}</Pill> },
+    { key: 'asin', label: 'ASIN', sort: false, render: (r) => <span className="muted">{r.asin}</span> },
+    ...adNativeMetricCols(),
+  ]
+  const presets = {
+    Performance: ['adName', 'adType', 'state', 'impr', 'clk', 'ctr', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas'],
+    'Default Plan': ['adName', 'adType', 'state', 'asin', 'impr', 'clk', 'spend', 'cpc', 'sales', 'orders', 'cvr', 'acos', 'roas'],
+  }
+  const dims = [{ key: 'adType', label: 'Ad Type' }, { key: 'campaignType', label: 'Campaign Type' }, { key: 'profileId', label: 'Profile' }]
+  return (
+    <>
+      <AdsHead title="Ads" sub={`${filtered.length} ad${filtered.length === 1 ? '' : 's'} · ${rangeResolved.label}${mixed ? ' · USD est.' : ''} · creatives & product ads`}>
+        <ExportMenu name="ads" fields={ADS_FIELDS} rows={filtered} />
+      </AdsHead>
+      <KpiRow rows={filtered} prev={prevFiltered} />
+      <DataGrid
+        id="ads-ads" columns={columns} rows={filtered}
+        initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Plan"
+        dimensions={dims} totals compare comparePrev={prevMap} compareDisabled={rangeResolved.label === 'All time'}
+        toolbarLeft={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search ads…" />
+          <FilterBar id="ads-ads" fields={ADS_FIELDS} value={filters} onChange={setFilters} />
+        </>}
+      />
+      <div className="footnote">Ads is the creative level — product ads (SP/SD) and Sponsored Brands headlines & videos. Group by Ad Type to compare creative formats. Drill into a row to see its ad groups. Money totals across profiles are USD estimates.</div>
+    </>
   )
 }
