@@ -10,10 +10,15 @@ const NAV = [
   {
     section: 'Sponsored Ads', module: true,
     items: [
+      { to: '/ads/profile', label: 'Profile', icon: 'store' },
       { to: '/ads/campaigns', label: 'Campaigns', icon: 'ads' },
       { to: '/ads/tagging', label: 'Tagging', icon: 'tag' },
+      { to: '/ads/portfolio', label: 'Portfolio', icon: 'layers' },
+      { to: '/ads/placement', label: 'Placement', icon: 'eye' },
       { to: '/ads/adgroups', label: 'Ad Groups', icon: 'layers' },
+      { to: '/ads/ads', label: 'Ads', icon: 'spark' },
       { to: '/ads/targeting', label: 'Targeting', icon: 'target' },
+      { to: '/ads/asin', label: 'ASIN', icon: 'box' },
       { to: '/ads/search-terms', label: 'Search Terms', icon: 'search' },
       { to: '/ads/sov', label: 'Share of Voice', icon: 'bars' },
       { to: '/ads/dayparting', label: 'Dayparting', icon: 'clock' },
@@ -78,14 +83,17 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.13.0</span>
+        <span className="app-version" title="CommerceHub build">v0.14.0</span>
       </div>
     </aside>
   )
 }
 
 const CRUMBS = {
-  '/': 'Overview', '/ads/campaigns': 'Sponsored Ads · Campaigns', '/ads/tagging': 'Sponsored Ads · Tagging',
+  '/': 'Overview', '/ads/profile': 'Sponsored Ads · Profile', '/ads/campaigns': 'Sponsored Ads · Campaigns',
+  '/ads/tagging': 'Sponsored Ads · Tagging', '/ads/portfolio': 'Sponsored Ads · Portfolio',
+  '/ads/placement': 'Sponsored Ads · Placement', '/ads/ads': 'Sponsored Ads · Ads',
+  '/ads/asin': 'Sponsored Ads · ASIN',
   '/ads/adgroups': 'Sponsored Ads · Ad Groups',
   '/ads/targeting': 'Sponsored Ads · Targeting', '/ads/search-terms': 'Sponsored Ads · Search Terms',
   '/ads/sov': 'Sponsored Ads · Share of Voice', '/ads/dayparting': 'Sponsored Ads · Dayparting',
