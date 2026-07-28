@@ -148,7 +148,7 @@ function BarChart(p) { return _Chart(p, 'bar'); }
 
 const order = [
   'src/lib/format.js', 'src/data/mock.js', 'src/components/Icon.jsx', 'src/components/ui.jsx',
-  'src/state.jsx', 'src/components/Layout.jsx', 'src/pages/Overview.jsx', 'src/pages/Ads.jsx',
+  'src/state.jsx', 'src/components/Layout.jsx', 'src/pages/Overview.jsx', 'src/pages/Tracker.jsx', 'src/pages/Ads.jsx',
   'src/pages/Dsp.jsx', 'src/pages/Commerce.jsx', 'src/pages/Automation.jsx', 'src/pages/Insights.jsx', 'src/App.jsx',
 ]
 let body = preamble + '\n'
@@ -157,6 +157,13 @@ body += `
 const ALL_CAMPAIGNS = campaigns; const ALERTS = alerts; const RULES = rules;
 ReactDOM.createRoot(document.getElementById('root')).render(<RouterProvider><App /></RouterProvider>);
 `
+
+// Amazon Tracker payload - kept out of the Babel block on purpose (see src/pages/Tracker.jsx).
+const trackerB64 = (() => {
+  const m = read('src/data/trackerSnapshot.js').match(/TRACKER_HTML_B64\s*=\s*"([A-Za-z0-9+/=]*)"/)
+  if (!m || !m[1]) { console.error('ERROR: could not read TRACKER_HTML_B64 from src/data/trackerSnapshot.js'); process.exit(1) }
+  return m[1]
+})()
 
 const html = `<!doctype html>
 <html lang="en">
@@ -175,6 +182,7 @@ ${css}
 </head>
 <body>
 <div id="root"><div id="boot">Loading CommerceHub…</div></div>
+<script>window.__TRACKER_HTML_B64="${trackerB64}";</script>
 <script type="text/babel" data-presets="react">
 ${body}
 </script>
