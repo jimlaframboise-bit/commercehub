@@ -134,6 +134,13 @@ button { font-family: inherit; cursor: pointer; }
 .topbar-ctrl .badge { background: var(--brand); color: #fff; border-radius: 9px; font-size: 10px; padding: 0 5px; font-weight:700;}
 
 .content { padding: 20px 22px 60px; flex: 1; }
+/* Amazon Tracker embed - full-bleed inside .content (padding 20px 22px 60px);
+   the tracker supplies its own background, padding and max-width. */
+.tracker-embed { margin: -20px -22px -60px; background: #f3f4f3; }
+.tracker-embed iframe { display: block; width: 100%; border: 0; background: #f3f4f3; }
+.tracker-missing { padding: 28px; color: var(--text-2); font-size: 13px; line-height: 1.6; }
+.tracker-missing code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; gap: 16px; flex-wrap: wrap; }
 .page-title { font-size: 19px; font-weight: 750; letter-spacing: -.3px; }
 .page-sub { color: var(--text-2); margin-top: 2px; font-size: 12.5px; }
