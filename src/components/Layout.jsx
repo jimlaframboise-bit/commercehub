@@ -6,7 +6,10 @@ import { useApp } from '../state.jsx'
 import { alerts } from '../data/mock.js'
 
 const NAV = [
-  { section: null, items: [{ to: '/', label: 'Overview', icon: 'dashboard', end: true }] },
+  { section: null, items: [
+    { to: '/', label: 'Overview', icon: 'dashboard', end: true },
+    { to: '/tracker', label: 'Amazon Tracker', icon: 'bars' },
+  ] },
   {
     section: 'Sponsored Ads', module: true,
     items: [
@@ -85,14 +88,14 @@ function Sidebar() {
       <div className="sidebar-foot">
         <div className="avatar">JL</div>
         <div className="who">Jim Laframboise<small>Brightleaf · Agency</small></div>
-        <span className="app-version" title="CommerceHub build">v0.15.0</span>
+        <span className="app-version" title="CommerceHub build">v0.16.0</span>
       </div>
     </aside>
   )
 }
 
 const CRUMBS = {
-  '/': 'Overview', '/ads/profile': 'Sponsored Ads · Profile', '/ads/campaigns': 'Sponsored Ads · Campaigns',
+  '/': 'Overview', '/tracker': 'Amazon Tracker', '/ads/profile': 'Sponsored Ads · Profile', '/ads/campaigns': 'Sponsored Ads · Campaigns',
   '/ads/tagging': 'Sponsored Ads · Tagging', '/ads/portfolio': 'Sponsored Ads · Portfolio',
   '/ads/placement': 'Sponsored Ads · Placement', '/ads/ads': 'Sponsored Ads · Ads',
   '/ads/asin': 'Sponsored Ads · ASIN',
