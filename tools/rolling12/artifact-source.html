@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Amazon Rolling12 Tracker",
+  "schemaVersion": 1,
+  "description": "Rolling 12 months of Crump Group Amazon shipped COGS + ordered revenue (CAD) with current-month actualization vs the frozen original projection and deviation tracking. Live data from the Pacvue connector on each open.",
+  "mcpTools": [
+    "mcp__d052010f-48fe-4ad4-a85d-9e4ee127ff98__execute_query"
+  ],
+  "mcpServerNames": [
+    "Pacvue MCP"
+  ]
+}
+</script>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crump Group - Amazon History &amp; Forecasting</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: #fcfcfb; color: #0b0b0b; margin: 0; padding: 20px; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 2px; }
+  .sub { font-size: 12px; color: #6b6a66; margin-bottom: 16px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: #fff; border: 1px solid #e5e4de; border-radius: 8px; padding: 14px; }
+  .card .lbl { font-size: 11px; color: #6b6a66; text-transform: uppercase; letter-spacing: .03em; }
+  .card .val { font-size: 22px; font-weight: 600; margin-top: 6px; }
+  .card .note { font-size: 12px; color: #6b6a66; margin-top: 6px; }
+  .pill { display: inline-block; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; margin-top: 8px; }
+  .pill.good { color: #085041; background: #e1f5ee; }
+  .pill.bad { color: #791f1f; background: #fcebeb; }
+  .pill.neutral { color: #5f5e5a; background: #f1efe8; }
+  .up { color: #0a7a43; } .down { color: #b3261e; } .flat { color: #6b6a66; }
+  .chartwrap { position: relative; height: 320px; background: #fff; border: 1px solid #e5e4de; border-radius: 8px; padding: 12px; }
+  .markets { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .mkt { background: #fff; border: 1px solid #e5e4de; border-radius: 8px; padding: 12px; }
+  .mkt-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+  .mkt-head .flag { font-size: 18px; }
+  .mkt-head .name { font-size: 14px; font-weight: 600; }
+  .mkt-head .badge { font-size: 11px; font-weight: 600; }
+  .mkt-chart { position: relative; height: 210px; }
+  @media (max-width: 640px) { .markets { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid #e5e4de; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 11px; color: #6b6a66; text-transform: uppercase; letter-spacing: .03em; }
+  .foot { font-size: 11px; color: #8a8983; margin-top: 12px; line-height: 1.5; }
+  #err { display: none; background: #fdecea; color: #b3261e; border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 13px; }
+  #loading { font-size: 13px; color: #6b6a66; padding: 24px 0; }
+</style>
+</head>
+<body>
+<h1>Crump Group - Amazon History &amp; Forecasting</h1>
+<div class="sub" id="asof">Loading…</div>
+<div id="err"></div>
+<div id="loading">Pulling live data from the Pacvue connector…</div>
+<div id="content" style="display:none">
+  <div class="cards" id="cards"></div>
+  <div class="chartwrap"><canvas id="chart"></canvas></div>
+  <div class="markets" id="zoomRow" style="display:none">
+    <div class="mkt">
+      <div class="mkt-head"><span class="name" id="zoomTitle">Current month — zoomed</span><span class="badge flat">y-axis magnified</span></div>
+      <div style="position:relative; height:200px"><canvas id="chartZoom"></canvas></div>
+    </div>
+    <div class="mkt" id="attrib">
+      <div class="mkt-head"><span class="name">Source of deviation</span><span class="badge" id="attribSummary"></span></div>
+      <div style="position:relative; height:90px"><canvas id="chartAttrib"></canvas></div>
+      <div id="mixLine" style="font-size:12px; color:#52514e; margin-top:8px"></div>
+    </div>
+  </div>
+  <div class="mkt" id="drivers" style="margin-top:12px; display:none">
+    <div class="mkt-head"><span class="name">Products driving the deviation</span><span class="badge flat" id="driversNote"></span></div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px">
+      <div><div style="font-size:12px; font-weight:600; color:#0a7a43; margin-bottom:4px">▲ Pushing the month up</div><div id="drvPos"></div></div>
+      <div><div style="font-size:12px; font-weight:600; color:#b3261e; margin-bottom:4px">▼ Dragging the month down</div><div id="drvNeg"></div></div>
+    </div>
+  </div>
+  <div class="markets">
+    <div class="mkt">
+      <div class="mkt-head"><span class="flag">🇨🇦</span><span class="name">Canada</span><span class="badge" id="badgeCA"></span></div>
+      <div class="mkt-chart"><canvas id="chartCA"></canvas></div>
+      <div id="spendCA"></div>
+      <div id="segCA"></div>
+    </div>
+    <div class="mkt">
+      <div class="mkt-head"><span class="flag">🇺🇸</span><span class="name">United States</span><span class="badge" id="badgeUS"></span></div>
+      <div class="mkt-chart"><canvas id="chartUS"></canvas></div>
+      <div id="spendUS"></div>
+      <div id="segUS"></div>
+    </div>
+  </div>
+  <div class="foot" id="foot"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script>
+const FX = 1.4205;
+const TOOL = 'mcp__d052010f-48fe-4ad4-a85d-9e4ee127ff98__execute_query';
+const ADS_PROFILES = ['753434554673441', '1282285688819043'];
+const VENDOR_ACCTS = ['2546180', '3042840'];
+// Frozen original projections per month (all CAD; US market converted). Set once when the month is planned; never overwritten.
+// rev fields retained for reference (v1 tracked revenue); v2 displays shipped COGS + ad spend only.
+const PLAN = {
+  '2026-07': { budget: 104000, cogs: 1440000, rev: 1870000,
+    CA: { cogs: 651000, rev: 785000 }, US: { cogs: 789000, rev: 1085000 },
+    mixCA: 0.33, // budgeted CA share per Pacvue campaign daily-budget caps pulled 2026-07-09 (CA $1,650 CAD/d, US $2,360 USD/d ≈ 33/67; ~$155K CAD monthly capacity)
+    spendPlan: { CA: 34320, US: 69680 },  // this month's $104K budget at the Pacvue 33/67 split, CAD
+    caps: { CA: 51150, US: 103950 },      // Pacvue campaign daily caps × 31 days, CAD, as of 2026-07-09
+    label: 'Model v4, bound-A weighted @ Pacvue budgeted mix (33% CA), frozen 2026-07-09' }
+};
+const fmtM = v => '$' + (v / 1e6).toFixed(2) + 'M';
+const fmtK = v => '$' + Math.round(v / 1000) + 'K';
+const pct = v => (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%';
+const devClr = v => v == null ? '#6b6a66' : v >= 0.005 ? '#0a7a43' : v <= -0.005 ? '#b3261e' : '#6b6a66';
+const cls = v => v == null ? 'flat' : (v > 0.005 ? 'up' : v < -0.005 ? 'down' : 'flat');
+const arrow = v => v == null ? '' : (v > 0.005 ? '▲ ' : v < -0.005 ? '▼ ' : '· ');
+
+async function waitForCowork() {
+  for (let i = 0; i < 25; i++) {
+    if (window.cowork && window.cowork.callMcpTool) return;
+    await new Promise(res => setTimeout(res, 200));
+  }
+  throw new Error('This tracker only works when opened as the Cowork artifact "amazon-rolling12-tracker" (Artifacts in the sidebar) — opening the HTML file directly has no connector access.');
+}
+async function q(args) {
+  const r = await window.cowork.callMcpTool(TOOL, args);
+  if (r.isError) throw new Error('Connector query failed: ' + JSON.stringify(r.content).slice(0, 300));
+  const payload = r.structuredContent ?? JSON.parse(r.content[0].text);
+  // drop null-date subtotal rows, but only for queries that HAVE a date dimension
+  return (payload.rows || []).filter(x => !('date' in x) || x.date);
+}
+function monthKey(d) { return d.toISOString().slice(0, 7); }
+
+async function main() {
+  await waitForCowork();
+  const now = new Date();
+  const curKey = monthKey(now);
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+  const startStr = start.toISOString().slice(0, 10);
+  const todayStr = now.toISOString().slice(0, 10);
+  const curStart = curKey + '-01';
+
+  const [vMonthly, aMonthly, vDaily, aDaily] = await Promise.all([
+    q({ platform: 'commerce-amazon-vendor', level: 'asin', profileIds: VENDOR_ACCTS,
+        dimensions: [{ field: 'date', granularity: 'month' }, { field: 'country_code' }],
+        measures: ['shipped_cogs'],
+        filters: [{ field: 'date', op: 'between', value: [startStr, todayStr] }] }),
+    q({ platform: 'amazon-ads', level: 'campaign', profileIds: ADS_PROFILES,
+        dimensions: [{ field: 'date', granularity: 'month' }, { field: 'profile.country_code' }],
+        measures: ['spend'],
+        filters: [{ field: 'date', op: 'between', value: [startStr, todayStr] }],
+        options: { toCurrency: 'CAD' } }),
+    q({ platform: 'commerce-amazon-vendor', level: 'asin', profileIds: VENDOR_ACCTS,
+        dimensions: [{ field: 'date', granularity: 'day' }, { field: 'country_code' }],
+        measures: ['shipped_cogs'],
+        filters: [{ field: 'date', op: 'between', value: [curStart, todayStr] }] }),
+    q({ platform: 'amazon-ads', level: 'campaign', profileIds: ADS_PROFILES,
+        dimensions: [{ field: 'date', granularity: 'day' }, { field: 'profile.country_code' }],
+        measures: ['spend'],
+        filters: [{ field: 'date', op: 'between', value: [curStart, todayStr] }],
+        options: { toCurrency: 'CAD' } }),
+  ]);
+
+  // per-market COGS by month (US converted to CAD)
+  const mkt = { CA: {}, US: {} };
+  for (const r of vMonthly) {
+    const m = r.country_code === 'US' ? 'US' : 'CA';
+    const k = r.date.slice(0, 7);
+    mkt[m][k] = (mkt[m][k] || 0) + (r.shipped_cogs || 0) * (m === 'US' ? FX : 1);
+  }
+  // per-market spend by month (already CAD)
+  const spendMkt = { CA: {}, US: {} };
+  for (const r of aMonthly) {
+    const m = r.country_code === 'US' ? 'US' : 'CA';
+    const k = r.date.slice(0, 7);
+    spendMkt[m][k] = (spendMkt[m][k] || 0) + (r.spend || 0);
+  }
+  // COMMON DATA WINDOW: every MTD metric is cut to the same last day where BOTH ad spend and
+  // shipped COGS (both markets) are complete. Fresher partial data is reported in the header but never used in math.
+  const lastDay = rows => { const ds = [...new Set(rows.map(r => r.date))].sort(); return ds.length ? parseInt(ds[ds.length - 1].slice(8, 10), 10) : 0; };
+  const adsLast = lastDay(aDaily.filter(r => r.date < todayStr && (r.spend || 0) > 0));
+  const vendLastCA = lastDay(vDaily.filter(r => r.country_code !== 'US' && (r.shipped_cogs || 0) > 0));
+  const vendLastUS = lastDay(vDaily.filter(r => r.country_code === 'US' && (r.shipped_cogs || 0) > 0));
+  // Accuracy over recency (Jim, 2026-07-09): only count days at least SETTLE_DAYS old, so late-posting
+  // shipments and ad-spend restatements have settled. Fresher data is shown in the header but never used.
+  const SETTLE_DAYS = 2;
+  const dCommon = Math.max(0, Math.min(adsLast, vendLastCA, vendLastUS, now.getDate() - SETTLE_DAYS));
+  const cut = curKey + '-' + String(dCommon).padStart(2, '0');
+  const mtdSpendMkt = { CA: 0, US: 0 };
+  for (const r of aDaily) if (r.date <= cut) mtdSpendMkt[r.country_code === 'US' ? 'US' : 'CA'] += (r.spend || 0);
+  const mtdSpend = mtdSpendMkt.CA + mtdSpendMkt.US;
+  const dA = dCommon;
+  const d = { CA: dCommon, US: dCommon };
+  const mtdCogsMkt = { CA: 0, US: 0 };
+  for (const r of vDaily) if (r.date <= cut) mtdCogsMkt[r.country_code === 'US' ? 'US' : 'CA'] += (r.shipped_cogs || 0) * (r.country_code === 'US' ? FX : 1);
+
+  // month keys: 12 complete + current
+  const keys = [];
+  for (let i = 12; i >= 1; i--) keys.push(monthKey(new Date(now.getFullYear(), now.getMonth() - i, 15)));
+  const curLabel = new Date(curKey + '-15').toLocaleDateString('en', { month: 'short', year: '2-digit' }).replace(' ', '-');
+  const labels = keys.map(k => new Date(k + '-15').toLocaleDateString('en', { month: 'short', year: '2-digit' }).replace(' ', '-'));
+  labels.push(curLabel + ' (live)');
+  const n = labels.length;
+
+  const plan = PLAN[curKey];
+  const cogsOf = m => [...keys.map(k => mkt[m][k] ?? null), null];
+  const spendOf = m => [...keys.map(k => spendMkt[m][k] ?? 0), mtdSpendMkt[m]];
+  const cogsCA = cogsOf('CA'), cogsUS = cogsOf('US');
+  const cogsAll = keys.map((k, i) => (cogsCA[i] || 0) + (cogsUS[i] || 0));
+  const spendAll = spendOf('CA').map((v, i) => v + spendOf('US')[i]);
+
+  function actualize(mtdV, projV, dd) {
+    if (projV == null || dd <= 0) return { act: null, dev: null };
+    const act = mtdV + projV * (daysInMonth - dd) / daysInMonth;
+    return { act, dev: (act - projV) / projV };
+  }
+  const aCA = actualize(mtdCogsMkt.CA, plan && plan.CA.cogs, d.CA);
+  const aUS = actualize(mtdCogsMkt.US, plan && plan.US.cogs, d.US);
+  let comb;
+  if (plan && aCA.act != null && aUS.act != null) {
+    comb = { act: aCA.act + aUS.act };
+    comb.dev = (comb.act - plan.cogs) / plan.cogs;
+  } else comb = actualize(mtdCogsMkt.CA + mtdCogsMkt.US, plan && plan.cogs, Math.max(d.CA, d.US));
+  const dMax = Math.max(d.CA, d.US);
+
+  // KPI cards
+  // merged top scoreboard: one row, scoreboard-style cards (big number · vs reference · pill · bullet bar with projection tick)
+  const bullet = (label, actual, actualLabel, ref, refLabel, deltaTxt, good, note) => {
+    const scale = Math.max(actual, ref) * 1.08;
+    const fillW = actual / scale * 100, tick = ref / scale * 100;
+    const clr = good == null ? '#5f5e5a' : good ? '#085041' : '#791f1f';
+    const bg = good == null ? '#f1efe8' : good ? '#e1f5ee' : '#fcebeb';
+    const fillClr = good == null ? '#888780' : good ? '#1baf7a' : '#e24b4a';
+    return `<div style="background:#fff;border:1px solid #e5e4de;border-radius:8px;padding:14px">
+      <div style="font-size:11px;color:#6b6a66;text-transform:uppercase;letter-spacing:.03em">${label}</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0 10px;flex-wrap:wrap">
+        <span style="font-size:21px;font-weight:600">${actualLabel}</span>
+        <span style="font-size:12px;color:#6b6a66">vs ${refLabel}</span>
+        <span style="margin-left:auto;font-size:12px;font-weight:600;color:${clr};background:${bg};padding:3px 10px;border-radius:999px">${deltaTxt}</span>
+      </div>
+      <div style="position:relative;height:14px;background:#eceae4;border-radius:7px">
+        <div style="position:absolute;left:0;top:0;height:14px;width:${fillW.toFixed(1)}%;background:${fillClr};border-radius:7px"></div>
+        <div style="position:absolute;left:${tick.toFixed(1)}%;top:-4px;width:2px;height:22px;background:#0b0b0b" title="target marker"></div>
+      </div>
+      <div style="font-size:11px;color:#8a8983;margin-top:5px">${note || 'black tick = target · bar = actual'}</div>
+    </div>`;
+  };
+  if (plan && comb.act != null) {
+    const mtdC = mtdCogsMkt.CA + mtdCogsMkt.US;
+    const expToDate = plan.cogs * dMax / daysInMonth;
+    const soFar = mtdC - expToDate;
+    const soFarGood = Math.abs(soFar) < 2000 ? null : soFar > 0;
+    const soFarTxt = soFarGood == null ? 'on track' : (soFar > 0 ? '▲ ' : '▼ ') + fmtK(Math.abs(soFar)) + (soFar > 0 ? ' ahead' : ' behind');
+    const mGood = Math.abs(comb.dev) < 0.005 ? null : comb.dev > 0;
+    const mTxt = mGood == null ? 'on track' : arrow(comb.dev) + pct(comb.dev) + (comb.dev > 0 ? ' ahead' : ' behind');
+    const expSpend = plan.budget * dA / daysInMonth;
+    const paceGood = mtdSpend >= expSpend - plan.budget * 0.05;
+    document.getElementById('cards').innerHTML =
+      bullet(`Shipped COGS so far — days 1–${dMax} of ${daysInMonth}`, mtdC, fmtM(mtdC), expToDate, fmtM(expToDate) + ' expected by now', soFarTxt, soFarGood,
+        'expected = frozen projection, pro-rata to measured days') +
+      bullet('Full month, if this pace holds', comb.act, fmtM(comb.act) + ' est.', plan.cogs, fmtM(plan.cogs) + ' projected (frozen)', mTxt, mGood,
+        `@ ${fmtK(plan.budget)} budget, 33/67 CA/US · by market: CA ${aCA.dev == null ? '—' : pct(aCA.dev)}, US ${aUS.dev == null ? '—' : pct(aUS.dev)}`) +
+      bullet(`Ad spend so far — days 1–${dA} of ${daysInMonth}`, mtdSpend, fmtK(mtdSpend), expSpend, fmtK(expSpend) + ' expected by now', paceGood ? 'on pace' : '▼ behind pace', paceGood,
+        `of ${fmtK(plan.budget)} budget · needs ${fmtK((plan.budget - mtdSpend) / Math.max(1, daysInMonth - dA))}/day to land it`);
+  } else {
+    document.getElementById('cards').innerHTML = plan
+      ? `<div class="card"><div class="lbl">Awaiting settled data for ${curKey}</div><div class="val">—</div><div class="note">No day yet has complete spend + COGS in both markets</div></div>`
+      : `<div class="card"><div class="lbl">No frozen projection for ${curKey}</div><div class="val">—</div><div class="note">Ask Claude to project this month and freeze it into the tracker</div></div>`;
+  }
+
+  // dataset builder: COGS line + frozen/actualized markers + ad spend bars, one $ axis from 0
+  function trackerDatasets(cogs, spend, projV, act, dev, small) {
+    const projLine = Array(n).fill(null), actLine = Array(n).fill(null);
+    if (projV != null) { projLine[n - 2] = cogs[n - 2]; projLine[n - 1] = projV; }
+    if (act != null) { actLine[n - 2] = cogs[n - 2]; actLine[n - 1] = act; }
+    const pr = small ? 4 : 6;
+    const spendColors = spend.map((v, i) => i === n - 1 ? '#85B7EB' : '#c9c7bd');
+    return [
+      { type: 'line', label: 'Shipped COGS', data: cogs, borderColor: '#2a78d6', backgroundColor: '#2a78d6', borderWidth: 2, pointRadius: small ? 2 : 3, tension: .25 },
+      { type: 'line', label: 'Frozen projection (hollow, dashed)', data: projLine, borderColor: '#2a78d6', backgroundColor: '#ffffff', borderWidth: 1.5, borderDash: [6, 4], pointRadius: pr, pointStyle: 'rectRot', pointBorderWidth: 2 },
+      { type: 'line', label: 'Actualized tracking (filled, solid)', data: actLine, borderColor: '#2a78d6', backgroundColor: devClr(dev), borderWidth: small ? 2 : 3, pointRadius: pr, pointBorderColor: devClr(dev) },
+      { type: 'bar', label: 'Ad spend', data: spend, backgroundColor: spendColors, borderRadius: 2, barPercentage: 0.65 }
+    ];
+  }
+  const TIP = ['Shipped COGS', 'COGS — frozen projection', 'COGS — actualized', 'Ad spend'];
+  function baseOptions(showLegend, padRight) {
+    return { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      layout: { padding: { right: padRight } },
+      plugins: {
+        legend: showLegend ? { labels: { boxWidth: 10, font: { size: 11 } } } : { display: false },
+        tooltip: { filter: i => i.raw != null, callbacks: { label: c =>
+          TIP[c.datasetIndex] + ': ' + (c.datasetIndex === 3 ? fmtK(c.raw) : fmtM(c.raw)) } } },
+      scales: { x: { ticks: { autoSkip: false, maxRotation: 45, font: { size: 9 } }, grid: { display: false } },
+        y: { min: 0, ticks: { callback: fmtM, font: { size: 10 } }, grid: { color: '#eceae4' } } } };
+  }
+
+  // combined chart with on-chart labels + in-progress shading
+  const annot = { id: 'annot', afterDatasetsDraw(chart) {
+    const { ctx, chartArea, scales: { x, y } } = chart;
+    const xi = x.getPixelForValue(n - 1), xp = x.getPixelForValue(n - 2);
+    ctx.save();
+    const x0 = (xi + xp) / 2;
+    ctx.fillStyle = 'rgba(137,135,129,0.08)';
+    ctx.fillRect(x0, chartArea.top, chartArea.right - x0, chartArea.bottom - chartArea.top);
+    ctx.fillStyle = '#8a8983'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('in progress', (x0 + chartArea.right) / 2, chartArea.top + 12);
+    ctx.textAlign = 'left';
+    const items = [];
+    if (plan) items.push({ v: plan.cogs, txt: 'Projected ' + fmtM(plan.cogs), clr: '#2a78d6', bold: false });
+    if (comb.act) items.push({ v: comb.act, txt: 'Now ' + fmtM(comb.act) + '  ' + pct(comb.dev), clr: devClr(comb.dev), bold: true });
+    items.sort((a, b) => y.getPixelForValue(b.v) - y.getPixelForValue(a.v));
+    let lastY = 1e9;
+    for (const it of items) {
+      let py = y.getPixelForValue(it.v);
+      if (lastY - py < 14) py = lastY - 14;
+      lastY = py;
+      ctx.font = (it.bold ? '600 ' : '400 ') + '11px sans-serif';
+      ctx.fillStyle = it.clr;
+      ctx.fillText(it.txt, xi + 10, py + 4);
+    }
+    if (plan && comb.act) {
+      const y1 = y.getPixelForValue(plan.cogs), y2 = y.getPixelForValue(comb.act);
+      if (Math.abs(y1 - y2) > 6) {
+        ctx.strokeStyle = '#8a8983'; ctx.setLineDash([2, 2]); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(xi, y1); ctx.lineTo(xi, y2); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }};
+  new Chart(document.getElementById('chart'), {
+    type: 'line', plugins: [annot],
+    data: { labels, datasets: trackerDatasets([...cogsAll, null], spendAll, plan && plan.cogs, comb.act, comb.dev, false) },
+    options: baseOptions(true, 120)
+  });
+
+  // in-progress shading for market charts
+  const shade = { id: 'shade', afterDatasetsDraw(chart) {
+    const { ctx, chartArea, scales: { x } } = chart;
+    const xi = x.getPixelForValue(n - 1), xp = x.getPixelForValue(n - 2);
+    ctx.save();
+    ctx.fillStyle = 'rgba(137,135,129,0.08)';
+    ctx.fillRect((xi + xp) / 2, chartArea.top, chartArea.right - (xi + xp) / 2, chartArea.bottom - chartArea.top);
+    ctx.restore();
+  }};
+  function marketChart(canvasId, badgeId, cogs, spend, p, a, dd) {
+    document.getElementById(badgeId).innerHTML = p
+      ? (a.dev == null ? '<span class="flat">awaiting data</span>'
+        : `<span class="${cls(a.dev)}">COGS ${arrow(a.dev)}${pct(a.dev)}</span> <span class="flat">vs proj ${fmtK(p.cogs)} (day ${dd}/${daysInMonth})</span>`)
+      : '<span class="flat">no frozen projection</span>';
+    new Chart(document.getElementById(canvasId), {
+      type: 'line', plugins: [shade],
+      data: { labels, datasets: trackerDatasets(cogs, spend, p && p.cogs, a.act, a.dev, true) },
+      options: baseOptions(false, 8)
+    });
+  }
+  marketChart('chartCA', 'badgeCA', cogsCA, spendOf('CA'), plan && plan.CA, aCA, d.CA);
+  marketChart('chartUS', 'badgeUS', cogsUS, spendOf('US'), plan && plan.US, aUS, d.US);
+
+  // Current-month zoom: tight y-axis so the projected-vs-actualized gap is legible
+  if (plan && comb.act != null) {
+    document.getElementById('zoomRow').style.display = 'grid';
+    document.getElementById('zoomTitle').textContent = curLabel + ' — zoomed';
+    const jun = cogsAll[11];
+    const vals = [jun, plan.cogs, comb.act];
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const padY = Math.max((hi - lo) * 0.3, 15000);
+    const zAnnot = { id: 'zannot', afterDatasetsDraw(chart) {
+      const { scales: { x, y }, ctx } = chart;
+      const xi = x.getPixelForValue(1);
+      ctx.save(); ctx.textAlign = 'left';
+      const items = [
+        { v: plan.cogs, txt: 'Projected ' + fmtM(plan.cogs), clr: '#2a78d6', bold: false },
+        { v: comb.act, txt: 'Now ' + fmtM(comb.act) + '  ' + pct(comb.dev), clr: devClr(comb.dev), bold: true }
+      ].sort((a, b) => y.getPixelForValue(b.v) - y.getPixelForValue(a.v));
+      let lastY = 1e9;
+      for (const it of items) {
+        let py = y.getPixelForValue(it.v);
+        if (lastY - py < 14) py = lastY - 14;
+        lastY = py;
+        ctx.font = (it.bold ? '600 ' : '400 ') + '12px sans-serif';
+        ctx.fillStyle = it.clr;
+        ctx.fillText(it.txt, xi + 12, py + 4);
+      }
+      const y1 = y.getPixelForValue(plan.cogs), y2 = y.getPixelForValue(comb.act);
+      if (Math.abs(y1 - y2) > 4) {
+        ctx.strokeStyle = '#8a8983'; ctx.setLineDash([2, 2]); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(xi, y1); ctx.lineTo(xi, y2); ctx.stroke();
+      }
+      ctx.restore();
+    }};
+    new Chart(document.getElementById('chartZoom'), {
+      type: 'line', plugins: [zAnnot],
+      data: { labels: [labels[n - 2], curLabel + ' (live)'], datasets: [
+        { data: [jun, plan.cogs], borderColor: '#2a78d6', backgroundColor: '#ffffff', borderWidth: 1.5, borderDash: [6, 4], pointRadius: [4, 7], pointStyle: 'rectRot', pointBorderWidth: 2 },
+        { data: [jun, comb.act], borderColor: '#2a78d6', backgroundColor: [ '#2a78d6', devClr(comb.dev) ], borderWidth: 2, pointRadius: [4, 7], pointBorderColor: ['#2a78d6', devClr(comb.dev)] }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false,
+        layout: { padding: { right: 140 } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c =>
+          (c.datasetIndex === 0 ? 'Frozen projection: ' : 'Actualized: ') + fmtM(c.raw) } } },
+        scales: { x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+          y: { min: lo - padY, max: hi + padY, ticks: { callback: fmtM, font: { size: 10 } }, grid: { color: '#eceae4' } } } }
+    });
+  }
+
+  // Source of deviation: each market's dollar contribution to the combined COGS miss/beat
+  if (plan && aCA.act != null && aUS.act != null) {
+    const rows = [
+      { lbl: '🇨🇦 COGS', v: aCA.act - plan.CA.cogs, p: aCA.dev },
+      { lbl: '🇺🇸 COGS', v: aUS.act - plan.US.cogs, p: aUS.dev },
+    ];
+    const fmtDevK = v => (v < 0 ? '−$' : '+$') + Math.abs(Math.round(v / 1000)) + 'K';
+    new Chart(document.getElementById('chartAttrib'), {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.lbl + '  ' + fmtDevK(r.v) + ' (' + pct(r.p) + ')'),
+        datasets: [{ data: rows.map(r => r.v / 1000), backgroundColor: rows.map(r => devClr(r.p)), borderRadius: 3, barThickness: 16 }]
+      },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: c => 'Deviation vs frozen projection: ' + fmtDevK(rows[c.dataIndex].v) } } },
+        scales: { x: { ticks: { callback: v => (v < 0 ? '−$' : v > 0 ? '+$' : '$') + Math.abs(v) + 'K', font: { size: 10 } }, grid: { color: '#eceae4' } },
+          y: { ticks: { font: { size: 11 } }, grid: { display: false } } } }
+    });
+    const gap = aCA.dev - aUS.dev;
+    const lag = Math.abs(gap) < 0.02 ? 'markets tracking together'
+      : (gap < 0 ? '🇨🇦 Canada is the lagging market' : '🇺🇸 US is the lagging market');
+    const fmtDevK2 = v => (v < 0 ? '−$' : '+$') + Math.abs(Math.round(v / 1000)) + 'K';
+    document.getElementById('attribSummary').innerHTML =
+      `combined COGS <span class="${cls(comb.dev)}">${fmtDevK2(comb.act - plan.cogs)}</span> = CA <span class="${cls(aCA.dev)}">${fmtDevK2(aCA.act - plan.CA.cogs)}</span> + US <span class="${cls(aUS.dev)}">${fmtDevK2(aUS.act - plan.US.cogs)}</span> · ${lag}`;
+    const mixNow = mtdSpend > 0 ? mtdSpendMkt.CA / mtdSpend : null;
+    if (mixNow != null && plan.mixCA != null) {
+      const drift = mixNow - plan.mixCA;
+      document.getElementById('mixLine').innerHTML =
+        `<strong>Pivot lever — spend mix:</strong> MTD CA ${Math.round(mixNow * 100)}% vs ${Math.round(plan.mixCA * 100)}% budgeted in Pacvue (campaign caps: CA $1,650 CAD/d, US $2,360 USD/d, ~$155K CAD/mo capacity as of 2026-07-09)` +
+        (Math.abs(drift) > 0.03 ? ` — actual delivery is ${drift < 0 ? 'under' : 'over'}weight CA by ${Math.abs(Math.round(drift * 100))} pts vs the budgeted split` : ' — delivering on the budgeted split') +
+        '. Deviation here means delivery vs caps, not allocation: check which market is underspending its Pacvue budget before reallocating. CA ad dollars measured ~1.6× US productivity in FY26.';
+    }
+  }
+
+  // Products driving the deviation: per-ASIN actual MTD vs expected MTD
+  // expected = ASIN's share of last complete month's COGS × frozen projection × (measured days / days in month)
+  if (plan && dCommon > 0) {
+    try {
+      const pk = keys[11];
+      const [py, pm] = pk.split('-').map(Number);
+      const prevEnd = pk + '-' + String(new Date(py, pm, 0).getDate()).padStart(2, '0');
+      // step 1: numbers only (no titles) to keep payloads small
+      const slimDims = [{ field: 'asin' }, { field: 'country_code' }];
+      const [aMtd, aBase] = await Promise.all([
+        q({ platform: 'commerce-amazon-vendor', level: 'asin', profileIds: VENDOR_ACCTS,
+            dimensions: slimDims, measures: ['shipped_cogs'],
+            filters: [{ field: 'date', op: 'between', value: [curStart, cut] }, { field: 'shipped_cogs', op: 'gt', value: 0 }], limit: 500 }),
+        q({ platform: 'commerce-amazon-vendor', level: 'asin', profileIds: VENDOR_ACCTS,
+            dimensions: slimDims, measures: ['shipped_cogs'],
+            filters: [{ field: 'date', op: 'between', value: [pk + '-01', prevEnd] }, { field: 'shipped_cogs', op: 'gt', value: 0 }], limit: 500 }),
+      ]);
+      const agg = rows => {
+        const m = {};
+        for (const r of rows) {
+          if (!r.asin || r.shipped_cogs == null) continue;
+          m[r.asin] = (m[r.asin] || 0) + r.shipped_cogs * (r.country_code === 'US' ? FX : 1);
+        }
+        return m;
+      };
+      const cur = agg(aMtd), base = agg(aBase);
+      const baseTotal = Object.values(base).reduce((s, x) => s + x, 0);
+      const expFactor = plan.cogs * dCommon / daysInMonth;
+      const items = [...new Set([...Object.keys(cur), ...Object.keys(base)])].map(asin => {
+        const act = cur[asin] || 0;
+        const exp = baseTotal ? (base[asin] || 0) / baseTotal * expFactor : 0;
+        return { asin, title: asin, act, exp, dev: act - exp };
+      });
+      // PRODUCT_IMAGES: ASIN -> Shopify CDN product shot (pulled via the Shopify connector 2026-07-09).
+      // Caledon Farms products only — Crumps' Naturals isn't on this store and falls back to branded tiles.
+      const SHOP = 'https://cdn.shopify.com/s/files/1/0011/4301/3434/files/';
+      const CRUMPS = 'https://cdn.shopify.com/s/files/1/0510/6073/6172/files/';
+      const PRODUCT_IMAGES = {
+        B09KSV26D7: SHOP + 'CF_SweetPotatoChews_CAN_2024_REFRESHED_795g_ValuePack_PACKAGE_FRONT.jpg?v=1739465851',
+        B00VGTHAQG: SHOP + 'CF_SweetPotatoChews_CAN_2024_REFRESHED_265g_PACKAGE_FRONT_407c39e5-a62b-4092-b66e-f363d990a5bb.jpg?v=1739465248',
+        B00XRIKR0U: SHOP + 'CF_BeefLiverBites_CAN_2024_REFRESHED_150g_PACKAGE_FRONT.jpg?v=1739474984',
+        B0FM9T41F2: SHOP + 'CF_BeefLiverBites_CAN_2024_REFRESHED_355g_ValuePack_PACKAGE_FRONT.jpg?v=1739476190',
+        B09KT9L6D1: SHOP + 'CF_BeefTendersticks_CAN_2024_REFRESHED_340g_ValuePack_PACKAGE_FRONT.jpg?v=1739473193',
+        B08TR8Q8M8: SHOP + 'CF_ChickenMorsels_CAN_2024_REFRESHED_125g_PACKAGE_FRONT.jpg?v=1764341584',
+        // Crumps' Naturals store (pulled 2026-07-09; image shows product line, size may differ from the ASIN's pack size)
+        B01M1VAH9F: CRUMPS + 'CN_MiniTrainersBeefLiver_Jul2024_126g_FRONT.jpg?v=1744640909',
+        B01M0MDD9T: CRUMPS + 'CN_PlaqueBustersOriginal_Jul2024_10PK-MED-LG-DOG_270g_FRONT.jpg?v=1744641281',
+        B0DPNFCFBM: CRUMPS + 'CN_PlaqueBustersBacon_Jul2024_10PK-MED-LG-DOG_270g_FRONT.jpg?v=1744641250',
+        B00B2F4RKG: CRUMPS + 'CN_BeefLiverBites_Jul2024_155g_FRONT.jpg?v=1744640061',
+        B00B2F4ZMG: CRUMPS + 'CN_SweetPotatoChews_Jul2024_160g_FRONT.jpg?v=1744641217',
+        B00B2F515G: CRUMPS + 'CN_SweetPotatoChews_Jul2024_160g_FRONT.jpg?v=1744641217',
+        B00B2F4JUO: CRUMPS + 'CN_BeefTendersticks_Jul2024_138g_FRONT.jpg?v=1744640091'
+      };
+      const tileFor = title => {
+        const t = (title || '').toLowerCase();
+        const brand = t.includes('caledon') ? ['#e1f5ee', '#085041', 'CF'] : t.includes('crump') ? ['#eeedfe', '#3c3489', 'CN'] : t.includes('dog delight') || t.includes(' dd ') ? ['#faeeda', '#633806', 'DD'] : ['#f1efe8', '#444441', '?'];
+        const icon =
+          t.includes('sweet potato') ? '🍠' :
+          t.includes('salmon') || t.includes('fish') ? '🐟' :
+          t.includes('dental') || t.includes('plaque') ? '🦷' :
+          t.includes('tenderstick') || t.includes('stick') ? '🦴' :
+          t.includes('liver') || t.includes('beef') || t.includes('jerky') ? '🥩' :
+          t.includes('chicken') ? '🍗' :
+          t.includes('lamb') ? '🐑' : '🐶';
+        return `<div style="position:absolute; inset:0; border-radius:6px; background:${brand[0]}; color:${brand[1]}; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:600"><span style="font-size:18px; line-height:1">${icon}</span><span style="font-size:8px; opacity:.75; margin-top:2px">${brand[2]}</span></div>`;
+      };
+      const rowHtml = it => {
+        const good = it.dev > 0;
+        const imgSrc = PRODUCT_IMAGES[it.asin];
+        return `<div style="display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid #f1efe8">
+          <div style="position:relative; width:42px; height:42px; flex:none">
+            ${tileFor(it.title)}
+            ${imgSrc ? `<img src="${imgSrc}" alt="" style="position:absolute; inset:0; width:42px; height:42px; object-fit:contain; border-radius:6px; background:#fff" onerror="this.style.display='none'">` : ''}
+          </div>
+          <div style="flex:1; min-width:0">
+            <div style="font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${it.title}</div>
+            <div style="font-size:11px; color:#6b6a66">actual ${fmtK(it.act)} vs expected ${fmtK(it.exp)} · ${it.asin}</div>
+          </div>
+          <span class="pill ${good ? 'good' : 'bad'}" style="margin-top:0; flex:none">${good ? '+' : '−'}${fmtK(Math.abs(it.dev)).slice(1)}</span>
+        </div>`;
+      };
+      const pos = items.filter(x => x.dev > 500).sort((a, b) => b.dev - a.dev).slice(0, 5);
+      const neg = items.filter(x => x.dev < -500).sort((a, b) => a.dev - b.dev).slice(0, 5);
+      // step 2: fetch titles only for the ~10 movers
+      const movers = [...pos, ...neg];
+      if (movers.length) {
+        const tRows = await q({ platform: 'commerce-amazon-vendor', level: 'asin', profileIds: VENDOR_ACCTS,
+          dimensions: [{ field: 'asin' }, { field: 'product_title' }, { field: 'country_code' }],
+          measures: ['shipped_cogs'],
+          filters: [{ field: 'date', op: 'between', value: [pk + '-01', cut] },
+                    { field: 'asin', op: 'in', value: movers.map(x => x.asin) }], limit: 60 });
+        const titles = {};
+        for (const r of tRows) {
+          if (!r.asin || !r.product_title) continue;
+          if (!titles[r.asin] || r.country_code === 'CA') titles[r.asin] = r.product_title;
+        }
+        for (const it of movers) it.title = titles[it.asin] || it.asin;
+      }
+      document.getElementById('drivers').style.display = 'block';
+      document.getElementById('driversNote').textContent =
+        `days 1–${dCommon} · expected = ${new Date(pk + '-15').toLocaleDateString('en', { month: 'short' })} product mix × frozen projection · both markets, CAD`;
+      document.getElementById('drvPos').innerHTML = pos.length ? pos.map(rowHtml).join('') : '<div style="font-size:12px;color:#8a8983;padding:6px 0">none above the ±$500 threshold</div>';
+      document.getElementById('drvNeg').innerHTML = neg.length ? neg.map(rowHtml).join('') : '<div style="font-size:12px;color:#8a8983;padding:6px 0">none above the ±$500 threshold</div>';
+    } catch (e) {
+      document.getElementById('drivers').style.display = 'block';
+      document.getElementById('driversNote').textContent = 'could not load product detail: ' + (e.message || e).toString().slice(0, 180);
+    }
+  }
+
+  // simple per-market budget pacing bars
+  function spendBar(elId, m) {
+    const el = document.getElementById(elId);
+    if (!plan || !plan.spendPlan) { el.innerHTML = ''; return; }
+    const target = plan.spendPlan[m];
+    const spent = mtdSpendMkt[m];
+    const expPct = Math.min(100, dA / daysInMonth * 100);
+    const pctRaw = spent / target * 100;
+    const pctW = Math.min(100, pctRaw);
+    const onPace = pctRaw >= expPct - 5;
+    const fillClr = onPace ? '#1baf7a' : '#e24b4a';
+    el.innerHTML = `
+      <div style="font-size:11px; color:#6b6a66; margin:12px 0 4px">Ad spend vs Pacvue plan — ${curLabel}</div>
+      <div style="position:relative; height:16px; background:#eceae4; border-radius:8px">
+        <div style="position:absolute; left:0; top:0; height:16px; width:${pctW.toFixed(1)}%; background:${fillClr}; border-radius:8px"></div>
+        <div style="position:absolute; left:${expPct.toFixed(1)}%; top:-3px; width:2px; height:22px; background:#0b0b0b" title="pro-rata target for today"></div>
+      </div>
+      <div style="font-size:12px; margin-top:5px; color:#52514e">
+        ${fmtK(spent)} of ${fmtK(target)} plan (${Math.round(pctRaw)}%) · should be ~${Math.round(expPct)}% by today →
+        <strong style="color:${fillClr}">${onPace ? 'on pace' : 'behind pace'}</strong>
+      </div>`;
+  }
+  spendBar('spendCA', 'CA');
+  spendBar('spendUS', 'US');
+
+  // Segment tables: ad spend (campaign tag) vs shipped COGS (vendor category L1) → TACoS, per market
+  if (dCommon > 0) {
+    try {
+      // ad campaign tag names differ slightly from vendor category names — map to the vendor naming
+      const SEG_MAP = { 'Sweet Potato': 'Sweet Potato Chews', 'Sticks & Jerky': 'Chewy Sticks & Jerky', 'Training Treats': 'Mini Trainers' };
+      const [segSpend, segCogs] = await Promise.all([
+        q({ platform: 'amazon-ads', level: 'campaign', profileIds: ADS_PROFILES,
+            dimensions: [{ field: 'campaign_tag.TagName' }, { field: 'profile.country_code' }],
+            measures: ['spend'],
+            filters: [{ field: 'date', op: 'between', value: [curStart, cut] }],
+            options: { toCurrency: 'CAD' }, limit: 80 }),
+        q({ platform: 'commerce-amazon-vendor', level: 'asin', profileIds: VENDOR_ACCTS,
+            dimensions: [{ field: 'category_level_one' }, { field: 'country_code' }],
+            measures: ['shipped_cogs'],
+            filters: [{ field: 'date', op: 'between', value: [curStart, cut] }, { field: 'shipped_cogs', op: 'gt', value: 0 }], limit: 80 }),
+      ]);
+      const seg = { CA: {}, US: {} };
+      const touch = (m, name) => { seg[m][name] = seg[m][name] || { spend: 0, cogs: 0 }; return seg[m][name]; };
+      for (const r of segSpend) {
+        if (!r.TagName || !r.spend) continue;
+        touch(r.country_code === 'US' ? 'US' : 'CA', SEG_MAP[r.TagName] || r.TagName).spend += r.spend;
+      }
+      for (const r of segCogs) {
+        if (!r.category_level_one || !r.shipped_cogs) continue;
+        const m = r.country_code === 'US' ? 'US' : 'CA';
+        touch(m, r.category_level_one).cogs += r.shipped_cogs * (m === 'US' ? FX : 1);
+      }
+      const segTable = (elId, m) => {
+        const rows = Object.entries(seg[m])
+          .map(([name, v]) => ({ name, ...v, tacos: v.cogs > 0 ? v.spend / v.cogs : null }))
+          .filter(r => r.spend > 0 || r.cogs > 500)
+          .sort((a, b) => b.spend - a.spend || b.cogs - a.cogs);
+        const tot = rows.reduce((s, r) => s + r.spend, 0), totC = rows.reduce((s, r) => s + r.cogs, 0);
+        const cell = r => `<tr>
+          <td style="text-align:left">${r.name}</td>
+          <td>${r.spend ? fmtK(r.spend) : '—'}</td>
+          <td>${r.cogs ? fmtK(r.cogs) : '—'}</td>
+          <td>${r.tacos == null ? '—' : (r.tacos * 100).toFixed(1) + '%'}</td></tr>`;
+        document.getElementById(elId).innerHTML = `
+          <div style="font-size:11px; color:#6b6a66; margin:14px 0 2px">Segment spend &amp; TACoS — ${curLabel} days 1–${dCommon}</div>
+          <table style="margin-top:2px"><thead><tr><th>Segment</th><th>Spend</th><th>Shipped COGS</th><th>TACoS</th></tr></thead>
+          <tbody>${rows.map(cell).join('')}
+          <tr style="font-weight:600"><td style="text-align:left">Total</td><td>${fmtK(tot)}</td><td>${fmtK(totC)}</td><td>${totC ? (tot / totC * 100).toFixed(1) + '%' : '—'}</td></tr>
+          </tbody></table>`;
+      };
+      segTable('segCA', 'CA');
+      segTable('segUS', 'US');
+    } catch (e) {
+      for (const id of ['segCA', 'segUS'])
+        document.getElementById(id).innerHTML = `<div style="font-size:11px;color:#b3261e;margin-top:12px">Segment table unavailable: ${(e.message || e).toString().slice(0, 120)}</div>`;
+    }
+  }
+
+  // (bottom tracking scoreboard removed — merged into the top cards row)
+
+  const monName = new Date(curKey + '-15').toLocaleDateString('en', { month: 'short' });
+  document.getElementById('asof').textContent =
+    `All CAD (US market at ${FX}). Refreshed ${now.toLocaleString()}. ` +
+    (dCommon > 0
+      ? `Current month measured over ${monName} 1–${dCommon} — only days with settled data for both ad spend and shipped COGS (${SETTLE_DAYS}-day settling buffer; newer data exists thru ${monName} ${Math.min(adsLast, vendLastCA, vendLastUS)} but is not counted until settled).`
+      : `No settled current-month data yet for both ad spend and shipped COGS.`);
+  document.getElementById('foot').innerHTML =
+    'Blue line = shipped COGS; gray bars = ad spend (same $ axis; current month bar = MTD, lighter). ' +
+    'Actualized estimate = MTD actual + frozen projected daily rate for remaining days; pro-rata assumes a flat intra-month curve. ' +
+    'Frozen projections are never overwritten by refreshes' + (plan ? ' (this month: ' + plan.label + ')' : '') + '. Source: Pacvue connector, campaign-level ads + vendor ASIN facts. ' +
+    'TACoS = spend ÷ shipped COGS (Crump convention). Connector FX 1.4205 — finance may restate at BoC monthly averages. ' +
+    'Version: v2 (COGS + ad spend). v1 (COGS + ordered revenue) archived in the project folder under tracker_versions/.';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+}
+main().catch(e => {
+  document.getElementById('loading').style.display = 'none';
+  const el = document.getElementById('err');
+  el.style.display = 'block';
+  el.textContent = e.message + ' — hit Reload to retry, or check that the Pacvue connector is connected.';
+});
+</script>
+</body>
+</html>
