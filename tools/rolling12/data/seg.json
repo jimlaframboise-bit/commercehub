@@ -1,0 +1,27 @@
+{
+  "segSpend": [
+    ["Cat Treats","CA",null],["Cat Treats","US",null],
+    ["Catch All","CA",null],["Catch All","US",null],
+    ["Cookies & Biscuits","CA",null],["Cookies & Biscuits","US",null],
+    ["Dental","CA",null],["Dental","US",6917.70],
+    ["Dog Treats Generic","CA",null],["Dog Treats Generic","US",null],
+    ["Freeze Dried","CA",18264.65],["Freeze Dried","US",7827.10],
+    ["Gutsy","CA",null],["Gutsy","US",null],
+    ["Horse Treats","US",null],
+    ["Sprinkles","CA",null],["Sprinkles","US",6174.41],
+    ["Sticks & Jerky","CA",null],["Sticks & Jerky","US",15214.87],
+    ["Sweet Potato","CA",9622.37],["Sweet Potato","US",24696.87],
+    ["Training Treats","CA",null],["Training Treats","US",6651.27]
+  ],
+  "segCogs": [
+    ["Freeze Dried","US",156623.24],["Dental","CA",76447.14],["Gutsy","US",513.35],
+    ["Horse Treats","US",4286.56],["Single Ingredient","US",2897.85],["Cat Treats","CA",2936.95],
+    ["Mini Trainers","US",20139.13],["Miscellaneous","US",77.64],["Dry Dog Food","CA",1904.67],
+    ["Chewy Sticks & Jerky","US",75738.44],["Single Ingredient","CA",5983.79],["Cat Treats","US",308.59],
+    ["Sweet Potato Chews","CA",93993.25],["Dental","US",23969.10],["Freeze Dried","CA",165497.67],
+    ["The Dodo","US",1579.27],["Sprinkles","US",25217.42],["Miscellaneous","CA",2088.74],
+    ["Sweet Potato Chews","US",201549.45],["Cookies & Biscuits","CA",4768.90],["Mini Trainers","CA",52498.01],
+    ["Sprinkles","CA",12878.06],["Dry Dog Food","US",2646.54],["Chewy Sticks & Jerky","CA",101429.86],
+    ["Gutsy","CA",241.60]
+  ]
+}
