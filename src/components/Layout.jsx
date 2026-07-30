@@ -9,6 +9,7 @@ const NAV = [
   { section: null, items: [
     { to: '/', label: 'Overview', icon: 'dashboard', end: true },
     { to: '/tracker', label: 'Amazon Tracker', icon: 'bars' },
+    { to: '/rolling12', label: 'Rolling 12 Tracker', icon: 'clock' },
   ] },
   {
     section: 'Sponsored Ads', module: true,
@@ -95,7 +96,7 @@ function Sidebar() {
 }
 
 const CRUMBS = {
-  '/': 'Overview', '/tracker': 'Amazon Tracker', '/ads/profile': 'Sponsored Ads · Profile', '/ads/campaigns': 'Sponsored Ads · Campaigns',
+  '/': 'Overview', '/tracker': 'Amazon Tracker', '/rolling12': 'Rolling 12 Tracker', '/ads/profile': 'Sponsored Ads · Profile', '/ads/campaigns': 'Sponsored Ads · Campaigns',
   '/ads/tagging': 'Sponsored Ads · Tagging', '/ads/portfolio': 'Sponsored Ads · Portfolio',
   '/ads/placement': 'Sponsored Ads · Placement', '/ads/ads': 'Sponsored Ads · Ads',
   '/ads/asin': 'Sponsored Ads · ASIN',
