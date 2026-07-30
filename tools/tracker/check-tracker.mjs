@@ -29,12 +29,15 @@ const results = [];
 const check = (label, pass, detail) => { results.push({ label, pass, detail }); };
 
 // chrome + honesty
+const AS_OF_LABEL = new Date(snap.asOf + 'T12:00:00Z').toLocaleDateString('en-GB',
+  { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const pill = (await page.textContent('#modePill')).trim();
 check('pill does not claim LIVE', !/LIVE/i.test(pill) && /snapshot/i.test(pill), pill);
+check(`pill carries the snapshot date (${AS_OF_LABEL})`, pill.includes(AS_OF_LABEL), pill);
 check('no SAMPLE banner', !(await page.$('.banner')), 'sample fallback did not trigger');
 check('charts drew', (await page.$$eval('canvas', cs => cs.filter(c => c.width > 0 && c.height > 0).length)) >= 2, 'canvases sized');
 const foot = await page.textContent('.foot');
-check('footer discloses snapshot', /Static snapshot/.test(foot) && /28 Jul 2026/.test(foot), '');
+check('footer discloses snapshot', /Static snapshot/.test(foot) && foot.includes(AS_OF_LABEL), foot.slice(-160));
 
 // filter states: [label, market buttons, brand buttons, expected markets, expected brands]
 const STATES = [

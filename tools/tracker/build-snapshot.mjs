@@ -5,8 +5,8 @@ import * as R from './raw.js';
 import { writeFileSync } from 'node:fs';
 
 const FX = 1.42071;                       // Pacvue connector rate — Crump reporting standard
-const AS_OF = '2026-07-28';
-const CUT_DAY = 26;                       // settled common window, computed below and asserted
+const AS_OF = '2026-07-29';
+const CUT_DAY = 27;                       // settled common window, computed below and asserted
 
 // representative real ASIN per brand — lets brand-attributed spend flow through the
 // tracker's ASIN->brand map with no code change
@@ -43,12 +43,14 @@ const near = (a, b, tol, label) => {
   return ok;
 };
 
-// 1. settled common window must land on day 26
+// 1. settled common window must land on the expected day
 const lastDay = ds => Math.max(...ds.map(d => +d.slice(8, 10)));
 const adsLast = lastDay(aDaily.filter(r => r.date < AS_OF && r.spend > 0).map(r => r.date));
 const vCA = lastDay(vDaily.filter(r => r.country_code === 'CA' && r.shipped_cogs > 0).map(r => r.date));
 const vUS = lastDay(vDaily.filter(r => r.country_code === 'US' && r.shipped_cogs > 0).map(r => r.date));
-const dCommon = Math.min(adsLast, vCA, vUS, 28 - 2);
+const SETTLE = 2;
+const asOfDay = +AS_OF.slice(8, 10);
+const dCommon = Math.min(adsLast, vCA, vUS, asOfDay - SETTLE);
 checks.push({ label: 'settled window day', a: dCommon, b: CUT_DAY, diff: dCommon - CUT_DAY, ok: dCommon === CUT_DAY });
 const cut = '2026-07-' + String(dCommon).padStart(2, '0');
 
@@ -81,7 +83,7 @@ checks.push({ label: 'movers ASINs unmapped', a: missing.length, b: 0, diff: mis
 const snapshot = {
   asOf: AS_OF, fx: FX, cut, dCommon,
   coverage: +coverage.toFixed(4),
-  source: 'Pacvue connector (execute_query) — pulled 2026-07-28',
+  source: 'Pacvue connector (execute_query) — pulled ' + AS_OF,
   moversCap: 'top 80 ASINs by shipped COGS in each window',
   vMonthly, aMonthly, vDaily, aDaily, aMonthlyAsin, aDailyAsin, brandMapRows,
   movers: { cur: moversCur, base: moversBase, pk: '2026-06', prevDays: 30 }

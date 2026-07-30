@@ -12,6 +12,9 @@ const snapshot = JSON.parse(readFileSync(new URL('./snapshot.json', import.meta.
 const titles = JSON.parse(readFileSync(new URL('./titles.json', import.meta.url)));
 snapshot.titles = titles;
 
+const AS_OF_LABEL = new Date(snapshot.asOf + 'T12:00:00Z').toLocaleDateString('en-GB',
+  { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });   // e.g. "29 Jul 2026"
+
 let h = readFileSync(SRC, 'utf8');
 const before = h.length;
 const patches = [];
@@ -114,17 +117,63 @@ patch('frozen titles',
 /* 6 — the status pill must not claim to be live */
 patch('honest pill',
   '<span class="pill live" id="modePill"><span class="dot"></span>LIVE · Pacvue</span>',
-  '<span class="pill month" id="modePill">Pacvue snapshot · 28 Jul 2026</span>');
+  '<span class="pill month" id="modePill">Pacvue snapshot · ' + AS_OF_LABEL + '</span>');
 patch('loading copy', 'Pulling live data from the Pacvue connector…', 'Loading the Pacvue snapshot…');
 patch('asof placeholder', 'Connecting to the Pacvue connector…', 'Loading…');
 
 /* 7 — say so in the methodology footer */
 patch('footer provenance',
   "(MODE === 'sample' ? ' <strong>This render used the built-in sample dataset (design preview), not Pacvue.</strong>' : '')",
-  `' <strong>Static snapshot</strong> — figures were pulled from Pacvue on 28 Jul 2026 and are frozen into this page; ` +
+  `' <strong>Static snapshot</strong> — figures were pulled from Pacvue on ${AS_OF_LABEL} and are frozen into this page; ` +
   `they do not refresh when you open it. Movers are drawn from the top 80 ASINs by shipped COGS in each window.'`);
 
-/* 8 — don't assert a clock time the snapshot doesn't have (pinned "now" is midday UTC) */
+/* 8 — watchdog: never leave a silent spinner.
+   This lives in its OWN <script> ahead of the main one, so it still runs even if the main
+   script fails to parse — which is exactly the case that produces an endless spinner and no
+   error. It reports what it can observe (did the script start, did Chart load, what threw,
+   which browser) instead of leaving the reader guessing. */
+const WATCHDOG = `<script>
+(function () {
+  var D = { started: false, finished: false, errors: [] };
+  window.__trk = D;
+  window.addEventListener('error', function (e) {
+    D.errors.push(String((e && e.message) || 'error') + (e && e.lineno ? ' (line ' + e.lineno + ')' : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    D.errors.push('unhandled rejection: ' + String((r && (r.message || r)) || 'unknown'));
+  });
+  function report() {
+    var l = document.getElementById('loading');
+    if (!l) return;
+    try { if (window.getComputedStyle(l).display === 'none') return; } catch (x) {}
+    var bits = [];
+    bits.push('charting library: ' + (typeof Chart === 'undefined' ? 'DID NOT LOAD' : 'loaded'));
+    bits.push('page script: ' + (D.started ? (D.finished ? 'finished (so the stall is later)' : 'started but did not finish') : 'NEVER STARTED - it failed to parse or run in this browser'));
+    if (D.errors.length) bits.push('errors: ' + D.errors.slice(0, 4).join(' | '));
+    else bits.push('errors: none reported');
+    bits.push('screen: ' + (window.innerWidth || '?') + 'x' + (window.innerHeight || '?'));
+    bits.push(navigator.userAgent);
+    l.innerHTML =
+      '<div style="max-width:660px;margin:0 auto;text-align:left;font:15px/1.6 system-ui,-apple-system,sans-serif;color:#14181f">' +
+      '<div style="font-weight:700;font-size:18px;margin-bottom:10px">This page could not finish loading in this browser.</div>' +
+      '<div style="color:#46536a;margin-bottom:16px">The tracker is one self-contained file with no server behind it, so this is something about the browser it opened in rather than a connection problem. Trying a different browser often works. The detail below is the useful part to send back.</div>' +
+      '<pre style="white-space:pre-wrap;word-break:break-word;background:#fff;border-radius:14px;padding:16px;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:#46536a;margin:0">' +
+      bits.join('\\n') + '</pre></div>';
+  }
+  setTimeout(report, 8000);
+})();
+</script>`;
+patch('watchdog', '\n<script>\nconst FX = 1.42071;',
+  '\n' + WATCHDOG + '\n<script>\ntry { window.__trk.started = true } catch (e) {}\nconst FX = 1.42071;');
+patch('watchdog finished flag',
+  `  el('loading').style.display = 'none';
+  el('content').style.display = 'block';`,
+  `  el('loading').style.display = 'none';
+  el('content').style.display = 'block';
+  try { window.__trk.finished = true } catch (e) {}`);
+
+/* 9 — don't assert a clock time the snapshot doesn't have (pinned "now" is midday UTC) */
 patch('date not time', "'. Refreshed ' + now.toLocaleString() + '. ' +",
   "'. Pulled from Pacvue ' + now.toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) + '. ' +");
 
