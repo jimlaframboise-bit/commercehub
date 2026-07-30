@@ -170,7 +170,20 @@ setInterval(reportHeight, 1000);
 
 main().then(reportHeight).catch(e => {`);
 
-/* 10 — the error path still mentions reloading to retry a connector. There is no connector. */
+/* 10 — DATA, not design: fill the gaps in the artifact's hand-curated product-photo map.
+   The map was frozen when the artifact was built; the movers card is recomputed every refresh,
+   so any ASIN that becomes a mover afterwards falls back to a branded letter tile. Merging the
+   build-time additions ON TOP means the artifact is never edited and the design is untouched —
+   the card still renders exactly as designed, it just has the photo it was always meant to
+   have. `build-snapshot12.mjs` fails the build if any mover is still uncovered. */
+patch('merge extra product photos',
+  `        B00B2F4JUO: CRUMPS + 'CN_BeefTendersticks_Jul2024_138g_FRONT.jpg?v=1744640091'
+      };`,
+  `        B00B2F4JUO: CRUMPS + 'CN_BeefTendersticks_Jul2024_138g_FRONT.jpg?v=1744640091'
+      };
+      Object.assign(PRODUCT_IMAGES, SNAP.images || {});`);
+
+/* 11 — the error path still mentions reloading to retry a connector. There is no connector. */
 patch('error copy', "e.message + ' — hit Reload to retry, or check that the Pacvue connector is connected.'",
   "e.message + ' — this page reads a frozen snapshot, so a reload will not change the outcome. Rebuild it with tools/rolling12/refresh-rolling12.md.'");
 

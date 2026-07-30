@@ -5,7 +5,7 @@
    This FAILS LOUDLY. Do not proceed past a FAIL: a frozen dataset that silently disagrees
    with Pacvue is worse than no page at all. */
 import * as R from './raw12.js';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const FX = 1.4205;                 // the ORIGINAL artifact's rate — see the note in raw12.js
 const AS_OF = R.AS_OF;             // '2026-07-30'
@@ -22,6 +22,29 @@ const moversBase = R.moversBase.map(([asin, country_code, shipped_cogs]) => ({ a
 const segSpend = R.segSpend.map(([TagName, country_code, spend]) => ({ TagName, country_code, spend }));
 const segCogs  = R.segCogs.map(([category_level_one, country_code, shipped_cogs]) => ({ category_level_one, country_code, shipped_cogs }));
 const titles = Object.fromEntries(R.titles);
+
+/* ---------- product photos for movers the artifact's own map does not cover ----------
+   The artifact carries a hand-curated PRODUCT_IMAGES map, frozen when it was built on
+   2026-07-09. The movers card, by contrast, is computed from live data every refresh — so any
+   ASIN that becomes a top-5 mover after that date has no photo and silently falls back to a
+   branded letter tile. That is what happened to B0CK8HD9L6 and B0CBL544BJ (spotted by Jim,
+   2026-07-30).
+
+   These entries are merged ON TOP of the artifact's map at build time, so the artifact itself
+   is never edited. Add to this list rather than to the artifact; the coverage check below
+   fails the build if a mover is still uncovered, so the gap can no longer ship silently.
+
+   Sourced from the Shopify Admin API (featured image of the matching product). As the
+   artifact already notes for Crumps' items, the shot shows the product line and the pack size
+   may differ from the ASIN's — CN_MiniTrainersLamb is the 132 g front because no 300 g shot
+   exists on the store. */
+const CRUMPS = 'https://cdn.shopify.com/s/files/1/0510/6073/6172/files/';
+const EXTRA_IMAGES = {
+  // Plaque Busters Advanced - Double Fresh Dental Sticks, 270 g (exact size match)
+  B0CK8HD9L6: CRUMPS + 'CN_PlaqueBustersAdvDoubleFresh_Jul2024_10PK-MED-LG-DOG_270g_FRONT.jpg?v=1744640800',
+  // Mini Trainers Lamb (semi-moist), 300 g — 132 g pack shot, the only one on the store
+  B0CBL544BJ: CRUMPS + 'CN_MiniTrainersLamb_Jul2024_132g_FRONT.jpg?v=1744640827',
+};
 
 /* ---------- reconciliation (RULE 0: verify, never assume) ---------- */
 const cad = (v, m) => (v || 0) * (m === 'US' ? FX : 1);
@@ -88,10 +111,24 @@ const untitled = movers.map(x => x.asin).filter(a => !titles[a]);
 check('movers without a title', untitled.length, 0, untitled.length === 0);
 check('movers shown (5 up + 5 down)', movers.length, 10, movers.length === 10);
 
-// 7. the current month must be the one the frozen PLAN block covers, or every card reads "—"
+// 7. every mover on the card must resolve to a product photo. A branded letter tile is the
+//    degraded state, not the intent, and it is invisible to any check that only asks whether
+//    the page rendered — which is how two of them shipped on 2026-07-30. The artifact's own
+//    map is READ FROM THE ARTIFACT rather than duplicated here, so if it ever grows this
+//    check follows it automatically instead of going stale.
+const artifactSrc = readFileSync(new URL('./artifact-source.html', import.meta.url), 'utf8');
+const mapStart = artifactSrc.indexOf('const PRODUCT_IMAGES');
+const mapBlock = artifactSrc.slice(mapStart, artifactSrc.indexOf('};', mapStart) + 2);
+const builtInImages = [...mapBlock.matchAll(/\b(B0[A-Z0-9]{8})\s*:/g)].map(m => m[1]);
+check('artifact PRODUCT_IMAGES map found', builtInImages.length > 0, true, builtInImages.length > 0);
+const covered = new Set([...builtInImages, ...Object.keys(EXTRA_IMAGES)]);
+const noPhoto = movers.map(x => x.asin).filter(a => !covered.has(a));
+check('movers with no product photo', noPhoto.length, 0, noPhoto.length === 0);
+
+// 8. the current month must be the one the frozen PLAN block covers, or every card reads "—"
 check('PLAN month == snapshot month', AS_OF.slice(0, 7), '2026-07', AS_OF.slice(0, 7) === '2026-07');
 
-// 8. rolling-12 window must be complete: 12 closed months + the live one, both markets
+// 9. rolling-12 window must be complete: 12 closed months + the live one, both markets
 const monthsSeen = new Set(vMonthly.map(r => r.date.slice(0, 7)));
 check('months in COGS window', monthsSeen.size, 13, monthsSeen.size === 13);
 
@@ -104,6 +141,7 @@ const snapshot = {
   source: 'Pacvue connector (execute_query) — pulled ' + AS_OF,
   moversCap: 'top 500 ASIN rows by shipped COGS in each window (the artifact\'s own limit)',
   vMonthly, aMonthly, vDaily, aDaily, segSpend, segCogs, titles,
+  images: EXTRA_IMAGES,
   movers: { cur: moversCur, base: moversBase, pk: '2026-06' }
 };
 writeFileSync(new URL('./snapshot12.json', import.meta.url), JSON.stringify(snapshot));
@@ -115,6 +153,12 @@ console.log('rolling-12 spend CAD:', money(spend12));
 console.log('July MTD COGS  CAD :', money(mtdCogs.CA + mtdCogs.US), `(CA ${money(mtdCogs.CA)} / US ${money(mtdCogs.US)})`);
 console.log('July MTD spend CAD :', money(spendTotal), `(CA ${money(mtdSpend.CA)} / US ${money(mtdSpend.US)})`);
 console.log('tag-coverage of spend:', (tagCoverage * 100).toFixed(1) + '%');
+console.log('mover photo coverage :', `${movers.length - noPhoto.length}/${movers.length}` +
+  ` (${builtInImages.length} from the artifact, ${Object.keys(EXTRA_IMAGES).length} added at build time)`);
+if (noPhoto.length) {
+  console.error('\n  Movers with no photo: ' + noPhoto.map(a => `${a} — ${titles[a] || 'no title'}`).join('\n                        '));
+  console.error('  Find each on the Shopify store and add it to EXTRA_IMAGES near the top of this file.');
+}
 console.log('\nchecks:');
 for (const c of checks) console.log(` ${c.ok ? 'PASS' : 'FAIL'}  ${c.label}: ${c.a} vs ${c.b}${c.diff !== '' ? ` (Δ ${c.diff})` : ''}`);
 if (checks.some(c => !c.ok)) { console.error('\nRECONCILIATION FAILED — do not build.'); process.exit(1); }

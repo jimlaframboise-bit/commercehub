@@ -97,6 +97,31 @@ const bareAsin = /^B0[A-Z0-9]{8}$/m;
 ok('no mover shows a bare ASIN as its title', !bareAsin.test(drvPos) && !bareAsin.test(drvNeg));
 has(drvPos + drvNeg, 'Caledon Farms', 'mover titles resolved');
 
+/* Every mover must carry a product photo element. The branded letter tile sits BEHIND the
+   photo as a fallback, so a missing photo is invisible to any check that only looks at
+   rendered text — which is exactly how two shipped unnoticed on 2026-07-30. Asserting on the
+   <img> element (not on whether it loaded) is the right test here: the build sandbox has no
+   route to Shopify's CDN, but the element's presence and src are what the build controls. */
+const moverImgs = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('#drvPos > div, #drvNeg > div')];
+  return rows.map(r => {
+    const img = r.querySelector('img');
+    const asin = (r.textContent.match(/\bB0[A-Z0-9]{8}\b/) || [null])[0];
+    return { asin, src: img ? img.getAttribute('src') : null };
+  });
+});
+ok('10 mover rows found', moverImgs.length === 10, moverImgs.length + ' rows');
+const photoless = moverImgs.filter(m => !m.src).map(m => m.asin || '?');
+ok('every mover has a product photo, not a fallback tile', photoless.length === 0,
+  photoless.length ? 'no photo: ' + photoless.join(', ') : '10/10');
+ok('every photo src points at the Shopify CDN', moverImgs.every(m => !m.src || /^https:\/\/cdn\.shopify\.com\//.test(m.src)));
+// the two Jim reported, named explicitly so a regression is unmistakable
+for (const asin of ['B0CK8HD9L6', 'B0CBL544BJ']) {
+  const row = moverImgs.find(m => m.asin === asin);
+  ok(`${asin} has a photo (was a tile before 2026-07-30)`, !!(row && row.src),
+    row ? (row.src || 'MISSING').slice(-52) : 'not a mover in this snapshot');
+}
+
 /* 6 — segment tables rendered for both markets and reconcile to the MTD totals */
 /* The page drops rows with no spend and under $500 COGS before totalling, so the table's
    Total is NOT the raw MTD figure. Replicate that filter rather than loosening the check. */
