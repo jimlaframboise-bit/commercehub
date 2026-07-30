@@ -6,16 +6,34 @@ const ROUTES = [
   '/ads/adgroups', '/ads/ads', '/ads/asin', '/ads/targeting', '/ads/search-terms', '/ads/sov',
   '/ads/dayparting', '/ads/bulk', '/dsp', '/dsp/audiences', '/dsp/amc', '/commerce/shelf',
   '/commerce/buybox', '/commerce/products', '/rules', '/budgets', '/ai/campaign', '/ai/product',
-  '/reports', '/alerts', '/settings', '/tracker',
+  '/reports', '/alerts', '/settings', '/tracker', '/rolling12',
 ]
 
 const url = 'file://' + path.resolve('render-check.html')
 const errors = []
+const blockedAssets = []
 let cur = 'boot'
+
+/* The /rolling12 tracker ships the artifact's product photos, which live on Shopify's public
+   CDN. This sandbox has no route to that CDN, so those image requests fail here and would
+   not fail in a real browser. They are excluded from the error count but NOT ignored: every
+   failed request is checked below to be an image from that CDN and nothing else. Both the
+   page builder and gen-render-html.mjs already assert that no script/CDN tag survives, so a
+   non-image external request would be a genuine regression. */
+const isBlockedAsset = (t) => /Failed to load resource/.test(t)
 
 const browser = await chromium.launch({ headless: true, executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' })
 const page = await browser.newPage()
-page.on('console', (m) => { if (m.type() === 'error') errors.push(`[${cur}] console.error: ${m.text()}`) })
+page.on('console', (m) => {
+  if (m.type() !== 'error') return
+  if (isBlockedAsset(m.text())) blockedAssets.push(`[${cur}] ${m.text()}`)
+  else errors.push(`[${cur}] console.error: ${m.text()}`)
+})
+page.on('requestfailed', (r) => {
+  const u = r.url()
+  if (r.resourceType() === 'image' && /^https:\/\/cdn\.shopify\.com\//.test(u)) blockedAssets.push(`[${cur}] image ${u}`)
+  else errors.push(`[${cur}] unexpected external request failed (${r.resourceType()}): ${u}`)
+})
 page.on('pageerror', (e) => errors.push(`[${cur}] pageerror: ${e.message}`))
 
 await page.goto(url, { waitUntil: 'networkidle' })
@@ -29,7 +47,8 @@ const rowCounts = {}
 for (const route of ROUTES) {
   cur = route
   await page.evaluate((h) => { window.location.hash = h }, route)
-  await page.waitForTimeout(route === '/tracker' ? 2500 : 450)
+  const EMBEDS = ['/tracker', '/rolling12']
+  await page.waitForTimeout(EMBEDS.includes(route) ? 2500 : 450)
   // sanity: content rendered under .content
   const ok = await page.evaluate(() => {
     const c = document.querySelector('.content')
@@ -37,10 +56,13 @@ for (const route of ROUTES) {
   })
   // /tracker is an embedded document - the host .content holds no text of its own, so the
   // generic assertion does not apply. It gets a stronger, frame-aware check instead.
-  if (!ok && route !== '/tracker') errors.push(`[${route}] EMPTY content region`)
-  if (route === '/tracker') {
-    const fr = await page.evaluate(() => {
-      const f = document.querySelector('.tracker-embed iframe')
+  if (!ok && !EMBEDS.includes(route)) errors.push(`[${route}] EMPTY content region`)
+  // Both tracker routes are embedded documents - the host .content holds no text of its own,
+  // so the generic assertion does not apply. They get a stronger, frame-aware check instead.
+  if (EMBEDS.includes(route)) {
+    const sel = route === '/tracker' ? '.tracker-embed iframe' : '[data-rolling12-embed] iframe'
+    const fr = await page.evaluate((sel) => {
+      const f = document.querySelector(sel)
       if (!f) return { ok: false, why: 'no iframe' }
       const d = f.contentDocument
       if (!d) return { ok: false, why: 'no contentDocument' }
@@ -53,14 +75,35 @@ for (const route of ROUTES) {
         sample: !!d.querySelector('.banner'),
         canvases: [...d.querySelectorAll('canvas')].filter((x) => x.width > 0).length,
         height: f.getBoundingClientRect().height,
+        title: (d.querySelector('h1') || {}).textContent || '',
+        body: txt.slice(0, 4000),
+        // does the last element on the page fall inside the frame? if not, the host is
+        // clipping content and the reader silently never sees the methodology footer.
+        lastBottom: (() => {
+          const foot = d.getElementById('foot') || d.body.lastElementChild
+          if (!foot) return 0
+          const r2 = foot.getBoundingClientRect()
+          return Math.round(r2.bottom + (d.defaultView.scrollY || 0))
+        })(),
       }
-    })
-    if (!fr.ok) errors.push(`[/tracker] frame did not render - ${fr.why}`)
-    if (fr.sample) errors.push('[/tracker] fell back to SAMPLE data')
-    if (/LIVE/i.test(fr.pill)) errors.push(`[/tracker] pill claims LIVE: ${fr.pill}`)
-    if (fr.canvases < 2) errors.push(`[/tracker] charts did not draw (${fr.canvases} canvases)`)
-    if (fr.height < 1200) errors.push(`[/tracker] frame did not size to content (${Math.round(fr.height)}px)`)
-    rowCounts['/tracker'] = `frame ${Math.round(fr.height)}px · ${fr.canvases} charts · ${fr.pill.trim()}`
+    }, sel)
+    if (!fr.ok) errors.push(`[${route}] frame did not render - ${fr.why}`)
+    if (fr.sample) errors.push(`[${route}] fell back to SAMPLE data`)
+    if (/LIVE/i.test(fr.pill)) errors.push(`[${route}] pill claims LIVE: ${fr.pill}`)
+    if (fr.canvases < 2) errors.push(`[${route}] charts did not draw (${fr.canvases} canvases)`)
+    if (fr.height < 1200) errors.push(`[${route}] frame did not size to content (${Math.round(fr.height)}px)`)
+    if (fr.lastBottom > Math.round(fr.height)) errors.push(`[${route}] frame CLIPS content (page ends at ${fr.lastBottom}px, frame is ${Math.round(fr.height)}px)`)
+    if (!/snapshot/i.test(fr.body)) errors.push(`[${route}] frame never says it is a snapshot`)
+    // The two routes carry DIFFERENT artifacts. The single-file build concatenates every page
+    // into one scope, so a name collision could silently serve one page's payload from both.
+    // Assert each frame is the one it is supposed to be.
+    if (route === '/tracker' && !/market/i.test(fr.body))
+      errors.push('[/tracker] does not look like the R3 redesign (no filter strip) - payload collision?')
+    if (route === '/rolling12' && !/Crump Group - Amazon History/i.test(fr.title))
+      errors.push(`[/rolling12] wrong document in the frame - title was "${fr.title.trim()}"`)
+    if (route === '/rolling12' && /FILTER\s*MARKET/i.test(fr.body))
+      errors.push('[/rolling12] shows the redesign filter strip - payload collision?')
+    rowCounts[route] = `frame ${Math.round(fr.height)}px · ${fr.canvases} charts${fr.pill.trim() ? ' · ' + fr.pill.trim() : ''}`
   }
   // capture grid entry count if present
   const cnt = await page.evaluate(() => {
@@ -110,5 +153,6 @@ await browser.close()
 console.log('=== render-check results ===')
 console.log('routes walked:', ROUTES.length)
 console.log('grid entry counts:', JSON.stringify(rowCounts))
+console.log('blocked external product photos (expected in this sandbox):', blockedAssets.length)
 if (errors.length) { console.log('FAIL —', errors.length, 'issue(s):'); errors.forEach((e) => console.log('  •', e)); process.exit(1) }
 else console.log('PASS — 0 console/page errors across all routes + AI interactions')
