@@ -1,5 +1,31 @@
 # CommerceHub — Project Hand-off
 
+> ## Session 18 — 2026-09-03: `/attribution` page, GitHub PAT, C4 punch list CLEARED
+>
+> Three things landed, all pushed from the Cowork sandbox with a fine-grained PAT (Jim minted it
+> this session; it lives OUTSIDE this repo, in the FY27 Ads Plan project folder at
+> `attribution_push/github_token.txt`). **The "no write credential / browser is the only push path"
+> constraint that shaped sessions 7–17 is gone.** `git clone https://x-access-token:$TOKEN@github…`
+> then push; pipe git output through `sed` so the token is never printed. `api.vercel.com` and SSH
+> are still unreachable from the sandbox — HTTPS git only.
+>
+> 1. **New page `/attribution`** — the Crump Amazon Attribution dashboard, framed from the static
+>    file `public/attribution/index.html`. NOT baked into the bundle: a Cowork task rewrites that
+>    file every weekday, and the 1.4 MB bundle is never rebuilt for data. `src/pages/Attribution.jsx`
+>    + nav + route + **`tools/build-singlefile.mjs` order array** (it was hand-spliced into the
+>    deployed bundle first; without the builder entry the next rebuild would have silently dropped it).
+> 2. **C4 punch list: all 12 root causes fixed** — commit `8de031e`. Detail and the verification
+>    evidence are at the top of `tools/c4-sweep-2026-07-28.md`. The top open item since session 14
+>    is closed.
+> 3. Verified headlessly before pushing: 30/30 routes render with zero console errors, and the six
+>    advertising grids still reconcile to exactly $880,647.30 / $2,477,338.20.
+>
+> **Verification note for future sessions:** `tools/render-check.mjs` needs Playwright, which the
+> sandbox does not have. The equivalent used here is jsdom + `@babel/core` transforming the bundle's
+> `text/babel` block with `runtime:'classic'`, React/ReactDOM injected onto the window, then
+> assertions on the rendered DOM. Same contract as render-check: assert what should be TRUE, and
+> re-derive every expected number rather than reading it off the page.
+
 > **Purpose of this file:** a single source of truth so any session can pick up exactly where we left off.
 > Claude maintains this file — update it at the end of each working session (status, decisions, next steps).
 > **Last updated:** 2026-07-22 (session 13 — **E2 Campaign AI + Product AI SHIPPED. Live at v0.15.0.**)
