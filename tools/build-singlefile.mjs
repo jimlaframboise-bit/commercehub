@@ -149,7 +149,7 @@ function BarChart(p) { return _Chart(p, 'bar'); }
 const order = [
   'src/lib/format.js', 'src/data/mock.js', 'src/components/Icon.jsx', 'src/components/ui.jsx',
   'src/state.jsx', 'src/components/Layout.jsx', 'src/pages/Overview.jsx', 'src/pages/Tracker.jsx',
-  'src/pages/Rolling12.jsx', 'src/pages/Ads.jsx',
+  'src/pages/Rolling12.jsx', 'src/pages/Attribution.jsx', 'src/pages/Ads.jsx',
   'src/pages/Dsp.jsx', 'src/pages/Commerce.jsx', 'src/pages/Automation.jsx', 'src/pages/Insights.jsx', 'src/App.jsx',
 ]
 let body = preamble + '\n'

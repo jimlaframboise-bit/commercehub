@@ -1507,7 +1507,7 @@ function DeltaChip({ row, ck, prevRow }) {
 function DataGrid({
   id, columns, rows, initialSort,
   presets, defaultPreset, dimensions, totals, compare, comparePrev, compareDisabled,
-  selectable, selected, onToggle, onToggleAll, rowKey = 'id',
+  selectable, selected, onToggle, onToggleAll, rowKey = 'id', isSubRow,
   pageSizes = [25, 50, 100], empty = 'No data', toolbarLeft,
 }) {
   const colByKey = useMemo(() => Object.fromEntries(columns.map((c) => [c.key, c])), [columns])
@@ -1521,7 +1521,23 @@ function DataGrid({
   const [order, setOrder] = useState(saved?.order?.filter((k) => colByKey[k])?.concat(allKeys.filter((k) => !(saved.order || []).includes(k))) || (firstPreset ? [...presetCols(firstPreset), ...allKeys.filter((k) => !presetCols(firstPreset).includes(k))] : allKeys))
   const [hidden, setHidden] = useState(new Set(saved?.hidden || (firstPreset ? allKeys.filter((k) => !presetCols(firstPreset).includes(k)) : [])))
 
-  useEffect(() => { if (id) gridStore.set(id, { view, order, hidden: [...hidden] }) }, [id, view, order, hidden])
+  /* C4 item 12 (2026-09-03): the three useState initializers above run once per MOUNT, but a few
+     grids change `id` in place (Campaign AI's `campaign-ai-${level}`, Tagging's `ads-tags-<kind>`)
+     with no `key` to force a remount. The persist effect then fired on the id change and wrote the
+     PREVIOUS tab's layout to the new key, destroying whatever was saved there. Reload the saved
+     layout when the id changes, and skip the persist for that render so the write cannot race. */
+  const lastId = useRef(id)
+  useEffect(() => {
+    if (lastId.current === id) return
+    lastId.current = id
+    const next = id ? gridStore.get(id) : null
+    setView(next?.view || firstPreset || 'Default')
+    setOrder(next?.order?.filter((k) => colByKey[k])?.concat(allKeys.filter((k) => !(next.order || []).includes(k)))
+      || (firstPreset ? [...presetCols(firstPreset), ...allKeys.filter((k) => !presetCols(firstPreset).includes(k))] : allKeys))
+    setHidden(new Set(next?.hidden || (firstPreset ? allKeys.filter((k) => !presetCols(firstPreset).includes(k)) : [])))
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { if (id && lastId.current === id) gridStore.set(id, { view, order, hidden: [...hidden] }) }, [id, view, order, hidden])
 
   const applyPreset = (name) => {
     setView(name)
@@ -1544,16 +1560,31 @@ function DataGrid({
 
   const [sort, setSort] = useState(initialSort || { key: null, dir: 'desc' })
   const onSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key: k, dir: typeof rows[0]?.[k] === 'number' ? 'desc' : 'asc' }))
+  /* C4 item 10 (2026-09-03): Tagging injects expanded sub-tag rows directly beneath their parent,
+     but this sorted the flat array with no parent awareness — a sub-tag's numbers landed as a peer
+     of real tags whose members it duplicates. `isSubRow` (a predicate the caller supplies) makes
+     three contracts hold: children sort WITH their parent and never on their own, they are not
+     counted as entities in the Total row or the pager, and Select-all ignores them (the callers'
+     onToggleAll only ever populated parent ids, so `allOn` could never become true). */
+  const isSub = (r) => (isSubRow ? !!isSubRow(r) : false)
+  const parentRows = useMemo(() => rows.filter((r) => !isSub(r)), [rows, isSubRow])
   const sortedAll = useMemo(() => {
     if (!sort.key) return rows
     const col = colByKey[sort.key]
     const val = (r) => (col?.sortVal ? col.sortVal(r) : r[sort.key])
-    return [...rows].sort((a, b) => {
+    const cmp = (a, b) => {
       const x = val(a), y = val(b)
       if (typeof x === 'number' && typeof y === 'number') return sort.dir === 'asc' ? x - y : y - x
       return sort.dir === 'asc' ? String(x).localeCompare(String(y)) : String(y).localeCompare(String(x))
-    })
-  }, [rows, sort, colByKey])
+    }
+    if (!isSubRow) return [...rows].sort(cmp)
+    const kids = new Map()   // parent index in `rows` -> its children, in the order the caller emitted them
+    let cur = null
+    for (const r of rows) { if (isSub(r)) { if (cur) kids.get(cur).push(r) } else { cur = r; kids.set(cur, []) } }
+    const out = []
+    for (const p of [...kids.keys()].sort(cmp)) { out.push(p); for (const k of kids.get(p)) out.push(k) }
+    return out
+  }, [rows, sort, colByKey, isSubRow])
 
   const [compareOn, setCompareOn] = useState(false)
   const showCompare = compareOn && !compareDisabled
@@ -1571,11 +1602,21 @@ function DataGrid({
 
   const [pageSize, setPageSize] = useState(pageSizes[0])
   const [page, setPage] = useState(1)
-  const totalEntries = rows.length
+  const totalEntries = parentRows.length   // C4 item 10 — sub-rows are not entities
   const pageCount = Math.max(1, Math.ceil(totalEntries / pageSize))
   const curPage = Math.min(page, pageCount)
   useEffect(() => { setPage(1) }, [pageSize, groupKey, totalEntries, sort.key, sort.dir])
-  const pageRows = grouped ? sortedAll : sortedAll.slice((curPage - 1) * pageSize, curPage * pageSize)
+  // Paginate by PARENT count so a page holds `pageSize` real rows plus whatever children they carry.
+  const pageRows = useMemo(() => {
+    if (grouped || !isSubRow) return grouped ? sortedAll : sortedAll.slice((curPage - 1) * pageSize, curPage * pageSize)
+    const from = (curPage - 1) * pageSize, to = curPage * pageSize
+    const out = []; let seen = -1; let take = false
+    for (const r of sortedAll) {
+      if (!isSub(r)) { seen++; take = seen >= from && seen < to }
+      if (take) out.push(r)
+    }
+    return out
+  }, [sortedAll, grouped, curPage, pageSize, isSubRow])
 
   const groups = useMemo(() => {
     if (!grouped) return null
@@ -1585,7 +1626,8 @@ function DataGrid({
   }, [grouped, groupField, sortedAll])
 
   const colSpan = visibleCols.length + (selectable ? 1 : 0)
-  const allOn = selectable && pageRows.length > 0 && pageRows.every((r) => selected?.has(r[rowKey]))
+  const selectableRows = pageRows.filter((r) => !isSub(r))   // C4 item 10 — children are never selectable
+  const allOn = selectable && selectableRows.length > 0 && selectableRows.every((r) => selected?.has(r[rowKey]))
 
   const cell = (c, r) => (
     <td key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l cellname' : ''}`}>
@@ -1670,7 +1712,7 @@ function DataGrid({
             {pageRows.length === 0 && <tr><td colSpan={colSpan} className="empty">{empty}</td></tr>}
             {!grouped && pageRows.map((r) => (
               <tr key={r[rowKey]}>
-                {selectable && <td className="sticky-l"><Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} /></td>}
+                {selectable && <td className="sticky-l">{!isSub(r) && <Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} />}</td>}
                 {visibleCols.map((c) => cell(c, r))}
               </tr>
             ))}
@@ -1685,7 +1727,7 @@ function DataGrid({
                 </tr>
                 {groupOpen(g.key) && g.rows.map((r) => (
                   <tr key={r[rowKey]}>
-                    {selectable && <td className="sticky-l"><Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} /></td>}
+                    {selectable && <td className="sticky-l">{!isSub(r) && <Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} />}</td>}
                     {visibleCols.map((c) => cell(c, r))}
                   </tr>
                 ))}
@@ -2727,13 +2769,18 @@ function Rolling12() {
 
 Rolling12
 
+
 /* ===================== src/pages/Attribution.jsx ===================== */
 
-/* Amazon Attribution dashboard (both markets). Unlike /tracker and /rolling12 the document is
- * NOT baked into this bundle: it is served as a static file from /attribution/index.html
- * (public/attribution/index.html in the repo) and refreshed daily by the scheduled Cowork task,
- * so a data refresh never touches this bundle. Same origin, so the frame height is read
- * directly from the child document - no postMessage handshake needed. */
+/* Amazon Attribution dashboard (both markets). Unlike Tracker.jsx and Rolling12.jsx the document
+ * is NOT baked into the bundle: it is served as a static file from /attribution/index.html
+ * (public/attribution/index.html in this repo, copied to the site root by Vite's public dir) and
+ * refreshed daily by the scheduled Cowork task "refresh-amazon-attribution-dashboard". A data
+ * refresh therefore never touches the app bundle.
+ *
+ * Same reason for the iframe as the trackers: the dashboard carries its own full stylesheet.
+ * Same origin, so the frame height is read directly from the child document - no postMessage
+ * handshake needed. */
 function Attribution() {
   const [height, setHeight] = useState(1800)
   const frameRef = useRef(null)
@@ -2756,6 +2803,8 @@ function Attribution() {
   )
 }
 
+Attribution
+
 
 /* ===================== src/pages/Ads.jsx ===================== */
 
@@ -2770,6 +2819,18 @@ const adsUsdSum = (rs, k) => rs.reduce((a, r) => a + (r[k] || 0) * fxUSD(r.profi
 const adsMoneyFoot = (k, dec = 0) => (rs) => (adsMixedCur(rs)
   ? `${cur(adsUsdSum(rs, k), '$', dec)} (USD est.)`
   : cur(sumKey(k)(rs), symOf(rs), dec))
+/* C4 item 3 (2026-09-03): a DERIVED money total (CPC = spend/clicks, AOV = sales/orders) was
+   `cur(aggregate(rs).cpc, symOf(rs), 2)`. aggregate() is FX-free and symOf() reads rs[0], so on a
+   mixed row set the total blended currencies and then labelled the blend with whichever profile
+   happened to sort first — re-sorting the grid changed the symbol without changing the number,
+   and no "(USD est.)" flag appeared. Convert both sides when mixed, exactly like adsMoneyFoot. */
+const adsRatioFoot = (numKey, denKey, dec = 2) => (rs) => {
+  const mixed = adsMixedCur(rs)
+  const num = mixed ? adsUsdSum(rs, numKey) : sumKey(numKey)(rs)
+  const den = rs.reduce((a, r) => a + (r[denKey] || 0), 0)
+  const v = den ? num / den : 0
+  return mixed ? `${cur(v, '$', dec)} (USD est.)` : cur(v, symOf(rs), dec)
+}
 
 const CAMPAIGN_FIELDS = [
   { key: 'name', label: 'Campaign Name', type: 'text' },
@@ -2852,6 +2913,22 @@ const SOV_FIELDS = [
 function useProfileFilter(rows) {
   const { profileId } = useApp()
   return useMemo(() => (profileId === 'all' ? rows : rows.filter((r) => r.profileId === profileId)), [rows, profileId])
+}
+
+/* C4 item 1 (2026-09-03): Campaigns, Ad Groups, Targeting and Tagging merged created campaigns
+   and the persisted `ads-campaigns` edits; Profile, Portfolio, Placement, ASIN and Ads seeded
+   from ALL_CAMPAIGNS alone. So launching a campaign left /ads/campaigns saying 41 and
+   /ads/profile saying 40, pausing one left its Ad row reading "Enabled", and the Daily Budget
+   total was short by the new budget. This hook is the single source those five now share.
+   `created` is read once per mount (same contract as the AdGroups/Targeting pages); `overrides`
+   is reactive, so a state or budget edit re-renders every grid that uses it. */
+function useAllCampaigns() {
+  const [overrides] = usePersistentOverrides('ads-campaigns')
+  const merged = useMemo(() => {
+    const all = [...createdStore.get('campaigns'), ...ALL_CAMPAIGNS]
+    return all.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c))
+  }, [overrides])
+  return useProfileFilter(merged)
 }
 
 /* ---- bulk bid / budget math (results floored: bids ≥ $0.02, budgets ≥ $1) ---- */
@@ -3458,14 +3535,22 @@ function TrackKeywordModal({ onClose, onCreate }) {
   )
 }
 
-function KpiRow({ rows, prev }) {
+/* C4 item 4 (2026-09-03): the tiles called `money(a.spend)`, whose symbol argument defaults to
+   '$'. On a UK profile the Total row read £98,180 while the tile above it read $98.2K for the
+   same number. And on Portfolio/Placement/ASIN the rows are pre-converted and carry no
+   profileId, so `adsMixedCur` was false here and the "(USD est.)" flag never reached the tiles
+   even though the Total row on the same page showed it. Those pages already compute both facts,
+   so they now pass them in; the four native-currency grids still derive them from the rows. */
+function KpiRow({ rows, prev, sym, note }) {
   // SA-R7: when the row set spans currencies, aggregate money in USD estimates.
-  const mixed = adsMixedCur(rows)
-  const toUsd = (rs) => (mixed ? rs.map((r) => ({ ...r, spend: (r.spend || 0) * fxUSD(r.profileId), sales: (r.sales || 0) * fxUSD(r.profileId) })) : rs)
+  const mixed = note != null ? !!note : adsMixedCur(rows)
+  const symbol = sym || (mixed ? '$' : symOf(rows))
+  const toUsd = (rs) => (adsMixedCur(rs) ? rs.map((r) => ({ ...r, spend: (r.spend || 0) * fxUSD(r.profileId), sales: (r.sales || 0) * fxUSD(r.profileId) })) : rs)
   const a = aggregate(toUsd(rows))
   const prevRows = (prev || []).filter(Boolean)
   const p = prevRows.length ? aggregate(toUsd(prevRows)) : null
   const est = (v) => (mixed ? `${v} (USD est.)` : v)
+  const money = (v) => cur(v, symbol)
   const dl = (cur, prv) => (p && prv ? ((cur - prv) / Math.abs(prv)) * 100 : undefined)
   return (
     <KpiGrid>
@@ -3486,6 +3571,12 @@ function Campaigns() {
   const { profileId, rangeResolved, profiles } = useApp()
   const loc = useLocation()
   const urlTag = new URLSearchParams(loc.search || '').get('tag')
+  /* C4 item 5 (2026-09-03): Profile, Portfolio and ASIN rows all linked to an UNFILTERED page —
+     the tooltip ("View campaigns for this profile") was the only thing implementing the promise,
+     because nothing read ?profile / ?portfolio / ?asin. They now emit the param and it is read
+     here and on Product Center, mirroring the ?tag= / ?camp= pattern that already worked. */
+  const urlProfile = new URLSearchParams(loc.search || '').get('profile')
+  const urlPortfolio = new URLSearchParams(loc.search || '').get('portfolio')
   const [created, setCreated] = useState(() => createdStore.get('campaigns'))
   const allCampaigns = useMemo(() => [...created, ...ALL_CAMPAIGNS], [created])
   const base = useProfileFilter(allCampaigns)
@@ -3506,7 +3597,7 @@ function Campaigns() {
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ads-campaigns'))
   const [sel, setSel] = useState(new Set())
-  useEffect(() => { setSel(new Set()) }, [profileId, urlTag]) // SA-R1: selection ids belong to the previous profile's rows
+  useEffect(() => { setSel(new Set()) }, [profileId, urlTag, urlProfile, urlPortfolio]) // SA-R1: selection ids belong to the previous profile's rows
 
   const [modal, setModal] = useState(null) // 'bid' | 'budget' | 'tag' | 'daypart' | 'rule'
   const [wizard, setWizard] = useState(false)
@@ -3537,7 +3628,10 @@ function Campaigns() {
   const searched = data.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
   // E1: ?tag=<name> scopes the grid to that tag's members (derived rule matches + manual assignments)
   const urlTagObj = urlTag ? campTagList.find((t) => t.name === urlTag) : null
-  const tagScoped = urlTag ? (urlTagObj ? searched.filter((c) => tagHasMember(urlTagObj, c.id, c.name)) : []) : searched
+  const tagScoped0 = urlTag ? (urlTagObj ? searched.filter((c) => tagHasMember(urlTagObj, c.id, c.name)) : []) : searched
+  const tagScoped = tagScoped0
+    .filter((c) => !urlProfile || c.profileId === urlProfile)
+    .filter((c) => !urlPortfolio || c.portfolio === urlPortfolio)
   const filtered = applyFilters(tagScoped, filters, CAMPAIGN_FIELDS)
   const prevFiltered = filtered.map((r) => prev[r.id])
 
@@ -3575,7 +3669,7 @@ function Campaigns() {
     { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
     { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
     { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'cpc', label: 'CPC', num: true, foot: (rs) => cur(aggregate(rs).cpc, symOf(rs), 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
+    { key: 'cpc', label: 'CPC', num: true, foot: adsRatioFoot('spend', 'clk', 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
     { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
     { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
     { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
@@ -3616,6 +3710,20 @@ function Campaigns() {
           <span className="muted">Campaigns tagged</span><b>{urlTag}</b>
           <span className="tag"><Icon name="tag" size={10} /> {filtered.length}</span>
           {!urlTagObj && <span className="muted">— tag not found; showing no rows</span>}
+        </div>
+      )}
+      {urlProfile && (
+        <div className="drillbar">
+          <Link className="celllink" to="/ads/profile"><Icon name="chevDown" size={13} style={{ transform: 'rotate(90deg)' }} /> Back to Profile</Link>
+          <span className="muted">Campaigns on profile</span><b>{(profiles.find((p) => p.id === urlProfile) || {}).market || urlProfile}</b>
+          <span className="tag">{filtered.length}</span>
+        </div>
+      )}
+      {urlPortfolio && (
+        <div className="drillbar">
+          <Link className="celllink" to="/ads/portfolio"><Icon name="chevDown" size={13} style={{ transform: 'rotate(90deg)' }} /> Back to Portfolio</Link>
+          <span className="muted">Campaigns in portfolio</span><b>{urlPortfolio}</b>
+          <span className="tag">{filtered.length}</span>
         </div>
       )}
       <KpiRow rows={filtered} prev={prevFiltered} />
@@ -4352,7 +4460,13 @@ function TagManageModal({ kind, tags, onCreate, onDelete, onPatch, onClose }) {
 }
 
 /* ---- Match Tag Rule builder: contains / does-not-contain + live preview (spec §12) ---- */
+/* C4 item 11 (2026-09-03): the preview counted matches across ALL profiles while the grid behind
+   it is scoped by the global Profile selector — on Amazon UK (8 of 40 campaigns) the modal showed
+   the all-profile number next to a row showing the UK-only one, and the preview reads as a
+   validation of what the tag will contain. It now counts inside the current scope and says so. */
 function TagRuleModal({ kind, tag, onSave, onClose }) {
+  const { profileId, profiles } = useApp()
+  const scopeName = profileId === 'all' ? null : ((profiles.find((p) => p.id === profileId) || {}).market || profileId)
   const noun = kind === 'campaign' ? 'campaign' : kind === 'keyword' ? 'keyword' : 'ASIN'
   const [inc, setInc] = useState((tag.matchRule?.contains || []).join(', '))
   const [exc, setExc] = useState((tag.matchRule?.notContains || []).join(', '))
@@ -4362,8 +4476,11 @@ function TagRuleModal({ kind, tag, onSave, onClose }) {
     return (c.length || n.length) ? { contains: c, notContains: n } : null
   }, [inc, exc])
   const entDef = useMemo(() => tagEntitiesFor(kind), [kind])
-  const matches = useMemo(() => (rule ? entDef.list.filter((e) => tagRuleMatch(entDef.textOf(e), rule)) : []), [rule, entDef])
+  const scoped = useMemo(() => (profileId === 'all' ? entDef.list : entDef.list.filter((e) => e.profileId === profileId)), [entDef, profileId])
+  const matches = useMemo(() => (rule ? scoped.filter((e) => tagRuleMatch(entDef.textOf(e), rule)) : []), [rule, entDef, scoped])
   const count = entDef.countOf ? entDef.countOf(matches) : matches.length
+  const allMatches = useMemo(() => (rule ? entDef.list.filter((e) => tagRuleMatch(entDef.textOf(e), rule)) : []), [rule, entDef])
+  const allCount = entDef.countOf ? entDef.countOf(allMatches) : allMatches.length
   return (
     <Modal width={520} title="Match Tag Rule" sub={`Auto-assign ${noun}s to “${tag.name}” by name`} onClose={onClose}
       footer={<><Btn ghost onClick={onClose}>Cancel</Btn><div style={{ flex: 1 }} /><Btn primary icon="check" onClick={() => { onSave(rule) }}>Save rule</Btn></>}>
@@ -4375,7 +4492,7 @@ function TagRuleModal({ kind, tag, onSave, onClose }) {
       </label>
       <div className="modal-note"><Icon name="bulb" size={14} />
         {rule
-          ? <span>Live preview: <b>{count} {noun}{count === 1 ? '' : 's'}</b> currently match this rule. New {noun}s that match are auto-added to the tag.</span>
+          ? <span>Live preview: <b>{count} {noun}{count === 1 ? '' : 's'}</b> currently match this rule{scopeName ? <> on <b>{scopeName}</b>{allCount !== count && <> ({allCount} across all profiles)</>}</> : ' across all profiles'}. New {noun}s that match are auto-added to the tag.</span>
           : <span>No rule — this tag keeps only manual assignments. Saving with both fields empty clears the rule.</span>}
       </div>
     </Modal>
@@ -4405,11 +4522,20 @@ function TaggingTab({ tab, tabsBar }) {
   useEffect(() => { setSel(new Set()) }, [profileId])
 
   const memberRows = (tag) => scaled.filter((e) => tagHasMember(tag, e.id, entDef.textOf(e)))
-  const buildRow = (tag, members, extra) => {
+  /* C4 item 2 (2026-09-03): buildRow USD-normalizes a mixed-currency tag's Spend/Sales, but this
+     side did not convert at all, so DeltaChip compared USD against a native-currency blend. At
+     FX_USD {us:1, ca:0.73, uk:1.26} a CA-weighted tag showed ~-27pp and a UK-weighted tag ~+26pp
+     of period change that never happened — and the KPI row above, which converts both sides,
+     disagreed with the grid on the same tag. Both sides now use the same normalization. */
+  const tagMoney = (members) => {
     const a = aggregate(members)
     const mixed = adsMixedCur(members)
     const spend = mixed ? adsUsdSum(members, 'spend') : a.spend
     const sales = mixed ? adsUsdSum(members, 'sales') : a.sales
+    return { a, spend, sales, mixed, roas: spend ? sales / spend : 0 }
+  }
+  const buildRow = (tag, members, extra) => {
+    const { a, spend, sales, mixed } = tagMoney(members)
     return {
       id: tag.id, name: tag.name, owner: tag.owner, desc: tag.desc || '',
       count: entDef.countOf ? entDef.countOf(members) : members.length,
@@ -4423,8 +4549,8 @@ function TaggingTab({ tab, tabsBar }) {
     const out = {}
     for (const r of parentRows) {
       const pm = r._members.map((e) => prevMap[e.id]).filter(Boolean)
-      const a = aggregate(pm)
-      out[r.id] = { impr: a.impr, clk: a.clk, ctr: a.ctr, spend: a.spend, sales: a.sales, orders: a.orders, roas: a.roas }
+      const { a, spend, sales, roas } = tagMoney(pm)
+      out[r.id] = { impr: a.impr, clk: a.clk, ctr: a.ctr, spend, sales, orders: a.orders, roas }
     }
     return out
   }, [tags, scaled]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -4543,6 +4669,7 @@ function TaggingTab({ tab, tabsBar }) {
         id={'ads-tags-' + kind}
         columns={columns}
         rows={gridRows}
+        isSubRow={(r) => !!r._child}   /* C4 item 10 — sub-tag rows: sort with the parent, not counted, not selectable */
         totals
         compare
         comparePrev={prevRowsById}
@@ -4619,13 +4746,13 @@ function adNativeMetricCols() {
     { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
     { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
     { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'cpc', label: 'CPC', num: true, foot: (rs) => cur(aggregate(rs).cpc, symOf(rs), 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
+    { key: 'cpc', label: 'CPC', num: true, foot: adsRatioFoot('spend', 'clk', 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
     { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
     { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
     { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
     { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
     { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
-    { key: 'aov', label: 'AOV', num: true, foot: (rs) => cur(aggregate(rs).aov, symOf(rs), 2), render: (r) => cur(r.aov, symA(r.profileId), 2) },
+    { key: 'aov', label: 'AOV', num: true, foot: adsRatioFoot('sales', 'orders', 2), render: (r) => cur(r.aov, symA(r.profileId), 2) },
   ]
 }
 
@@ -4640,11 +4767,22 @@ const PROFILE_FIELDS = [
   { key: 'acos', label: 'ACoS %', type: 'number' },
   { key: 'roas', label: 'ROAS', type: 'number' },
   { key: 'orders', label: 'Orders', type: 'number' },
+  /* C4 item 9 (2026-09-03): one *_FIELDS array feeds BOTH the FilterBar and the ExportMenu, so
+     every column missing from it was neither filterable nor exportable. Added below. */
   { key: 'impr', label: 'Impressions', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+  { key: 'ctr', label: 'CTR %', type: 'number' },
+  { key: 'cpc', label: 'CPC', type: 'number' },
+  { key: 'cvr', label: 'CVR %', type: 'number' },
+  { key: 'aov', label: 'AOV', type: 'number' },
+  { key: 'monthlyCap', label: 'Monthly Cap', type: 'number' },
+  { key: 'total', label: 'Campaigns', type: 'number' },
+  { key: 'active', label: 'Active Campaigns', type: 'number' },
+  { key: 'currency', label: 'Currency', type: 'text' },
 ]
 function ProfileGrid() {
   const { profileId, rangeResolved } = useApp()
-  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const base = useAllCampaigns()
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ads-profile'))
   const { rows: scaled, prev } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
@@ -4668,7 +4806,7 @@ function ProfileGrid() {
 
   const columns = [
     { key: 'market', label: 'Profile', sticky: true, width: 260, sortVal: (r) => r.market, render: (r) => (
-      <div className="namecell"><div className="nc-top"><Link className="celllink" to="/ads/campaigns" title="View campaigns for this profile">{r.market}</Link><span className="tag">{r.type}</span></div><small>{r.cc} · {r.active}/{r.total} active · {r.currency}</small></div>) },
+      <div className="namecell"><div className="nc-top"><Link className="celllink" to={`/ads/campaigns?profile=${r.id}`} title="View campaigns for this profile">{r.market}</Link><span className="tag">{r.type}</span></div><small>{r.cc} · {r.active}/{r.total} active · {r.currency}</small></div>) },
     { key: 'campaigns', label: 'Campaigns', num: true, sort: false, foot: (rs) => int(rs.reduce((a, r) => a + (r.total || 0), 0)), render: (r) => <span className="muted">{r.active}/{r.total}</span> },
     { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: adsMoneyFoot('dailyBudget'), render: (r) => cur(r.dailyBudget, symA(r.profileId)) },
     { key: 'monthlyCap', label: 'Monthly Cap', num: true, foot: adsMoneyFoot('monthlyCap'), render: (r) => cur(r.monthlyCap, symA(r.profileId)) },
@@ -4676,13 +4814,13 @@ function ProfileGrid() {
     { key: 'clk', label: 'Clicks', num: true, delta: true, foot: (rs) => int(aggregate(rs).clk), render: (r) => int(r.clk) },
     { key: 'ctr', label: 'CTR', num: true, foot: (rs) => pct(aggregate(rs).ctr, 2), render: (r) => pct(r.ctr, 2) },
     { key: 'spend', label: 'Spend', num: true, delta: true, foot: adsMoneyFoot('spend'), render: (r) => cur(r.spend, symA(r.profileId)) },
-    { key: 'cpc', label: 'CPC', num: true, foot: (rs) => cur(aggregate(rs).cpc, symOf(rs), 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
+    { key: 'cpc', label: 'CPC', num: true, foot: adsRatioFoot('spend', 'clk', 2), render: (r) => cur(r.cpc, symA(r.profileId), 2) },
     { key: 'sales', label: 'Sales', num: true, delta: true, foot: adsMoneyFoot('sales'), render: (r) => cur(r.sales, symA(r.profileId)) },
     { key: 'orders', label: 'Orders', num: true, delta: true, foot: (rs) => int(aggregate(rs).orders), render: (r) => int(r.orders) },
     { key: 'cvr', label: 'CVR', num: true, foot: (rs) => pct(aggregate(rs).cvr), render: (r) => pct(r.cvr) },
     { key: 'acos', label: 'ACoS', num: true, delta: true, foot: (rs) => pct(aggregate(rs).acos), render: (r) => <span style={{ color: r.acos > 40 ? 'var(--red)' : r.acos < 25 ? 'var(--green)' : 'inherit', fontWeight: 600 }}>{pct(r.acos)}</span> },
     { key: 'roas', label: 'ROAS', num: true, delta: true, foot: (rs) => dec2(aggregate(rs).roas), render: (r) => dec2(r.roas) },
-    { key: 'aov', label: 'AOV', num: true, foot: (rs) => cur(aggregate(rs).aov, symOf(rs), 2), render: (r) => cur(r.aov, symA(r.profileId), 2) },
+    { key: 'aov', label: 'AOV', num: true, foot: adsRatioFoot('sales', 'orders', 2), render: (r) => cur(r.aov, symA(r.profileId), 2) },
     { key: 'pacing', label: 'Pacing', sort: false, render: (r) => <Pill>{r.pacing}</Pill> },
   ]
   const presets = {
@@ -4720,10 +4858,19 @@ const PORTFOLIO_FIELDS = [
   { key: 'acos', label: 'ACoS %', type: 'number' },
   { key: 'roas', label: 'ROAS', type: 'number' },
   { key: 'orders', label: 'Orders', type: 'number' },
+  /* C4 item 9 (2026-09-03): one *_FIELDS array feeds BOTH the FilterBar and the ExportMenu, so
+     every column missing from it was neither filterable nor exportable. Added below. */
+  { key: 'impr', label: 'Impressions', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+  { key: 'ctr', label: 'CTR %', type: 'number' },
+  { key: 'cpc', label: 'CPC', type: 'number' },
+  { key: 'cvr', label: 'CVR %', type: 'number' },
+  { key: 'aov', label: 'AOV', type: 'number' },
+  { key: 'total', label: 'Campaigns', type: 'number' },
 ]
 function PortfolioGrid() {
   const { profileId, rangeResolved } = useApp()
-  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const base = useAllCampaigns()
   const mixed = adsMixedCur(base)
   const dispSym = mixed ? '$' : symOf(base)
   const note = mixed ? ' (USD est.)' : ''
@@ -4742,7 +4889,7 @@ function PortfolioGrid() {
 
   const columns = [
     { key: 'name', label: 'Portfolio', sticky: true, width: 240, sortVal: (r) => r.name, render: (r) => (
-      <div className="namecell"><div className="nc-top"><Link className="celllink" to="/ads/campaigns" title="View campaigns">{r.name}</Link></div><small>{r.total} campaign{r.total === 1 ? '' : 's'}</small></div>) },
+      <div className="namecell"><div className="nc-top"><Link className="celllink" to={`/ads/campaigns?portfolio=${encodeURIComponent(r.name)}`} title="View campaigns in this portfolio">{r.name}</Link></div><small>{r.total} campaign{r.total === 1 ? '' : 's'}</small></div>) },
     { key: 'campaigns', label: 'Campaigns', num: true, sort: false, foot: (rs) => int(rs.reduce((a, r) => a + (r.total || 0), 0)), render: (r) => <span className="muted">{r.total}</span> },
     { key: 'dailyBudget', label: 'Daily Budget', num: true, foot: (rs) => cur(rs.reduce((a, r) => a + (r.dailyBudget || 0), 0), dispSym) + note, render: (r) => cur(r.dailyBudget, dispSym) },
     ...adMetricCols(dispSym, note),
@@ -4756,7 +4903,7 @@ function PortfolioGrid() {
       <AdsHead title="Portfolio" sub={`${filtered.length} portfolio${filtered.length === 1 ? '' : 's'} · ${rangeResolved.label}${mixed ? ' · USD est.' : ''} · campaign groupings`}>
         <ExportMenu name="portfolios" fields={PORTFOLIO_FIELDS} rows={filtered} />
       </AdsHead>
-      <KpiRow rows={filtered} prev={prevFiltered} />
+      <KpiRow rows={filtered} prev={prevFiltered} sym={dispSym} note={mixed} />
       <DataGrid
         id="ads-portfolio" columns={columns} rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Plan"
@@ -4799,10 +4946,20 @@ const PLACEMENT_FIELDS = [
   { key: 'sales', label: 'Sales', type: 'number' },
   { key: 'acos', label: 'ACoS %', type: 'number' },
   { key: 'roas', label: 'ROAS', type: 'number' },
+  { key: 'orders', label: 'Orders', type: 'number' },
+  /* C4 item 9 (2026-09-03): one *_FIELDS array feeds BOTH the FilterBar and the ExportMenu, so
+     every column missing from it was neither filterable nor exportable. Added below. */
+  { key: 'impr', label: 'Impressions', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+  { key: 'ctr', label: 'CTR %', type: 'number' },
+  { key: 'cpc', label: 'CPC', type: 'number' },
+  { key: 'cvr', label: 'CVR %', type: 'number' },
+  { key: 'aov', label: 'AOV', type: 'number' },
+  { key: 'bidAdj', label: 'Bid Adjustment %', type: 'number' },
 ]
 function PlacementGrid() {
   const { profileId, rangeResolved } = useApp()
-  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const base = useAllCampaigns()
   const mixed = adsMixedCur(base)
   const dispSym = mixed ? '$' : symOf(base)
   const note = mixed ? ' (USD est.)' : ''
@@ -4829,7 +4986,7 @@ function PlacementGrid() {
       <AdsHead title="Placement" sub={`Top of Search · Product Pages · Rest of Search · ${rangeResolved.label}${mixed ? ' · USD est.' : ''}`}>
         <ExportMenu name="placements" fields={PLACEMENT_FIELDS} rows={filtered} />
       </AdsHead>
-      <KpiRow rows={filtered} prev={prevFiltered} />
+      <KpiRow rows={filtered} prev={prevFiltered} sym={dispSym} note={mixed} />
       <DataGrid
         id="ads-placement" columns={columns} rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Plan"
@@ -4850,10 +5007,20 @@ const ASIN_FIELDS = [
   { key: 'acos', label: 'ACoS %', type: 'number' },
   { key: 'roas', label: 'ROAS', type: 'number' },
   { key: 'orders', label: 'Orders', type: 'number' },
+  /* C4 item 9 (2026-09-03): one *_FIELDS array feeds BOTH the FilterBar and the ExportMenu, so
+     every column missing from it was neither filterable nor exportable. Added below. */
+  { key: 'impr', label: 'Impressions', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+  { key: 'ctr', label: 'CTR %', type: 'number' },
+  { key: 'cpc', label: 'CPC', type: 'number' },
+  { key: 'cvr', label: 'CVR %', type: 'number' },
+  { key: 'aov', label: 'AOV', type: 'number' },
+  { key: 'units', label: 'Units', type: 'number' },
+  { key: 'asp', label: 'ASP', type: 'number' },
 ]
 function AsinGrid() {
   const { profileId, rangeResolved } = useApp()
-  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const base = useAllCampaigns()
   const mixed = adsMixedCur(base)
   const dispSym = mixed ? '$' : symOf(base)
   const note = mixed ? ' (USD est.)' : ''
@@ -4872,7 +5039,7 @@ function AsinGrid() {
 
   const columns = [
     { key: 'asin', label: 'Advertised Product', sticky: true, width: 320, sortVal: (r) => r.title, render: (r) => (
-      <div className="namecell"><div className="nc-top"><Link className="celllink" to="/commerce/products" title="Open in Product Center">{r.asin}</Link></div><small>{(r.title || '').split('—')[0].trim()} · {r.total} camp.</small></div>) },
+      <div className="namecell"><div className="nc-top"><Link className="celllink" to={`/commerce/products?asin=${r.asin}`} title="Open in Product Center">{r.asin}</Link></div><small>{(r.title || '').split('—')[0].trim()} · {r.total} camp.</small></div>) },
     ...adMetricCols(dispSym, note),
     { key: 'units', label: 'Units', num: true, foot: (rs) => int(aggregate(rs).units), render: (r) => int(r.units) },
     { key: 'asp', label: 'ASP', num: true, foot: (rs) => { const a = aggregate(rs); return cur(a.units ? a.sales / a.units : 0, dispSym, 2) }, render: (r) => cur(r.asp, dispSym, 2) },
@@ -4886,7 +5053,7 @@ function AsinGrid() {
       <AdsHead title="ASIN" sub={`${filtered.length} advertised product${filtered.length === 1 ? '' : 's'} · ${rangeResolved.label}${mixed ? ' · USD est.' : ''} · ad performance by product`}>
         <ExportMenu name="asins" fields={ASIN_FIELDS} rows={filtered} />
       </AdsHead>
-      <KpiRow rows={filtered} prev={prevFiltered} />
+      <KpiRow rows={filtered} prev={prevFiltered} sym={dispSym} note={mixed} />
       <DataGrid
         id="ads-asin" columns={columns} rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Plan"
@@ -4913,13 +5080,22 @@ const ADS_FIELDS = [
   { key: 'sales', label: 'Sales', type: 'number' },
   { key: 'acos', label: 'ACoS %', type: 'number' },
   { key: 'roas', label: 'ROAS', type: 'number' },
+  { key: 'orders', label: 'Orders', type: 'number' },
+  /* C4 item 9 (2026-09-03): one *_FIELDS array feeds BOTH the FilterBar and the ExportMenu, so
+     every column missing from it was neither filterable nor exportable. Added below. */
+  { key: 'impr', label: 'Impressions', type: 'number' },
+  { key: 'clk', label: 'Clicks', type: 'number' },
+  { key: 'ctr', label: 'CTR %', type: 'number' },
+  { key: 'cpc', label: 'CPC', type: 'number' },
+  { key: 'cvr', label: 'CVR %', type: 'number' },
+  { key: 'aov', label: 'AOV', type: 'number' },
 ]
 function adRowsFrom(camps) {
   return camps.map((c) => ({ ...c, id: 'AD-' + c.id, adName: (c.product || '').split('—')[0].trim(), adType: AD_KIND[c.campaignType] || 'SP Product ad', campaign: c.name }))
 }
 function AdsGrid() {
   const { profileId, rangeResolved } = useApp()
-  const base = useProfileFilter(ALL_CAMPAIGNS)
+  const base = useAllCampaigns()
   const mixed = adsMixedCur(base)
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('ads-ads'))
@@ -5442,7 +5618,13 @@ function BuyBox() {
 /* ============================ PRODUCT CENTER ============================ */
 function Products() {
   const { rows: data, prev, allTime, range, profileId, noShelf, marketName } = useCommerceData()
-  const [q, setQ] = useState('')
+  /* C4 item 5 (2026-09-03): the ASIN grid's "Open in Product Center" link landed on the
+     unfiltered catalog. It now sends ?asin=<ASIN> and this reads it, so the row you clicked is
+     the row you get. Seeded into the search box so clearing it is obvious and reversible. */
+  const cLoc = useLocation()
+  const urlAsin = new URLSearchParams(cLoc.search || '').get('asin')
+  const [q, setQ] = useState(urlAsin || '')
+  useEffect(() => { setQ(urlAsin || '') }, [urlAsin])
   const [filters, setFilters] = useState(() => loadFilterModel('commerce-products'))
   const kv = (v) => (noShelf ? '—' : v)
   // de-dupe by ASIN (catalog-level content view): sum cumulative metrics across
@@ -6293,34 +6475,56 @@ const CAMPAI_FIELDS = [
   { key: 'harvestKWs', label: 'Harvest KWs', type: 'number' },
   { key: 'creator', label: 'Creator', type: 'text' },
 ]
-function LaunchCampaignAIModal({ level, onClose, onLaunch }) {
+/* C4 items 7 + 8 (2026-09-03).
+   8 — the launch hardcoded `profileId: level === 'tag' ? 'us' : …`, so launching a tag under
+   Canada or UK toasted success, persisted, and then filtered itself out of the grid (or rendered
+   in the wrong currency under All Profiles). There was no Profile control at all. The modal now
+   defaults to the app's active profile and shows the field.
+   7 — the modal was titled "Launch AI for a SINGLE Tag", advertising a batch sibling that was
+   never built (`SplitBtn`/`Batches` have zero occurrences bundle-wide). The header button is now
+   a Popover with Single / In batches, and batch mode multi-selects. `onLaunch` already accepted
+   an array on Product AI; Campaign AI's now does too. */
+function LaunchCampaignAIModal({ level, batch, onClose, onLaunch }) {
+  const { profileId: appProfile, profiles } = useApp()
   const pool = level === 'tag' ? campaignTags : campaigns.filter((c) => c.campaignType.startsWith('SP'))
-  const [refId, setRefId] = useState(pool[0] ? pool[0].id : '')
+  const [refIds, setRefIds] = useState(pool[0] ? [pool[0].id] : [])
+  const [pid, setPid] = useState(appProfile === 'all' ? 'us' : appProfile)
   const [targetRoas, setTargetRoas] = useState('3.5')
   const [maxBid, setMaxBid] = useState('2.00')
   const [budgetOn, setBudgetOn] = useState(true)
   const [budgetCap, setBudgetCap] = useState('300')
   const [harvest, setHarvest] = useState(true)
-  const sel = pool.find((x) => x.id === refId) || {}
-  const pid = level === 'tag' ? 'us' : (sel.profileId || 'us')
+  const chosen = refIds.map((rid) => pool.find((x) => x.id === rid)).filter(Boolean)
   const submit = () => {
-    onLaunch({
-      id: 'CAI-N' + Date.now().toString().slice(-7), level, name: sel.name || sel.id || 'New', refId,
-      profileId: pid, aiState: 'Active',
+    if (!chosen.length) return
+    onLaunch(chosen.map((sel, i) => ({
+      id: 'CAI-N' + (Date.now() + i).toString().slice(-7), level, name: sel.name || sel.id || 'New', refId: sel.id,
+      profileId: level === 'tag' ? pid : (sel.profileId || pid), aiState: 'Active',
       targetRoas: +targetRoas || 3.5, maxBid: +maxBid || 2,
       budgetControl: budgetOn ? 'On' : 'Off', budgetCap: budgetOn ? (+budgetCap || 0) : 0,
       harvest, harvestKWs: 0, roas30: 0, lastRun: 'just now',
       creator: 'jim@brightleaf.co', createTime: new Date().toISOString().slice(0, 10),
-    })
+    })))
   }
   return (
-    <Modal title={`Launch AI for a Single ${level === 'tag' ? 'Tag' : 'Campaign'}`} sub="Set a Target ROAS and Max Bid — the AI paces bids toward it and harvests converting search terms automatically." onClose={onClose} width={480}
-      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" onClick={submit}>Launch AI</Btn></>}>
-      <label className="fld">{level === 'tag' ? 'Tag' : 'Campaign'}
-        <select value={refId} onChange={(e) => setRefId(e.target.value)}>
-          {pool.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-        </select>
+    <Modal title={batch ? `Launch AI for ${level === 'tag' ? 'Tags' : 'Campaigns'} in batches` : `Launch AI for a Single ${level === 'tag' ? 'Tag' : 'Campaign'}`} sub="Set a Target ROAS and Max Bid — the AI paces bids toward it and harvests converting search terms automatically." onClose={onClose} width={480}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" disabled={!chosen.length} onClick={submit}>{batch ? `Launch AI for ${chosen.length}` : 'Launch AI'}</Btn></>}>
+      <label className="fld">{level === 'tag' ? (batch ? 'Tags' : 'Tag') : (batch ? 'Campaigns' : 'Campaign')}
+        {batch
+          ? <select multiple size={7} value={refIds} onChange={(e) => setRefIds([...e.target.selectedOptions].map((o) => o.value))}>
+              {pool.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          : <select value={refIds[0] || ''} onChange={(e) => setRefIds([e.target.value])}>
+              {pool.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>}
       </label>
+      {level === 'tag' && (
+        <label className="fld">Profile
+          <select value={pid} onChange={(e) => setPid(e.target.value)}>
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.market}</option>)}
+          </select>
+        </label>
+      )}
       <div style={{ display: 'flex', gap: 10 }}>
         <label className="fld" style={{ flex: 1 }}>Target ROAS<input type="number" step="0.1" value={targetRoas} onChange={(e) => setTargetRoas(e.target.value)} /></label>
         <label className="fld" style={{ flex: 1 }}>Max Bid ($)<input type="number" step="0.05" value={maxBid} onChange={(e) => setMaxBid(e.target.value)} /></label>
@@ -6342,6 +6546,11 @@ function CampaignAI() {
   const level = tab === 'Tag Level' ? 'tag' : 'campaign'
   const [created, setCreated] = useState(() => createdStore.get('campaign-ai'))
   const [stateOv, setStateOv] = usePersistentOverrides('campaign-ai-state')
+  /* C4 item 6 (2026-09-03): §13 specifies a checkbox column and a Bulk Operation bar on BOTH AI
+     grids. `selectable` was passed only by the four Ads grids, so DataGrid's checkbox branches
+     never rendered here and there was no way to act on more than one row. Selection resets when
+     the tab or the profile changes — those ids belong to rows that are no longer on screen. */
+  const [sel, setSel] = useState(new Set())
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('campaign-ai'))
   const [launch, setLaunch] = useState(false)
@@ -6358,14 +6567,26 @@ function CampaignAI() {
   const searched = rows0.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, CAMPAI_FIELDS)
 
+  useEffect(() => { setSel(new Set()) }, [level, profileId])
+  const toggleSel = (id) => setSel((sx) => { const nx = new Set(sx); nx.has(id) ? nx.delete(id) : nx.add(id); return nx })
+  const bulkAI = (next) => {
+    const ids = [...sel].filter((id) => filtered.some((r) => r.id === id))
+    if (!ids.length) return
+    setStateOv((o) => { const nx = { ...o }; for (const id of ids) nx[id] = { ...nx[id], aiState: next }; return nx })
+    setSel(new Set())
+    toast(`AI ${next === 'Active' ? 'resumed' : 'paused'} on ${ids.length} ${level === 'tag' ? 'tag' : 'campaign'}${ids.length === 1 ? '' : 's'}`)
+  }
   const toggleAI = (r) => {
     const next = r.aiState === 'Active' ? 'Paused' : 'Active'
     setStateOv((o) => ({ ...o, [r.id]: { ...o[r.id], aiState: next } }))
     toast(`AI ${next === 'Active' ? 'resumed' : 'paused'} for “${r.name}”`)
   }
-  const onLaunch = (setting) => {
-    const next = [setting, ...created]; createdStore.set('campaign-ai', next); setCreated(next)
-    setLaunch(false); toast(`Launched Campaign AI for “${setting.name}”`)
+  const onLaunch = (settings) => {
+    const rowset = Array.isArray(settings) ? settings : [settings]
+    if (!rowset.length) return
+    const next = [...rowset, ...created]; createdStore.set('campaign-ai', next); setCreated(next)
+    setLaunch(false)
+    toast(rowset.length === 1 ? `Launched Campaign AI for “${rowset[0].name}”` : `Launched Campaign AI on ${rowset.length} ${level === 'tag' ? 'tags' : 'campaigns'}`)
   }
 
   const activeN = filtered.filter((r) => r.aiState === 'Active').length
@@ -6390,7 +6611,14 @@ function CampaignAI() {
     <>
       <AutoHead title="Campaign AI" sub="Automated bid, budget & keyword-harvesting AI at the tag or campaign level — set a Target ROAS and Max Bid, the AI paces toward it.">
         <ExportMenu name="campaign-ai" fields={CAMPAI_FIELDS} rows={filtered} />
-        <Btn icon="spark" primary onClick={() => setLaunch(true)}>Launch AI for {level === 'tag' ? 'Tag' : 'Campaign'}</Btn>
+        <Popover align="right" width={210} trigger={<Btn icon="spark" primary>Launch AI for {level === 'tag' ? 'Tag' : 'Campaign'} <Icon name="chevDown" size={12} /></Btn>}>
+          {(close) => (
+            <div className="colmenu"><div className="cm-list">
+              <div className="cm-opt" onClick={() => { close(); setLaunch('single') }}>Single {level === 'tag' ? 'tag' : 'campaign'}</div>
+              <div className="cm-opt" onClick={() => { close(); setLaunch('batch') }}>In batches…</div>
+            </div></div>
+          )}
+        </Popover>
       </AutoHead>
       <KpiGrid>
         <Kpi label={`AI ${level === 'tag' ? 'Tags' : 'Campaigns'} · Active`} value={`${activeN}/${filtered.length}`} />
@@ -6399,16 +6627,27 @@ function CampaignAI() {
         <Kpi label="Keywords Harvested" value={int(totHarvest)} />
       </KpiGrid>
       <ViewTabs tabs={['Tag Level', 'Campaign Level']} active={tab} onChange={setTab} />
+      {sel.size > 0 && (
+        <div className="bulkbar">
+          <span className="sel">{sel.size} selected</span>
+          <Btn sm icon="play" onClick={() => bulkAI('Active')}>Resume AI</Btn>
+          <Btn sm icon="pause" onClick={() => bulkAI('Paused')}>Pause AI</Btn>
+          <div style={{ flex: 1 }} />
+          <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
+        </div>
+      )}
       <DataGrid
         id={`campaign-ai-${level}`} columns={columns} rows={filtered}
         initialSort={{ key: 'roas30', dir: 'desc' }} dimensions={dims} totals
+        selectable selected={sel} onToggle={toggleSel}
+        onToggleAll={() => setSel((sx) => (sx.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))}
         toolbarLeft={<>
           <SearchBox value={q} onChange={setQ} placeholder={`Search ${level === 'tag' ? 'tags' : 'campaigns'}…`} />
           <FilterBar id="campaign-ai" fields={CAMPAI_FIELDS} value={filters} onChange={setFilters} />
         </>}
       />
       <div className="footnote">Campaign AI is Pacvue's alternative to manual rules — give it a Target ROAS and a Max Bid and it auto-adjusts bids, controls budget, and harvests converting search terms. Toggle AI State per row; ROAS (Last 30 Days) is colour-coded against each row's target. Launch new AI for a tag or campaign from the top-right button.</div>
-      {launch && <LaunchCampaignAIModal level={level} onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
+      {launch && <LaunchCampaignAIModal level={level} batch={launch === 'batch'} onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
     </>
   )
 }
@@ -6429,6 +6668,8 @@ const PRODAI_FIELDS = [
   { key: 'sales', label: 'Sales', type: 'number' },
   { key: 'roas', label: 'ROAS', type: 'number' },
   { key: 'acos', label: 'ACoS %', type: 'number' },
+  // C4 item 9 (2026-09-03) — Owner was a visible column that could be neither filtered nor exported.
+  { key: 'owner', label: 'Owner', type: 'text' },
 ]
 const PRODAI_EVENTS = [
   { key: 'evIncBid', label: 'Increase Bid', icon: 'trendUp', tone: 'green' },
@@ -6452,17 +6693,29 @@ function ManagedEvents({ rows, days }) {
     </div>
   )
 }
-function LaunchProductAIModal({ onClose, onLaunch }) {
-  const catalog = useMemo(() => [...new Map(productAI.map((r) => [r.asin, r])).values()], [])
-  const [asin, setAsin] = useState(catalog[0] ? catalog[0].asin : '')
+/* C4 items 7 + 8 (2026-09-03). 8 — the catalog was deduped `new Map(productAI.map(r => [r.asin, r]))`,
+   which is last-wins across marketplaces, so 6 of 8 selectable products resolved to 'ca' and a
+   launch under another profile vanished from the grid. Keyed by asin|profileId now, with the
+   active profile preferred and shown in the option label. 7 — batch mode; `onLaunch(rowset)`
+   already took an array and the toast already pluralised, but submit only ever passed one. */
+function LaunchProductAIModal({ batch, onClose, onLaunch }) {
+  const { profileId: appProfile } = useApp()
+  const catalog = useMemo(() => {
+    const byKey = [...new Map(productAI.map((r) => [r.asin + '|' + r.profileId, r])).values()]
+    const preferred = appProfile === 'all' ? byKey : byKey.filter((r) => r.profileId === appProfile)
+    return (preferred.length ? preferred : byKey).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+  }, [appProfile])
+  const keyOf = (r) => r.asin + '|' + r.profileId
+  const [keys, setKeys] = useState(catalog[0] ? [keyOf(catalog[0])] : [])
   const [strategy, setStrategy] = useState(AI_STRATEGIES[0])
   const [targetRoas, setTargetRoas] = useState('3.5')
   const [dailyBudget, setDailyBudget] = useState('1000')
-  const sel = catalog.find((x) => x.asin === asin) || {}
+  const chosen = keys.map((k) => catalog.find((x) => keyOf(x) === k)).filter(Boolean)
   const submit = () => {
     const tr = +targetRoas || 3.5
-    onLaunch([{
-      id: 'PAI-N' + Date.now().toString().slice(-7), asin, title: sel.title || asin, profileId: sel.profileId || 'us',
+    if (!chosen.length) return
+    onLaunch(chosen.map((sel, i) => ({
+      id: 'PAI-N' + (Date.now() + i).toString().slice(-7), asin: sel.asin, title: sel.title || sel.asin, profileId: sel.profileId || 'us',
       state: 'Enabled', bidMode: 'Auto', strategy, targetRoas: tr,
       budgetType: 'Daily', dailyBudget: +dailyBudget || 1000, dailySpend: 0,
       lastRunStart: new Date().toISOString().slice(0, 10), lastRunEnd: 'pending',
@@ -6470,15 +6723,19 @@ function LaunchProductAIModal({ onClose, onLaunch }) {
       trend: Array.from({ length: 8 }, (_, k) => ({ w: 'W' + (k + 1), roas: tr })),
       evIncBid: 0, evDecBid: 0, evAddTgt: 0, evPauseTgt: 0,
       impr: 0, clk: 0, ctr: 0, cpc: 0, spend: 0, cvr: 0, orders: 0, sales: 0, units: 0, acos: 0, roas: 0, cpa: 0, aov: 0,
-    }])
+    })))
   }
   return (
-    <Modal title="Launch a Single Product AI" sub="Choose a launch Strategy and Target ROAS — the AI manages bids and targeting for this ASIN." onClose={onClose} width={500}
-      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" onClick={submit}>Launch AI</Btn></>}>
-      <label className="fld">Product (ASIN)
-        <select value={asin} onChange={(e) => setAsin(e.target.value)}>
-          {catalog.map((x) => <option key={x.asin} value={x.asin}>{(x.title || '').split('—')[0].trim()} · {x.asin}</option>)}
-        </select>
+    <Modal title={batch ? 'Launch Product AI in batches' : 'Launch a Single Product AI'} sub="Choose a launch Strategy and Target ROAS — the AI manages bids and targeting for these ASINs." onClose={onClose} width={500}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" disabled={!chosen.length} onClick={submit}>{batch ? `Launch AI on ${chosen.length}` : 'Launch AI'}</Btn></>}>
+      <label className="fld">{batch ? 'Products (ASIN)' : 'Product (ASIN)'}
+        {batch
+          ? <select multiple size={7} value={keys} onChange={(e) => setKeys([...e.target.selectedOptions].map((o) => o.value))}>
+              {catalog.map((x) => <option key={keyOf(x)} value={keyOf(x)}>{(x.title || '').split('—')[0].trim()} · {x.asin} · {(profileById[x.profileId] || {}).market || x.profileId}</option>)}
+            </select>
+          : <select value={keys[0] || ''} onChange={(e) => setKeys([e.target.value])}>
+              {catalog.map((x) => <option key={keyOf(x)} value={keyOf(x)}>{(x.title || '').split('—')[0].trim()} · {x.asin} · {(profileById[x.profileId] || {}).market || x.profileId}</option>)}
+            </select>}
       </label>
       <label className="fld">Strategy
         <select value={strategy} onChange={(e) => setStrategy(e.target.value)}>
@@ -6499,10 +6756,20 @@ function ProductAI() {
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('product-ai'))
   const [launch, setLaunch] = useState(false)
+  // C4 item 6 — selection + bulk bar; see the note on Campaign AI. State was render-only here,
+  // so a bulk Enable/Pause needs somewhere to persist: same `chedits:` shape Campaign AI uses.
+  const [stateOv, setStateOv] = usePersistentOverrides('product-ai-state')
+  const [sel, setSel] = useState(new Set())
+  useEffect(() => { setSel(new Set()) }, [profileId])
+  const toggleSel = (id) => setSel((sx) => { const nx = new Set(sx); nx.has(id) ? nx.delete(id) : nx.add(id); return nx })
 
   const base = useMemo(() => [...created, ...productAI].filter((r) => profileId === 'all' || r.profileId === profileId), [created, profileId])
   const { rows: scaled } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
-  const rows0 = useMemo(() => scaled.map((r) => { const p = profileById[r.profileId] || {}; return { ...r, market: p.market || r.profileId, currency: p.currency || '$' } }), [scaled])
+  const rows0 = useMemo(() => scaled.map((r) => {
+    const p = profileById[r.profileId] || {}
+    const st = (stateOv[r.id] && stateOv[r.id].state) || r.state
+    return { ...r, state: st, market: p.market || r.profileId, currency: p.currency || '$' }
+  }), [scaled, stateOv])
   const searched = rows0.filter((r) => (r.asin + ' ' + r.title).toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, PRODAI_FIELDS)
 
@@ -6514,6 +6781,13 @@ function ProductAI() {
   const agg = aggregate(filtered.map(toUsd))
 
   const onLaunch = (rowset) => { const next = [...rowset, ...created]; createdStore.set('product-ai', next); setCreated(next); setLaunch(false); toast(`Launched Product AI on ${rowset.length} ASIN${rowset.length === 1 ? '' : 's'}`) }
+  const bulkState = (next) => {
+    const ids = [...sel].filter((id) => filtered.some((r) => r.id === id))
+    if (!ids.length) return
+    setStateOv((o) => { const nx = { ...o }; for (const id of ids) nx[id] = { ...nx[id], state: next }; return nx })
+    setSel(new Set())
+    toast(`${next} ${ids.length} product AI${ids.length === 1 ? '' : 's'}`)
+  }
 
   const columns = [
     { key: 'asin', label: 'ASIN', sticky: true, width: 300, sortVal: (r) => r.title, render: (r) => (
@@ -6545,7 +6819,14 @@ function ProductAI() {
     <>
       <AutoHead title="Product AI" sub={`ASIN-level automation · ${rangeResolved.label}${mixed ? ' · USD est.' : ''} — pick a launch Strategy toward a Target ROAS; the AI manages bids & targeting per product.`}>
         <ExportMenu name="product-ai" fields={PRODAI_FIELDS} rows={filtered} />
-        <Btn icon="spark" primary onClick={() => setLaunch(true)}>Launch AI</Btn>
+        <Popover align="right" width={210} trigger={<Btn icon="spark" primary>Launch AI <Icon name="chevDown" size={12} /></Btn>}>
+          {(close) => (
+            <div className="colmenu"><div className="cm-list">
+              <div className="cm-opt" onClick={() => { close(); setLaunch('single') }}>Single product</div>
+              <div className="cm-opt" onClick={() => { close(); setLaunch('batch') }}>In batches…</div>
+            </div></div>
+          )}
+        </Popover>
       </AutoHead>
       <div className="ai-dash">
         <Card title="Managed Events" sub={`AI actions · ${rangeResolved.label}`} pad={false}>
@@ -6565,17 +6846,28 @@ function ProductAI() {
       <Card title="Performance" sub={`Spend vs Sales · ${rangeResolved.label}`}>
         <PerfChart data={timeseries} />
       </Card>
+      {sel.size > 0 && (
+        <div className="bulkbar">
+          <span className="sel">{sel.size} selected</span>
+          <Btn sm icon="play" onClick={() => bulkState('Enabled')}>Enable</Btn>
+          <Btn sm icon="pause" onClick={() => bulkState('Paused')}>Pause</Btn>
+          <div style={{ flex: 1 }} />
+          <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
+        </div>
+      )}
       <DataGrid
         id="product-ai" columns={columns} rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Columns"
         dimensions={dims} totals
+        selectable selected={sel} onToggle={toggleSel}
+        onToggleAll={() => setSel((sx) => (sx.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))}
         toolbarLeft={<>
           <SearchBox value={q} onChange={setQ} placeholder="Search ASIN or product…" />
           <FilterBar id="product-ai" fields={PRODAI_FIELDS} value={filters} onChange={setFilters} />
         </>}
       />
       <div className="footnote">Product AI runs per-ASIN automation toward a Target ROAS using a launch Strategy (More Conversion / More Traffic / More Efficiency). The Managed Events panel counts the AI's bid and targeting actions in the selected range; Weekly ROAS Trend shows each product's trajectory under "Auto" bidding. Money totals across profiles are USD estimates.</div>
-      {launch && <LaunchProductAIModal onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
+      {launch && <LaunchProductAIModal batch={launch === 'batch'} onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
     </>
   )
 }

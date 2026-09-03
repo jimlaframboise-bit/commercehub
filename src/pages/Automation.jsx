@@ -1,5 +1,5 @@
-import { useState, useMemo, Fragment } from 'react'
-import { Kpi, KpiGrid, Card, Pill, Toggle, Check, Btn, Modal, toast, createdStore, usePersistentOverrides, SearchBox, ViewTabs, DataGrid, FilterBar, applyFilters, loadFilterModel, ExportMenu, MiniLine, PerfChart, scaleForRange, fxUSD } from '../components/ui.jsx'
+import { useState, useMemo, useEffect, Fragment } from 'react'
+import { Kpi, KpiGrid, Card, Pill, Toggle, Check, Btn, Modal, toast, createdStore, usePersistentOverrides, SearchBox, ViewTabs, DataGrid, FilterBar, applyFilters, loadFilterModel, ExportMenu, MiniLine, PerfChart, scaleForRange, fxUSD, Popover } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
 import { rules as RULES, budgets, campaigns, campaignTags, profiles, profileById, aggregate, campaignAI, productAI, timeseries, AI_STRATEGIES } from '../data/mock.js'
 import { cur, pct, money, int, compact, dec2 } from '../lib/format.js'
@@ -779,34 +779,56 @@ const CAMPAI_FIELDS = [
   { key: 'harvestKWs', label: 'Harvest KWs', type: 'number' },
   { key: 'creator', label: 'Creator', type: 'text' },
 ]
-function LaunchCampaignAIModal({ level, onClose, onLaunch }) {
+/* C4 items 7 + 8 (2026-09-03).
+   8 — the launch hardcoded `profileId: level === 'tag' ? 'us' : …`, so launching a tag under
+   Canada or UK toasted success, persisted, and then filtered itself out of the grid (or rendered
+   in the wrong currency under All Profiles). There was no Profile control at all. The modal now
+   defaults to the app's active profile and shows the field.
+   7 — the modal was titled "Launch AI for a SINGLE Tag", advertising a batch sibling that was
+   never built (`SplitBtn`/`Batches` have zero occurrences bundle-wide). The header button is now
+   a Popover with Single / In batches, and batch mode multi-selects. `onLaunch` already accepted
+   an array on Product AI; Campaign AI's now does too. */
+function LaunchCampaignAIModal({ level, batch, onClose, onLaunch }) {
+  const { profileId: appProfile, profiles } = useApp()
   const pool = level === 'tag' ? campaignTags : campaigns.filter((c) => c.campaignType.startsWith('SP'))
-  const [refId, setRefId] = useState(pool[0] ? pool[0].id : '')
+  const [refIds, setRefIds] = useState(pool[0] ? [pool[0].id] : [])
+  const [pid, setPid] = useState(appProfile === 'all' ? 'us' : appProfile)
   const [targetRoas, setTargetRoas] = useState('3.5')
   const [maxBid, setMaxBid] = useState('2.00')
   const [budgetOn, setBudgetOn] = useState(true)
   const [budgetCap, setBudgetCap] = useState('300')
   const [harvest, setHarvest] = useState(true)
-  const sel = pool.find((x) => x.id === refId) || {}
-  const pid = level === 'tag' ? 'us' : (sel.profileId || 'us')
+  const chosen = refIds.map((rid) => pool.find((x) => x.id === rid)).filter(Boolean)
   const submit = () => {
-    onLaunch({
-      id: 'CAI-N' + Date.now().toString().slice(-7), level, name: sel.name || sel.id || 'New', refId,
-      profileId: pid, aiState: 'Active',
+    if (!chosen.length) return
+    onLaunch(chosen.map((sel, i) => ({
+      id: 'CAI-N' + (Date.now() + i).toString().slice(-7), level, name: sel.name || sel.id || 'New', refId: sel.id,
+      profileId: level === 'tag' ? pid : (sel.profileId || pid), aiState: 'Active',
       targetRoas: +targetRoas || 3.5, maxBid: +maxBid || 2,
       budgetControl: budgetOn ? 'On' : 'Off', budgetCap: budgetOn ? (+budgetCap || 0) : 0,
       harvest, harvestKWs: 0, roas30: 0, lastRun: 'just now',
       creator: 'jim@brightleaf.co', createTime: new Date().toISOString().slice(0, 10),
-    })
+    })))
   }
   return (
-    <Modal title={`Launch AI for a Single ${level === 'tag' ? 'Tag' : 'Campaign'}`} sub="Set a Target ROAS and Max Bid — the AI paces bids toward it and harvests converting search terms automatically." onClose={onClose} width={480}
-      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" onClick={submit}>Launch AI</Btn></>}>
-      <label className="fld">{level === 'tag' ? 'Tag' : 'Campaign'}
-        <select value={refId} onChange={(e) => setRefId(e.target.value)}>
-          {pool.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-        </select>
+    <Modal title={batch ? `Launch AI for ${level === 'tag' ? 'Tags' : 'Campaigns'} in batches` : `Launch AI for a Single ${level === 'tag' ? 'Tag' : 'Campaign'}`} sub="Set a Target ROAS and Max Bid — the AI paces bids toward it and harvests converting search terms automatically." onClose={onClose} width={480}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" disabled={!chosen.length} onClick={submit}>{batch ? `Launch AI for ${chosen.length}` : 'Launch AI'}</Btn></>}>
+      <label className="fld">{level === 'tag' ? (batch ? 'Tags' : 'Tag') : (batch ? 'Campaigns' : 'Campaign')}
+        {batch
+          ? <select multiple size={7} value={refIds} onChange={(e) => setRefIds([...e.target.selectedOptions].map((o) => o.value))}>
+              {pool.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          : <select value={refIds[0] || ''} onChange={(e) => setRefIds([e.target.value])}>
+              {pool.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>}
       </label>
+      {level === 'tag' && (
+        <label className="fld">Profile
+          <select value={pid} onChange={(e) => setPid(e.target.value)}>
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.market}</option>)}
+          </select>
+        </label>
+      )}
       <div style={{ display: 'flex', gap: 10 }}>
         <label className="fld" style={{ flex: 1 }}>Target ROAS<input type="number" step="0.1" value={targetRoas} onChange={(e) => setTargetRoas(e.target.value)} /></label>
         <label className="fld" style={{ flex: 1 }}>Max Bid ($)<input type="number" step="0.05" value={maxBid} onChange={(e) => setMaxBid(e.target.value)} /></label>
@@ -828,6 +850,11 @@ export function CampaignAI() {
   const level = tab === 'Tag Level' ? 'tag' : 'campaign'
   const [created, setCreated] = useState(() => createdStore.get('campaign-ai'))
   const [stateOv, setStateOv] = usePersistentOverrides('campaign-ai-state')
+  /* C4 item 6 (2026-09-03): §13 specifies a checkbox column and a Bulk Operation bar on BOTH AI
+     grids. `selectable` was passed only by the four Ads grids, so DataGrid's checkbox branches
+     never rendered here and there was no way to act on more than one row. Selection resets when
+     the tab or the profile changes — those ids belong to rows that are no longer on screen. */
+  const [sel, setSel] = useState(new Set())
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('campaign-ai'))
   const [launch, setLaunch] = useState(false)
@@ -844,14 +871,26 @@ export function CampaignAI() {
   const searched = rows0.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, CAMPAI_FIELDS)
 
+  useEffect(() => { setSel(new Set()) }, [level, profileId])
+  const toggleSel = (id) => setSel((sx) => { const nx = new Set(sx); nx.has(id) ? nx.delete(id) : nx.add(id); return nx })
+  const bulkAI = (next) => {
+    const ids = [...sel].filter((id) => filtered.some((r) => r.id === id))
+    if (!ids.length) return
+    setStateOv((o) => { const nx = { ...o }; for (const id of ids) nx[id] = { ...nx[id], aiState: next }; return nx })
+    setSel(new Set())
+    toast(`AI ${next === 'Active' ? 'resumed' : 'paused'} on ${ids.length} ${level === 'tag' ? 'tag' : 'campaign'}${ids.length === 1 ? '' : 's'}`)
+  }
   const toggleAI = (r) => {
     const next = r.aiState === 'Active' ? 'Paused' : 'Active'
     setStateOv((o) => ({ ...o, [r.id]: { ...o[r.id], aiState: next } }))
     toast(`AI ${next === 'Active' ? 'resumed' : 'paused'} for “${r.name}”`)
   }
-  const onLaunch = (setting) => {
-    const next = [setting, ...created]; createdStore.set('campaign-ai', next); setCreated(next)
-    setLaunch(false); toast(`Launched Campaign AI for “${setting.name}”`)
+  const onLaunch = (settings) => {
+    const rowset = Array.isArray(settings) ? settings : [settings]
+    if (!rowset.length) return
+    const next = [...rowset, ...created]; createdStore.set('campaign-ai', next); setCreated(next)
+    setLaunch(false)
+    toast(rowset.length === 1 ? `Launched Campaign AI for “${rowset[0].name}”` : `Launched Campaign AI on ${rowset.length} ${level === 'tag' ? 'tags' : 'campaigns'}`)
   }
 
   const activeN = filtered.filter((r) => r.aiState === 'Active').length
@@ -876,7 +915,14 @@ export function CampaignAI() {
     <>
       <AutoHead title="Campaign AI" sub="Automated bid, budget & keyword-harvesting AI at the tag or campaign level — set a Target ROAS and Max Bid, the AI paces toward it.">
         <ExportMenu name="campaign-ai" fields={CAMPAI_FIELDS} rows={filtered} />
-        <Btn icon="spark" primary onClick={() => setLaunch(true)}>Launch AI for {level === 'tag' ? 'Tag' : 'Campaign'}</Btn>
+        <Popover align="right" width={210} trigger={<Btn icon="spark" primary>Launch AI for {level === 'tag' ? 'Tag' : 'Campaign'} <Icon name="chevDown" size={12} /></Btn>}>
+          {(close) => (
+            <div className="colmenu"><div className="cm-list">
+              <div className="cm-opt" onClick={() => { close(); setLaunch('single') }}>Single {level === 'tag' ? 'tag' : 'campaign'}</div>
+              <div className="cm-opt" onClick={() => { close(); setLaunch('batch') }}>In batches…</div>
+            </div></div>
+          )}
+        </Popover>
       </AutoHead>
       <KpiGrid>
         <Kpi label={`AI ${level === 'tag' ? 'Tags' : 'Campaigns'} · Active`} value={`${activeN}/${filtered.length}`} />
@@ -885,16 +931,27 @@ export function CampaignAI() {
         <Kpi label="Keywords Harvested" value={int(totHarvest)} />
       </KpiGrid>
       <ViewTabs tabs={['Tag Level', 'Campaign Level']} active={tab} onChange={setTab} />
+      {sel.size > 0 && (
+        <div className="bulkbar">
+          <span className="sel">{sel.size} selected</span>
+          <Btn sm icon="play" onClick={() => bulkAI('Active')}>Resume AI</Btn>
+          <Btn sm icon="pause" onClick={() => bulkAI('Paused')}>Pause AI</Btn>
+          <div style={{ flex: 1 }} />
+          <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
+        </div>
+      )}
       <DataGrid
         id={`campaign-ai-${level}`} columns={columns} rows={filtered}
         initialSort={{ key: 'roas30', dir: 'desc' }} dimensions={dims} totals
+        selectable selected={sel} onToggle={toggleSel}
+        onToggleAll={() => setSel((sx) => (sx.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))}
         toolbarLeft={<>
           <SearchBox value={q} onChange={setQ} placeholder={`Search ${level === 'tag' ? 'tags' : 'campaigns'}…`} />
           <FilterBar id="campaign-ai" fields={CAMPAI_FIELDS} value={filters} onChange={setFilters} />
         </>}
       />
       <div className="footnote">Campaign AI is Pacvue's alternative to manual rules — give it a Target ROAS and a Max Bid and it auto-adjusts bids, controls budget, and harvests converting search terms. Toggle AI State per row; ROAS (Last 30 Days) is colour-coded against each row's target. Launch new AI for a tag or campaign from the top-right button.</div>
-      {launch && <LaunchCampaignAIModal level={level} onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
+      {launch && <LaunchCampaignAIModal level={level} batch={launch === 'batch'} onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
     </>
   )
 }
@@ -915,6 +972,8 @@ const PRODAI_FIELDS = [
   { key: 'sales', label: 'Sales', type: 'number' },
   { key: 'roas', label: 'ROAS', type: 'number' },
   { key: 'acos', label: 'ACoS %', type: 'number' },
+  // C4 item 9 (2026-09-03) — Owner was a visible column that could be neither filtered nor exported.
+  { key: 'owner', label: 'Owner', type: 'text' },
 ]
 const PRODAI_EVENTS = [
   { key: 'evIncBid', label: 'Increase Bid', icon: 'trendUp', tone: 'green' },
@@ -938,17 +997,29 @@ function ManagedEvents({ rows, days }) {
     </div>
   )
 }
-function LaunchProductAIModal({ onClose, onLaunch }) {
-  const catalog = useMemo(() => [...new Map(productAI.map((r) => [r.asin, r])).values()], [])
-  const [asin, setAsin] = useState(catalog[0] ? catalog[0].asin : '')
+/* C4 items 7 + 8 (2026-09-03). 8 — the catalog was deduped `new Map(productAI.map(r => [r.asin, r]))`,
+   which is last-wins across marketplaces, so 6 of 8 selectable products resolved to 'ca' and a
+   launch under another profile vanished from the grid. Keyed by asin|profileId now, with the
+   active profile preferred and shown in the option label. 7 — batch mode; `onLaunch(rowset)`
+   already took an array and the toast already pluralised, but submit only ever passed one. */
+function LaunchProductAIModal({ batch, onClose, onLaunch }) {
+  const { profileId: appProfile } = useApp()
+  const catalog = useMemo(() => {
+    const byKey = [...new Map(productAI.map((r) => [r.asin + '|' + r.profileId, r])).values()]
+    const preferred = appProfile === 'all' ? byKey : byKey.filter((r) => r.profileId === appProfile)
+    return (preferred.length ? preferred : byKey).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+  }, [appProfile])
+  const keyOf = (r) => r.asin + '|' + r.profileId
+  const [keys, setKeys] = useState(catalog[0] ? [keyOf(catalog[0])] : [])
   const [strategy, setStrategy] = useState(AI_STRATEGIES[0])
   const [targetRoas, setTargetRoas] = useState('3.5')
   const [dailyBudget, setDailyBudget] = useState('1000')
-  const sel = catalog.find((x) => x.asin === asin) || {}
+  const chosen = keys.map((k) => catalog.find((x) => keyOf(x) === k)).filter(Boolean)
   const submit = () => {
     const tr = +targetRoas || 3.5
-    onLaunch([{
-      id: 'PAI-N' + Date.now().toString().slice(-7), asin, title: sel.title || asin, profileId: sel.profileId || 'us',
+    if (!chosen.length) return
+    onLaunch(chosen.map((sel, i) => ({
+      id: 'PAI-N' + (Date.now() + i).toString().slice(-7), asin: sel.asin, title: sel.title || sel.asin, profileId: sel.profileId || 'us',
       state: 'Enabled', bidMode: 'Auto', strategy, targetRoas: tr,
       budgetType: 'Daily', dailyBudget: +dailyBudget || 1000, dailySpend: 0,
       lastRunStart: new Date().toISOString().slice(0, 10), lastRunEnd: 'pending',
@@ -956,15 +1027,19 @@ function LaunchProductAIModal({ onClose, onLaunch }) {
       trend: Array.from({ length: 8 }, (_, k) => ({ w: 'W' + (k + 1), roas: tr })),
       evIncBid: 0, evDecBid: 0, evAddTgt: 0, evPauseTgt: 0,
       impr: 0, clk: 0, ctr: 0, cpc: 0, spend: 0, cvr: 0, orders: 0, sales: 0, units: 0, acos: 0, roas: 0, cpa: 0, aov: 0,
-    }])
+    })))
   }
   return (
-    <Modal title="Launch a Single Product AI" sub="Choose a launch Strategy and Target ROAS — the AI manages bids and targeting for this ASIN." onClose={onClose} width={500}
-      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" onClick={submit}>Launch AI</Btn></>}>
-      <label className="fld">Product (ASIN)
-        <select value={asin} onChange={(e) => setAsin(e.target.value)}>
-          {catalog.map((x) => <option key={x.asin} value={x.asin}>{(x.title || '').split('—')[0].trim()} · {x.asin}</option>)}
-        </select>
+    <Modal title={batch ? 'Launch Product AI in batches' : 'Launch a Single Product AI'} sub="Choose a launch Strategy and Target ROAS — the AI manages bids and targeting for these ASINs." onClose={onClose} width={500}
+      footer={<><Btn ghost onClick={onClose}>Cancel</Btn><Btn primary icon="spark" disabled={!chosen.length} onClick={submit}>{batch ? `Launch AI on ${chosen.length}` : 'Launch AI'}</Btn></>}>
+      <label className="fld">{batch ? 'Products (ASIN)' : 'Product (ASIN)'}
+        {batch
+          ? <select multiple size={7} value={keys} onChange={(e) => setKeys([...e.target.selectedOptions].map((o) => o.value))}>
+              {catalog.map((x) => <option key={keyOf(x)} value={keyOf(x)}>{(x.title || '').split('—')[0].trim()} · {x.asin} · {(profileById[x.profileId] || {}).market || x.profileId}</option>)}
+            </select>
+          : <select value={keys[0] || ''} onChange={(e) => setKeys([e.target.value])}>
+              {catalog.map((x) => <option key={keyOf(x)} value={keyOf(x)}>{(x.title || '').split('—')[0].trim()} · {x.asin} · {(profileById[x.profileId] || {}).market || x.profileId}</option>)}
+            </select>}
       </label>
       <label className="fld">Strategy
         <select value={strategy} onChange={(e) => setStrategy(e.target.value)}>
@@ -985,10 +1060,20 @@ export function ProductAI() {
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState(() => loadFilterModel('product-ai'))
   const [launch, setLaunch] = useState(false)
+  // C4 item 6 — selection + bulk bar; see the note on Campaign AI. State was render-only here,
+  // so a bulk Enable/Pause needs somewhere to persist: same `chedits:` shape Campaign AI uses.
+  const [stateOv, setStateOv] = usePersistentOverrides('product-ai-state')
+  const [sel, setSel] = useState(new Set())
+  useEffect(() => { setSel(new Set()) }, [profileId])
+  const toggleSel = (id) => setSel((sx) => { const nx = new Set(sx); nx.has(id) ? nx.delete(id) : nx.add(id); return nx })
 
   const base = useMemo(() => [...created, ...productAI].filter((r) => profileId === 'all' || r.profileId === profileId), [created, profileId])
   const { rows: scaled } = useMemo(() => scaleForRange(base, rangeResolved), [base, rangeResolved])
-  const rows0 = useMemo(() => scaled.map((r) => { const p = profileById[r.profileId] || {}; return { ...r, market: p.market || r.profileId, currency: p.currency || '$' } }), [scaled])
+  const rows0 = useMemo(() => scaled.map((r) => {
+    const p = profileById[r.profileId] || {}
+    const st = (stateOv[r.id] && stateOv[r.id].state) || r.state
+    return { ...r, state: st, market: p.market || r.profileId, currency: p.currency || '$' }
+  }), [scaled, stateOv])
   const searched = rows0.filter((r) => (r.asin + ' ' + r.title).toLowerCase().includes(q.toLowerCase()))
   const filtered = applyFilters(searched, filters, PRODAI_FIELDS)
 
@@ -1000,6 +1085,13 @@ export function ProductAI() {
   const agg = aggregate(filtered.map(toUsd))
 
   const onLaunch = (rowset) => { const next = [...rowset, ...created]; createdStore.set('product-ai', next); setCreated(next); setLaunch(false); toast(`Launched Product AI on ${rowset.length} ASIN${rowset.length === 1 ? '' : 's'}`) }
+  const bulkState = (next) => {
+    const ids = [...sel].filter((id) => filtered.some((r) => r.id === id))
+    if (!ids.length) return
+    setStateOv((o) => { const nx = { ...o }; for (const id of ids) nx[id] = { ...nx[id], state: next }; return nx })
+    setSel(new Set())
+    toast(`${next} ${ids.length} product AI${ids.length === 1 ? '' : 's'}`)
+  }
 
   const columns = [
     { key: 'asin', label: 'ASIN', sticky: true, width: 300, sortVal: (r) => r.title, render: (r) => (
@@ -1031,7 +1123,14 @@ export function ProductAI() {
     <>
       <AutoHead title="Product AI" sub={`ASIN-level automation · ${rangeResolved.label}${mixed ? ' · USD est.' : ''} — pick a launch Strategy toward a Target ROAS; the AI manages bids & targeting per product.`}>
         <ExportMenu name="product-ai" fields={PRODAI_FIELDS} rows={filtered} />
-        <Btn icon="spark" primary onClick={() => setLaunch(true)}>Launch AI</Btn>
+        <Popover align="right" width={210} trigger={<Btn icon="spark" primary>Launch AI <Icon name="chevDown" size={12} /></Btn>}>
+          {(close) => (
+            <div className="colmenu"><div className="cm-list">
+              <div className="cm-opt" onClick={() => { close(); setLaunch('single') }}>Single product</div>
+              <div className="cm-opt" onClick={() => { close(); setLaunch('batch') }}>In batches…</div>
+            </div></div>
+          )}
+        </Popover>
       </AutoHead>
       <div className="ai-dash">
         <Card title="Managed Events" sub={`AI actions · ${rangeResolved.label}`} pad={false}>
@@ -1051,17 +1150,28 @@ export function ProductAI() {
       <Card title="Performance" sub={`Spend vs Sales · ${rangeResolved.label}`}>
         <PerfChart data={timeseries} />
       </Card>
+      {sel.size > 0 && (
+        <div className="bulkbar">
+          <span className="sel">{sel.size} selected</span>
+          <Btn sm icon="play" onClick={() => bulkState('Enabled')}>Enable</Btn>
+          <Btn sm icon="pause" onClick={() => bulkState('Paused')}>Pause</Btn>
+          <div style={{ flex: 1 }} />
+          <Btn sm ghost onClick={() => setSel(new Set())}>Clear</Btn>
+        </div>
+      )}
       <DataGrid
         id="product-ai" columns={columns} rows={filtered}
         initialSort={{ key: 'spend', dir: 'desc' }} presets={presets} defaultPreset="Default Columns"
         dimensions={dims} totals
+        selectable selected={sel} onToggle={toggleSel}
+        onToggleAll={() => setSel((sx) => (sx.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.id))))}
         toolbarLeft={<>
           <SearchBox value={q} onChange={setQ} placeholder="Search ASIN or product…" />
           <FilterBar id="product-ai" fields={PRODAI_FIELDS} value={filters} onChange={setFilters} />
         </>}
       />
       <div className="footnote">Product AI runs per-ASIN automation toward a Target ROAS using a launch Strategy (More Conversion / More Traffic / More Efficiency). The Managed Events panel counts the AI's bid and targeting actions in the selected range; Weekly ROAS Trend shows each product's trajectory under "Auto" bidding. Money totals across profiles are USD estimates.</div>
-      {launch && <LaunchProductAIModal onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
+      {launch && <LaunchProductAIModal batch={launch === 'batch'} onClose={() => setLaunch(false)} onLaunch={onLaunch} />}
     </>
   )
 }

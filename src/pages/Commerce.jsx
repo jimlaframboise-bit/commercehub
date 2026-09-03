@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Kpi, KpiGrid, Pill, DataGrid, FilterBar, applyFilters, loadFilterModel, Btn, SearchBox, ExportMenu, scaleFields, fxUSD } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
 import { digitalShelf, profileById } from '../data/mock.js'
@@ -224,7 +225,13 @@ export function BuyBox() {
 /* ============================ PRODUCT CENTER ============================ */
 export function Products() {
   const { rows: data, prev, allTime, range, profileId, noShelf, marketName } = useCommerceData()
-  const [q, setQ] = useState('')
+  /* C4 item 5 (2026-09-03): the ASIN grid's "Open in Product Center" link landed on the
+     unfiltered catalog. It now sends ?asin=<ASIN> and this reads it, so the row you clicked is
+     the row you get. Seeded into the search box so clearing it is obvious and reversible. */
+  const cLoc = useLocation()
+  const urlAsin = new URLSearchParams(cLoc.search || '').get('asin')
+  const [q, setQ] = useState(urlAsin || '')
+  useEffect(() => { setQ(urlAsin || '') }, [urlAsin])
   const [filters, setFilters] = useState(() => loadFilterModel('commerce-products'))
   const kv = (v) => (noShelf ? '—' : v)
   // de-dupe by ASIN (catalog-level content view): sum cumulative metrics across

@@ -210,7 +210,7 @@ function DeltaChip({ row, ck, prevRow }) {
 export function DataGrid({
   id, columns, rows, initialSort,
   presets, defaultPreset, dimensions, totals, compare, comparePrev, compareDisabled,
-  selectable, selected, onToggle, onToggleAll, rowKey = 'id',
+  selectable, selected, onToggle, onToggleAll, rowKey = 'id', isSubRow,
   pageSizes = [25, 50, 100], empty = 'No data', toolbarLeft,
 }) {
   const colByKey = useMemo(() => Object.fromEntries(columns.map((c) => [c.key, c])), [columns])
@@ -224,7 +224,23 @@ export function DataGrid({
   const [order, setOrder] = useState(saved?.order?.filter((k) => colByKey[k])?.concat(allKeys.filter((k) => !(saved.order || []).includes(k))) || (firstPreset ? [...presetCols(firstPreset), ...allKeys.filter((k) => !presetCols(firstPreset).includes(k))] : allKeys))
   const [hidden, setHidden] = useState(new Set(saved?.hidden || (firstPreset ? allKeys.filter((k) => !presetCols(firstPreset).includes(k)) : [])))
 
-  useEffect(() => { if (id) gridStore.set(id, { view, order, hidden: [...hidden] }) }, [id, view, order, hidden])
+  /* C4 item 12 (2026-09-03): the three useState initializers above run once per MOUNT, but a few
+     grids change `id` in place (Campaign AI's `campaign-ai-${level}`, Tagging's `ads-tags-<kind>`)
+     with no `key` to force a remount. The persist effect then fired on the id change and wrote the
+     PREVIOUS tab's layout to the new key, destroying whatever was saved there. Reload the saved
+     layout when the id changes, and skip the persist for that render so the write cannot race. */
+  const lastId = useRef(id)
+  useEffect(() => {
+    if (lastId.current === id) return
+    lastId.current = id
+    const next = id ? gridStore.get(id) : null
+    setView(next?.view || firstPreset || 'Default')
+    setOrder(next?.order?.filter((k) => colByKey[k])?.concat(allKeys.filter((k) => !(next.order || []).includes(k)))
+      || (firstPreset ? [...presetCols(firstPreset), ...allKeys.filter((k) => !presetCols(firstPreset).includes(k))] : allKeys))
+    setHidden(new Set(next?.hidden || (firstPreset ? allKeys.filter((k) => !presetCols(firstPreset).includes(k)) : [])))
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { if (id && lastId.current === id) gridStore.set(id, { view, order, hidden: [...hidden] }) }, [id, view, order, hidden])
 
   const applyPreset = (name) => {
     setView(name)
@@ -247,16 +263,31 @@ export function DataGrid({
 
   const [sort, setSort] = useState(initialSort || { key: null, dir: 'desc' })
   const onSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key: k, dir: typeof rows[0]?.[k] === 'number' ? 'desc' : 'asc' }))
+  /* C4 item 10 (2026-09-03): Tagging injects expanded sub-tag rows directly beneath their parent,
+     but this sorted the flat array with no parent awareness — a sub-tag's numbers landed as a peer
+     of real tags whose members it duplicates. `isSubRow` (a predicate the caller supplies) makes
+     three contracts hold: children sort WITH their parent and never on their own, they are not
+     counted as entities in the Total row or the pager, and Select-all ignores them (the callers'
+     onToggleAll only ever populated parent ids, so `allOn` could never become true). */
+  const isSub = (r) => (isSubRow ? !!isSubRow(r) : false)
+  const parentRows = useMemo(() => rows.filter((r) => !isSub(r)), [rows, isSubRow])
   const sortedAll = useMemo(() => {
     if (!sort.key) return rows
     const col = colByKey[sort.key]
     const val = (r) => (col?.sortVal ? col.sortVal(r) : r[sort.key])
-    return [...rows].sort((a, b) => {
+    const cmp = (a, b) => {
       const x = val(a), y = val(b)
       if (typeof x === 'number' && typeof y === 'number') return sort.dir === 'asc' ? x - y : y - x
       return sort.dir === 'asc' ? String(x).localeCompare(String(y)) : String(y).localeCompare(String(x))
-    })
-  }, [rows, sort, colByKey])
+    }
+    if (!isSubRow) return [...rows].sort(cmp)
+    const kids = new Map()   // parent index in `rows` -> its children, in the order the caller emitted them
+    let cur = null
+    for (const r of rows) { if (isSub(r)) { if (cur) kids.get(cur).push(r) } else { cur = r; kids.set(cur, []) } }
+    const out = []
+    for (const p of [...kids.keys()].sort(cmp)) { out.push(p); for (const k of kids.get(p)) out.push(k) }
+    return out
+  }, [rows, sort, colByKey, isSubRow])
 
   const [compareOn, setCompareOn] = useState(false)
   const showCompare = compareOn && !compareDisabled
@@ -274,11 +305,21 @@ export function DataGrid({
 
   const [pageSize, setPageSize] = useState(pageSizes[0])
   const [page, setPage] = useState(1)
-  const totalEntries = rows.length
+  const totalEntries = parentRows.length   // C4 item 10 — sub-rows are not entities
   const pageCount = Math.max(1, Math.ceil(totalEntries / pageSize))
   const curPage = Math.min(page, pageCount)
   useEffect(() => { setPage(1) }, [pageSize, groupKey, totalEntries, sort.key, sort.dir])
-  const pageRows = grouped ? sortedAll : sortedAll.slice((curPage - 1) * pageSize, curPage * pageSize)
+  // Paginate by PARENT count so a page holds `pageSize` real rows plus whatever children they carry.
+  const pageRows = useMemo(() => {
+    if (grouped || !isSubRow) return grouped ? sortedAll : sortedAll.slice((curPage - 1) * pageSize, curPage * pageSize)
+    const from = (curPage - 1) * pageSize, to = curPage * pageSize
+    const out = []; let seen = -1; let take = false
+    for (const r of sortedAll) {
+      if (!isSub(r)) { seen++; take = seen >= from && seen < to }
+      if (take) out.push(r)
+    }
+    return out
+  }, [sortedAll, grouped, curPage, pageSize, isSubRow])
 
   const groups = useMemo(() => {
     if (!grouped) return null
@@ -288,7 +329,8 @@ export function DataGrid({
   }, [grouped, groupField, sortedAll])
 
   const colSpan = visibleCols.length + (selectable ? 1 : 0)
-  const allOn = selectable && pageRows.length > 0 && pageRows.every((r) => selected?.has(r[rowKey]))
+  const selectableRows = pageRows.filter((r) => !isSub(r))   // C4 item 10 — children are never selectable
+  const allOn = selectable && selectableRows.length > 0 && selectableRows.every((r) => selected?.has(r[rowKey]))
 
   const cell = (c, r) => (
     <td key={c.key} className={`${c.num ? 'num' : ''} ${c.sticky ? 'sticky-l cellname' : ''}`}>
@@ -373,7 +415,7 @@ export function DataGrid({
             {pageRows.length === 0 && <tr><td colSpan={colSpan} className="empty">{empty}</td></tr>}
             {!grouped && pageRows.map((r) => (
               <tr key={r[rowKey]}>
-                {selectable && <td className="sticky-l"><Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} /></td>}
+                {selectable && <td className="sticky-l">{!isSub(r) && <Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} />}</td>}
                 {visibleCols.map((c) => cell(c, r))}
               </tr>
             ))}
@@ -388,7 +430,7 @@ export function DataGrid({
                 </tr>
                 {groupOpen(g.key) && g.rows.map((r) => (
                   <tr key={r[rowKey]}>
-                    {selectable && <td className="sticky-l"><Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} /></td>}
+                    {selectable && <td className="sticky-l">{!isSub(r) && <Check on={selected?.has(r[rowKey])} onClick={() => onToggle(r[rowKey])} />}</td>}
                     {visibleCols.map((c) => cell(c, r))}
                   </tr>
                 ))}
