@@ -1,0 +1,3015 @@
+<!DOCTYPE html><script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Amazon Attribution Dashboard",
+  "schemaVersion": 1,
+  "description": "Amazon Attribution dashboard for The Crump Group — both markets (US and CA), switchable. Campaign list with click-through drill-down to ad groups and attributed products. Data pulled from the Amazon Ads console via Chrome; refreshed daily by a scheduled task."
+}
+</script>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon Attribution Dashboard — The Crump Group</title>
+<style>
+  :root {
+    color-scheme: light;
+    --pv-blue: #2b5cc7; --pv-navy: #17233f;
+    --clicks: #6c5ce7; --dpv: #0ea5e9; --atc: #ec4899; --purch: #22c55e; --sales: #f59e0b;
+    --ink: #1f2a44; --slate: #6b7a99; --line: #e6eaf2; --bg: #f4f6fa;
+    --up: #16a34a; --down: #f97316;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, sans-serif; background: var(--bg); color: var(--ink); font-size: 14px; }
+  .topbar { background: var(--pv-blue); color: #fff; padding: 12px 22px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .topbar h1 { font-size: 16.5px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .topbar .logo { width: 26px; height: 26px; border-radius: 6px; background: #fff; color: var(--pv-blue); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex-shrink: 0; }
+  .topbar .sub { color: rgba(255,255,255,0.85); font-size: 11.5px; margin-top: 3px; font-weight: 400; }
+  .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badge { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.35); color: #fff; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .mkt { display: flex; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; overflow: hidden; }
+  .mkt button { border: none; background: transparent; color: #fff; padding: 5px 11px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: inherit; }
+  .mkt button.sel { background: #fff; color: var(--pv-blue); }
+  .mkt .flag { font-size: 14px; }
+  .dctl { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; padding: 4px 8px; flex-wrap: wrap; }
+  .dctl select, .dctl input[type=date] { border: none; background: #fff; color: var(--ink); border-radius: 4px; font-size: 11.5px; padding: 3px 6px; font-family: inherit; }
+  .dctl label { font-size: 10.5px; color: rgba(255,255,255,0.85); font-weight: 600; }
+  .unit { display: flex; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; overflow: hidden; }
+  .unit button { border: none; background: transparent; color: #fff; padding: 5px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .unit button.sel { background: #fff; color: var(--pv-blue); }
+  .wrap { padding: 16px 22px 22px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 0 0 12px; box-shadow: 0 1px 2px rgba(23,35,63,0.05); overflow: hidden; }
+  .card .strip { height: 4px; }
+  .card .body { padding: 10px 14px 0; }
+  .card.toggle { cursor: pointer; user-select: none; transition: box-shadow .12s, transform .12s; }
+  .card.toggle:hover { box-shadow: 0 3px 10px rgba(23,35,63,0.12); transform: translateY(-1px); }
+  .card .label { font-size: 11.5px; color: var(--slate); font-weight: 600; }
+  .card .value { font-size: 21px; font-weight: 800; margin-top: 3px; letter-spacing: -0.4px; font-variant-numeric: tabular-nums; }
+  .card .prev { font-size: 11px; color: #9aa7c2; margin-top: 3px; }
+  .card .delta { font-size: 11.5px; font-weight: 700; margin-top: 2px; }
+  .delta.up { color: var(--up); } .delta.down { color: var(--down); } .delta.flat { color: #9aa7c2; }
+  .card .state { float: right; font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; color: #b6c1d8; }
+  .card.off { opacity: 0.5; } .card.off .strip { background: #cbd5e1 !important; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(23,35,63,0.05); }
+  .panel h2 { font-size: 14px; font-weight: 700; padding: 14px 18px 10px; color: var(--ink); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .panel h2 .note { font-weight: 500; font-size: 11px; color: #9aa7c2; }
+  .chartwrap { padding: 4px 14px 12px; position: relative; }
+  .chartwrap svg { display: block; width: 100%; height: auto; }
+  .tt { position: absolute; pointer-events: none; background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px rgba(23,35,63,0.15); padding: 8px 10px; font-size: 11px; display: none; z-index: 5; min-width: 140px; }
+  .tt .d { font-weight: 700; margin-bottom: 4px; }
+  .tt .r { display: flex; justify-content: space-between; gap: 12px; margin-top: 2px; }
+  .tt .r .k { color: var(--slate); display: flex; align-items: center; gap: 5px; }
+  .tt .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate); padding: 10px 18px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #f9fafc; font-weight: 700; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td { padding: 12px 18px; border-bottom: 1px solid #f0f3f8; }
+  tr:last-child td { border-bottom: none; }
+  tr.clickable { cursor: pointer; } tr.clickable:hover { background: #f5f8ff; }
+  .cname { color: var(--pv-blue); font-weight: 700; }
+  .cid { color: #9aa7c2; font-size: 10.5px; margin-top: 2px; }
+  .nodata { color: #9aa7c2; font-style: italic; font-size: 12px; }
+  .pill { display: inline-block; border-radius: 3px; padding: 2.5px 8px; font-size: 10.5px; font-weight: 700; }
+  .pill.active { background: #e7f6ec; color: #15803d; }
+  .pill.idle { background: #eef1f7; color: var(--slate); }
+  .pill.ntb { background: #eeebff; color: var(--clicks); }
+  .typechip { display: inline-block; border-radius: 3px; padding: 2.5px 8px; font-size: 10.5px; font-weight: 600; }
+  .typechip.social { background: #fdeef7; color: var(--atc); }
+  .typechip.search { background: #e7f4fd; color: #0369a1; }
+  .typechip.email  { background: #fef3e2; color: #b45309; }
+  .typechip.sampl  { background: #e7f6ec; color: #15803d; }
+  .typechip.agency { background: #eeebff; color: #6d28d9; }
+  #detail { display: none; }
+  .back { display: inline-flex; align-items: center; gap: 6px; color: #fff; font-weight: 700; cursor: pointer; font-size: 12px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.35); border-radius: 4px; padding: 5px 12px; font-family: inherit; }
+  .prodgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; padding: 14px 18px 18px; }
+  .prod { border: 1px solid var(--line); border-radius: 8px; padding: 13px; display: flex; gap: 13px; background: #fbfcfe; }
+  .prod img, .prod .imgfallback { width: 82px; height: 82px; border-radius: 6px; object-fit: contain; background: #fff; border: 1px solid var(--line); flex-shrink: 0; }
+  .prod .imgfallback { display: flex; align-items: center; justify-content: center; font-size: 25px; font-weight: 800; color: var(--clicks); background: #eeebff; }
+  .prod .pname { font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+  .prod .asin { font-size: 10.5px; color: #9aa7c2; margin: 3px 0 7px; }
+  .prod .stats { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--slate); }
+  .prod .stats b { color: var(--ink); }
+  .funnel { display: flex; padding: 12px 18px 16px; align-items: stretch; flex-wrap: wrap; }
+  .fstep { flex: 1; min-width: 108px; text-align: center; padding: 10px 6px; position: relative; }
+  .fstep .fv { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .fstep .fl { font-size: 10.5px; color: var(--slate); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; font-weight: 600; }
+  .fstep .fr { font-size: 10.5px; font-weight: 700; margin-top: 3px; }
+  .fstep:not(:last-child)::after { content: "→"; position: absolute; right: -7px; top: 38%; color: #cbd5e1; font-size: 15px; }
+  .footer { color: #9aa7c2; font-size: 11px; line-height: 1.6; padding: 2px 2px 8px; }
+  .axisnote { font-size: 10px; color: #b6c1d8; padding: 0 18px 12px; }
+</style>
+</head>
+<body>
+
+<div id="list">
+  <div class="topbar">
+    <div>
+      <h1><span class="logo">C</span> Amazon Attribution — The Crump Group</h1>
+      <div class="sub" id="metaSub"></div>
+    </div>
+    <div class="controls">
+      <div class="mkt" id="mktSel"></div>
+      <div class="unit" id="unitSel"></div>
+      <div class="dctl">
+        <select id="preset" onchange="presetChange()">
+          <option value="7">Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="180">Last 6 months</option>
+          <option value="365">Last 12 months</option>
+          <option value="all">Full history</option>
+          <option value="custom">Custom</option>
+        </select>
+        <label>From</label><input type="date" id="dFrom" onchange="customChange()">
+        <label>To</label><input type="date" id="dTo" onchange="customChange()">
+      </div>
+      <span class="badge">&#8635; Daily ~7 AM ET</span>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="cards" id="summaryCards"></div>
+
+    <div class="panel">
+      <h2>Trend <span class="note" id="trendNote"></span></h2>
+      <div class="chartwrap" id="trendWrap"></div>
+      <div class="axisnote">D/W/M: left axis click-throughs, right axis sales (USD as reported by the console), DPV / ATC / purchases on their own count scale · WoW/MoM: % change vs the previous week/month, all KPIs on one % axis (gaps where the prior period was zero; edge buckets may be partial) · Click KPI cards to toggle lines</div>
+    </div>
+
+    <div class="panel">
+      <h2>Campaigns <span class="note">metrics reflect the selected date range · click a row for detail</span></h2>
+      <table>
+        <thead><tr>
+          <th>Campaign</th><th>Type</th><th class="num">Click-throughs</th><th class="num">DPV</th><th class="num">ATC</th><th class="num">Purchases</th><th class="num">Sales (USD)</th>
+        </tr></thead>
+        <tbody id="campaignRows"></tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      Source: Amazon Ads console → Measurement &amp; Reporting → Amazon Attribution. US entity ENTITY3FRPOP6N3OXGZ (advertising.amazon.com) and Canada entity ENTITY2DY8IVFQCZ67U (advertising.amazon.ca).
+      Attribution history begins 2025-03-20 for both markets — Amazon reports no data earlier, so that is the full available window.
+      DPV = detail page views, ATC = add to cart; 14-day attribution, brand-level metrics (promoted products + brand halo) matching the console&#8217;s Total tiles. Sales shown in USD for both markets, exactly as the console reports them.
+      Deltas compare the selected range to the prior period of equal length (e.g., last 30 days vs the 30 days before). Note: DPV, add-to-cart, purchases, and sales use a 14-day attribution window, so the most recent ~2 weeks read low until attribution backfills. Refreshed daily by a scheduled Claude task.
+    </div>
+  </div>
+</div>
+
+<div id="detail">
+  <div class="topbar">
+    <div>
+      <div style="margin-bottom:8px"><button class="back" onclick="showList()">&larr; All campaigns</button></div>
+      <h1><span class="logo">C</span> <span id="dTitle"></span></h1>
+      <div class="sub" id="dSub"></div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="cards" id="dCards"></div>
+    <div class="panel" id="dFunnelPanel">
+      <h2>Conversion funnel <span class="note">selected range · share of previous step</span></h2>
+      <div class="funnel" id="dFunnel"></div>
+    </div>
+    <div class="panel" id="dTrendPanel">
+      <h2>Trend — this campaign <span class="note">click the KPI cards above to toggle lines</span></h2>
+      <div class="chartwrap" id="dTrendWrap"></div>
+      <div class="axisnote">D/W/M: left axis click-throughs, right axis sales (USD), small counts on their own scale · WoW/MoM: % change vs previous week/month on one % axis</div>
+    </div>
+    <div class="panel" id="dAdGroupPanel">
+      <h2>Ad groups <span class="note" id="dAdGroupNote"></span></h2>
+      <table>
+        <thead><tr><th>Ad group</th><th>Channel</th><th>Publisher</th><th class="num">Click-throughs</th><th class="num">DPV</th><th class="num">ATC</th><th class="num">Purchases</th><th class="num">Sales (USD)</th></tr></thead>
+        <tbody id="dAdGroups"></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Attributed products <span class="note" id="dProdNote"></span></h2>
+      <div class="prodgrid" id="dProducts"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== DATA (embedded; rewritten by the daily scheduled refresh) =====
+// Sparse rows: "YYYY-MM-DD|clicks|dpv|atc|purchases|sales"
+const PULLED = "Sep 3, 2026";
+const IMG = a => `https://m.media-amazon.com/images/P/${a}.01._SL400_.jpg`;
+
+const MARKETS = {
+  "US": {
+    "label": "United States",
+    "flag": "🇺🇸",
+    "entity": "US · ENTITY3FRPOP6N3OXGZ · advertising.amazon.com",
+    "start": "2025-03-20",
+    "end": "2026-09-02",
+    "campaigns": [
+      {
+        "id": "587036131839746717",
+        "name": "Google Paid Search - CF",
+        "type": "Paid search",
+        "chip": "search",
+        "adGroups": [
+          {
+            "name": "CF Google Paid Search - Single Ingredient",
+            "id": "579958479093457877",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 82,
+            "dpv": 39,
+            "atc": 17,
+            "purchases": 9,
+            "sales": 88.05
+          },
+          {
+            "name": "CF Google Paid Search - Dental",
+            "id": "585171920439879787",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 1333,
+            "dpv": 153,
+            "atc": 28,
+            "purchases": 10,
+            "sales": 157.65
+          },
+          {
+            "name": "CF Google Paid Search",
+            "id": "586129927099764029",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 10297,
+            "dpv": 1032,
+            "atc": 251,
+            "purchases": 111,
+            "sales": 1219.57
+          },
+          {
+            "name": "CF Google Paid Search - Sweet Potato",
+            "id": "587827824700437177",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 656,
+            "dpv": 187,
+            "atc": 64,
+            "purchases": 43,
+            "sales": 691.16
+          }
+        ],
+        "products": [],
+        "prodNote": "Amazon reports no ASIN-level rows for this campaign (purchases are campaign-level only)"
+      },
+      {
+        "id": "585761681620029469",
+        "name": "The Dodo",
+        "type": "Social",
+        "chip": "social",
+        "adGroups": [
+          {
+            "name": "The Dodo Store Landing Page",
+            "id": "584949870026590225",
+            "channel": "Social",
+            "publisher": "The Dodo",
+            "clicks": 11893,
+            "dpv": 23,
+            "atc": 6,
+            "purchases": 3,
+            "sales": 35.82
+          }
+        ],
+        "products": [
+          {
+            "name": "Caledon Farms The Dodo Crunchy Biscuits - Sweet Potato with Peanut Butter 19.5oz, Dog Treats",
+            "asin": "B0F2H9CLNK",
+            "dpv": 8,
+            "atc": 1,
+            "purchases": 1,
+            "sales": 9.94,
+            "ntb": 1
+          },
+          {
+            "name": "Caledon Farms The Dodo Crunchy Biscuits - Chicken with Apple & Blueberry 19.5oz, Dog Treats, Biscuits",
+            "asin": "B0F2H8MV5G",
+            "dpv": 2,
+            "atc": 1,
+            "purchases": 1,
+            "sales": 8.98,
+            "ntb": 1
+          }
+        ],
+        "prodNote": ""
+      },
+      {
+        "id": "593043373481508190",
+        "name": "Email - Daily Dig - CN",
+        "type": "Email",
+        "chip": "email",
+        "adGroups": [
+          {
+            "name": "Daily Dig #2",
+            "id": "578160727070190514",
+            "channel": "Email",
+            "publisher": "Daily Dig",
+            "clicks": 1247,
+            "dpv": 109,
+            "atc": 18,
+            "purchases": 9,
+            "sales": 68.21
+          },
+          {
+            "name": "Daily Dig #3",
+            "id": "587450190524730183",
+            "channel": "Email",
+            "publisher": "Daily Dig",
+            "clicks": 526,
+            "dpv": 54,
+            "atc": 29,
+            "purchases": 15,
+            "sales": 127.35
+          },
+          {
+            "name": "Daily Dig",
+            "id": "594229183300480031",
+            "channel": "Email",
+            "publisher": "Daily Dig",
+            "clicks": 1465,
+            "dpv": 98,
+            "atc": 38,
+            "purchases": 16,
+            "sales": 208.43
+          }
+        ],
+        "products": [],
+        "prodNote": "Amazon reports no ASIN-level rows for this campaign (purchases are campaign-level only)"
+      },
+      {
+        "id": "578084048994437856",
+        "name": "Email - Website - CF",
+        "type": "Email",
+        "chip": "email",
+        "adGroups": [
+          {
+            "name": "CF Email - 4/16/2025 - Beef Tendersticks",
+            "id": "577912977644512055",
+            "channel": "Email",
+            "publisher": "Caledon Farms",
+            "clicks": 44,
+            "dpv": 83,
+            "atc": 27,
+            "purchases": 18,
+            "sales": 390.97
+          },
+          {
+            "name": "CF Email - 4/16/2025 - Sweet Potato Chews",
+            "id": "580584464797183781",
+            "channel": "Email",
+            "publisher": "Caledon Farms",
+            "clicks": 38,
+            "dpv": 95,
+            "atc": 10,
+            "purchases": 6,
+            "sales": 121.87
+          },
+          {
+            "name": "CF Email - 4/16/2025 - Store Home",
+            "id": "589020116443518633",
+            "channel": "Email",
+            "publisher": "Caledon Farms",
+            "clicks": 20,
+            "dpv": 3,
+            "atc": 4,
+            "purchases": 1,
+            "sales": 11.5
+          },
+          {
+            "name": "CF Email - 4/16/2025 - Beef Liver Bites",
+            "id": "589166828806736057",
+            "channel": "Email",
+            "publisher": "Caledon Farms",
+            "clicks": 27,
+            "dpv": 36,
+            "atc": 5,
+            "purchases": 5,
+            "sales": 41.21
+          }
+        ],
+        "products": [],
+        "prodNote": "Amazon reports no ASIN-level rows for this campaign (purchases are campaign-level only)"
+      },
+      {
+        "id": "578946094521229049",
+        "name": "Google Paid Search - CN",
+        "type": "Paid search",
+        "chip": "search",
+        "adGroups": [
+          {
+            "name": "Google Paid Search",
+            "id": "591904878308651696",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 0,
+            "dpv": 0,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0
+          }
+        ],
+        "products": [],
+        "prodNote": "Amazon reports no ASIN-level rows for this campaign (purchases are campaign-level only)"
+      },
+      {
+        "id": "584658966046466773",
+        "name": "CF Amazon Brand Store",
+        "type": "Brand Store",
+        "chip": "agency",
+        "adGroups": [
+          {
+            "name": "CF Brand Store",
+            "id": "589345455411345561",
+            "channel": "Social",
+            "publisher": "Caledon Farms",
+            "clicks": 3113,
+            "dpv": 16,
+            "atc": 1,
+            "purchases": 1,
+            "sales": 16.47
+          }
+        ],
+        "products": [
+          {
+            "name": "Caledon Farms Freeze Dried Dog Treats - Salmon 3.2OZ",
+            "asin": "B0BX4HQPJC",
+            "dpv": 2,
+            "atc": 1,
+            "purchases": 1,
+            "sales": 16.47,
+            "ntb": 1
+          },
+          {
+            "name": "Caledon Farms Plaque Busters with Bacon Dog Treats: Grain Free, Gluten Free, No Additives, Colors or Preservatives, Brown 8 Count (Pack of 1)",
+            "asin": "B08TR75KHK",
+            "dpv": 4,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Sweet Potato Chews for Dogs 9.3 OZ",
+            "asin": "B00VGTHAQG",
+            "dpv": 2,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Beef Tendersticks All Natural Dog Treats 3.9oz / 110 Grams",
+            "asin": "B00VMLPS3U",
+            "dpv": 2,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Plaque Busters with Oyster Dog Treats: 140G/4.9OZ",
+            "asin": "B08287V51Y",
+            "dpv": 1,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Chicken Morsels Dog Treats: 125G/4.4OZ",
+            "asin": "B08TR8Q8M8",
+            "dpv": 1,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Chicken Sprinkles Dog Food Topper - 120g (1 Pack)",
+            "asin": "B0BX4G7M54",
+            "dpv": 1,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Pork Tendersticks, Dog Treats, All Natural",
+            "asin": "B0CS4Q2KJ5",
+            "dpv": 1,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms The Dodo Crunchy Biscuits - Chicken with Apple & Blueberry 19.5oz, Dog Treats, Biscuits",
+            "asin": "B0F2H8MV5G",
+            "dpv": 1,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms The Dodo Baked Bites - Pumpkin 9.35oz, Dog Treats, Soft & Chewy",
+            "asin": "B0F2H9WTFQ",
+            "dpv": 1,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          }
+        ],
+        "prodNote": ""
+      },
+      {
+        "id": "579100176971154723",
+        "name": "2026 International Armbruster VDD-GNA - CF",
+        "type": "Social",
+        "chip": "social",
+        "adGroups": [
+          {
+            "name": "CF - 2026 International Armbruster VDD-GNA",
+            "id": "580041471693574048",
+            "channel": "Social",
+            "publisher": "Caledon Farms",
+            "clicks": 0,
+            "dpv": 0,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0
+          }
+        ],
+        "products": [],
+        "prodNote": "Amazon reports no ASIN-level rows for this campaign (purchases are campaign-level only)"
+      }
+    ],
+    "raw": {
+      "593043373481508190": [
+        "2025-03-20|3|0|0|0|0",
+        "2025-03-21|16|0|0|0|0",
+        "2025-03-27|9|0|0|0|0",
+        "2025-03-28|866|57|26|10|144.49",
+        "2025-03-29|281|3|1|1|10.99",
+        "2025-03-30|183|14|3|0|0",
+        "2025-03-31|62|7|3|0|0",
+        "2025-04-01|6|1|0|0|0",
+        "2025-04-02|4|0|0|0|0",
+        "2025-04-03|5|8|2|3|30.97",
+        "2025-04-04|28|2|0|0|0",
+        "2025-04-06|2|0|0|0|0",
+        "2025-04-07|1|0|0|0|0",
+        "2025-04-09|1|0|0|0|0",
+        "2025-04-10|9|0|0|0|0",
+        "2025-04-11|695|85|13|5|46.84",
+        "2025-04-12|296|10|4|0|0",
+        "2025-04-13|166|3|0|1|6.99",
+        "2025-04-14|45|6|1|1|6.4",
+        "2025-04-15|1|5|1|1|5.99",
+        "2025-04-16|13|0|0|0|0",
+        "2025-04-17|12|0|0|1|5.99",
+        "2025-04-19|1|0|0|0|0",
+        "2025-04-22|13|1|0|0|0",
+        "2025-04-24|11|4|1|1|10.99",
+        "2025-04-25|386|34|26|11|91.39",
+        "2025-04-26|44|3|1|1|8.99",
+        "2025-04-27|23|0|0|0|0",
+        "2025-04-28|14|10|0|0|0",
+        "2025-04-29|2|2|0|0|0",
+        "2025-04-30|2|0|0|0|0",
+        "2025-05-01|5|1|1|1|6.99",
+        "2025-05-02|1|0|1|1|8.99",
+        "2025-05-03|1|0|0|0|0",
+        "2025-05-04|2|0|0|0|0",
+        "2025-05-05|1|1|0|0|0",
+        "2025-05-06|0|2|1|1|8.99",
+        "2025-05-07|0|1|0|1|8.99",
+        "2025-05-08|3|0|0|0|0",
+        "2025-05-09|1|0|0|0|0",
+        "2025-05-10|1|0|0|0|0",
+        "2025-05-11|1|0|0|0|0",
+        "2025-05-16|1|0|0|0|0",
+        "2025-05-21|0|1|0|0|0",
+        "2025-06-11|1|0|0|0|0",
+        "2025-06-14|1|0|0|0|0",
+        "2025-06-21|1|0|0|0|0",
+        "2025-06-27|1|0|0|0|0",
+        "2025-06-28|1|0|0|0|0",
+        "2025-07-10|2|0|0|0|0",
+        "2025-07-11|1|0|0|0|0",
+        "2025-07-17|1|0|0|0|0",
+        "2025-07-19|2|0|0|0|0",
+        "2025-07-31|1|0|0|0|0",
+        "2025-08-05|1|0|0|0|0",
+        "2025-08-13|1|0|0|0|0",
+        "2025-08-23|1|0|0|0|0",
+        "2025-12-26|1|0|0|0|0",
+        "2026-02-09|2|0|0|0|0",
+        "2026-02-27|1|0|0|0|0",
+        "2026-04-07|1|0|0|0|0",
+        "2026-08-23|1|0|0|0|0"
+      ],
+      "578946094521229049": [
+        "2025-04-05|0|0|0|0|0",
+        "2025-04-11|0|0|0|0|0",
+        "2025-04-12|0|0|0|0|0",
+        "2025-04-13|0|0|0|0|0",
+        "2025-04-14|0|0|0|0|0"
+      ],
+      "578084048994437856": [
+        "2025-04-16|70|101|7|4|75.19",
+        "2025-04-17|19|18|8|6|75.9",
+        "2025-04-18|8|9|0|0|0",
+        "2025-04-19|6|7|2|1|23.94",
+        "2025-04-20|4|5|0|0|0",
+        "2025-04-21|2|8|4|1|45.8",
+        "2025-04-23|0|1|4|1|8.23",
+        "2025-04-24|9|32|2|0|0",
+        "2025-04-25|0|0|0|3|72.74",
+        "2025-04-26|0|0|1|0|0",
+        "2025-04-28|1|4|2|0|0",
+        "2025-04-29|0|16|9|8|200.79",
+        "2025-04-30|0|5|1|1|9.04",
+        "2025-05-01|1|0|0|0|0",
+        "2025-05-02|0|1|1|0|0",
+        "2025-05-16|5|5|3|3|37.96",
+        "2025-05-27|0|1|0|0|0",
+        "2025-06-04|1|1|0|0|0",
+        "2025-07-03|1|0|0|0|0",
+        "2025-07-04|0|0|0|0|0",
+        "2025-07-07|0|0|0|0|0",
+        "2025-12-17|2|3|2|2|15.96"
+      ],
+      "587036131839746717": [
+        "2025-06-10|554|67|29|13|167.02",
+        "2025-06-11|1176|158|52|23|273.84",
+        "2025-06-12|1500|127|34|13|181.68",
+        "2025-06-13|714|79|14|3|23.94",
+        "2025-06-14|855|94|22|16|202.69",
+        "2025-06-15|1720|170|33|15|179.87",
+        "2025-06-16|1298|164|43|28|337.51",
+        "2025-06-17|1373|114|31|8|123.83",
+        "2025-06-18|768|59|12|4|31.93",
+        "2025-06-19|30|7|0|2|23.94",
+        "2025-06-20|444|67|20|12|171.99",
+        "2025-06-21|322|43|15|5|67.87",
+        "2025-06-22|1455|209|41|13|143.69",
+        "2025-06-23|84|22|3|6|81.88",
+        "2025-06-24|14|8|0|2|28.98",
+        "2025-06-25|8|3|5|4|45.9",
+        "2025-06-26|4|3|1|2|27.97",
+        "2025-06-27|6|4|0|1|7.98",
+        "2025-06-28|4|7|2|0|0",
+        "2025-06-29|2|3|1|1|15.96",
+        "2025-06-30|3|0|1|1|7.98",
+        "2025-07-01|1|1|0|1|9.98",
+        "2025-07-02|0|1|0|0|0",
+        "2025-07-04|4|1|1|0|0",
+        "2025-07-05|6|0|0|0|0",
+        "2025-07-06|1|0|0|0|0",
+        "2025-07-09|1|0|0|0|0",
+        "2025-07-10|1|0|0|0|0",
+        "2025-07-11|1|0|0|0|0",
+        "2025-07-12|1|0|0|0|0",
+        "2025-07-13|1|0|0|0|0",
+        "2025-07-15|1|0|0|0|0",
+        "2025-07-23|1|0|0|0|0",
+        "2025-07-30|1|0|0|0|0",
+        "2025-08-17|1|0|0|0|0",
+        "2025-09-18|6|0|0|0|0",
+        "2026-03-14|4|0|0|0|0",
+        "2026-05-06|1|0|0|0|0",
+        "2026-08-06|2|0|0|0|0"
+      ],
+      "585761681620029469": [
+        "2026-04-30|3|0|0|0|0",
+        "2026-05-01|166|0|0|0|0",
+        "2026-05-02|347|0|0|0|0",
+        "2026-05-03|327|0|0|0|0",
+        "2026-05-04|328|0|0|0|0",
+        "2026-05-05|289|0|0|0|0",
+        "2026-05-06|359|0|0|0|0",
+        "2026-05-07|276|0|0|0|0",
+        "2026-05-08|307|2|0|0|0",
+        "2026-05-09|317|0|0|0|0",
+        "2026-05-10|367|3|3|0|0",
+        "2026-05-11|270|0|0|0|0",
+        "2026-05-12|237|2|0|0|0",
+        "2026-05-13|239|0|0|0|0",
+        "2026-05-14|310|0|0|0|0",
+        "2026-05-15|230|1|1|0|0",
+        "2026-05-16|274|0|0|0|0",
+        "2026-05-17|290|1|0|1|16.9",
+        "2026-05-18|290|0|0|0|0",
+        "2026-05-19|266|0|0|0|0",
+        "2026-05-20|252|3|0|0|0",
+        "2026-05-21|231|0|0|0|0",
+        "2026-05-22|293|0|0|0|0",
+        "2026-05-23|411|0|0|0|0",
+        "2026-05-24|409|0|0|0|0",
+        "2026-05-25|418|0|0|0|0",
+        "2026-05-26|397|0|0|0|0",
+        "2026-05-27|383|0|0|0|0",
+        "2026-05-28|373|0|0|0|0",
+        "2026-05-29|352|1|0|0|0",
+        "2026-05-30|321|0|0|0|0",
+        "2026-05-31|401|0|0|0|0",
+        "2026-06-01|349|1|0|0|0",
+        "2026-06-02|353|0|0|0|0",
+        "2026-06-03|374|0|0|0|0",
+        "2026-06-04|397|0|0|0|0",
+        "2026-06-05|245|0|0|0|0",
+        "2026-06-06|12|0|0|0|0",
+        "2026-06-07|25|0|0|0|0",
+        "2026-06-08|26|0|0|0|0",
+        "2026-06-09|17|0|0|0|0",
+        "2026-06-10|31|0|0|0|0",
+        "2026-06-11|24|0|0|0|0",
+        "2026-06-12|30|1|0|0|0",
+        "2026-06-13|28|1|0|0|0",
+        "2026-06-14|15|0|0|0|0",
+        "2026-06-15|9|0|0|0|0",
+        "2026-06-16|16|0|0|0|0",
+        "2026-06-17|16|0|0|0|0",
+        "2026-06-18|9|0|0|0|0",
+        "2026-06-19|14|0|0|0|0",
+        "2026-06-20|11|0|0|0|0",
+        "2026-06-21|15|0|0|0|0",
+        "2026-06-22|14|0|0|0|0",
+        "2026-06-23|16|0|0|0|0",
+        "2026-06-24|14|0|0|0|0",
+        "2026-06-25|17|7|2|0|0",
+        "2026-06-26|16|0|0|0|0",
+        "2026-06-27|12|0|0|0|0",
+        "2026-06-28|26|0|0|0|0",
+        "2026-06-29|16|0|0|0|0",
+        "2026-06-30|11|0|0|2|18.92",
+        "2026-07-21|1|0|0|0|0",
+        "2026-08-13|1|0|0|0|0"
+      ],
+      "584658966046466773": [
+        "2026-08-11|103|0|0|0|0",
+        "2026-08-12|148|0|0|0|0",
+        "2026-08-13|151|0|0|0|0",
+        "2026-08-14|207|3|0|0|0",
+        "2026-08-15|193|0|0|0|0",
+        "2026-08-16|249|0|0|0|0",
+        "2026-08-17|222|2|0|0|0",
+        "2026-08-18|196|0|0|0|0",
+        "2026-08-19|132|1|0|0|0",
+        "2026-08-20|199|5|1|1|16.47",
+        "2026-08-21|152|0|0|0|0",
+        "2026-08-22|220|0|0|0|0",
+        "2026-08-23|214|2|0|0|0",
+        "2026-08-24|237|2|0|0|0",
+        "2026-08-25|190|0|0|0|0",
+        "2026-08-26|140|1|0|0|0",
+        "2026-08-27|160|0|0|0|0",
+        "2026-08-28|154|0|0|0|0",
+        "2026-08-29|186|1|0|0|0",
+        "2026-08-30|133|0|0|0|0",
+        "2026-08-31|43|1|0|0|0",
+        "2026-09-02|151|0|0|0|0"
+      ],
+      "579100176971154723": [
+        "2026-08-13|0|0|0|0|0",
+        "2026-08-27|0|0|0|0|0"
+      ]
+    }
+  },
+  "CA": {
+    "label": "Canada",
+    "flag": "🇨🇦",
+    "entity": "CA · ENTITY2DY8IVFQCZ67U · advertising.amazon.ca",
+    "start": "2025-03-20",
+    "end": "2026-09-02",
+    "campaigns": [
+      {
+        "id": "580317128981094467",
+        "name": "CN Sampl Campaign",
+        "type": "Sampling",
+        "chip": "sampl",
+        "adGroups": [
+          {
+            "name": "CN Brand Store",
+            "id": "579012105567514225",
+            "channel": "Email",
+            "publisher": "Sampl",
+            "clicks": 35390,
+            "dpv": 11749,
+            "atc": 5807,
+            "purchases": 1787,
+            "sales": 24291.94
+          },
+          {
+            "name": "Mini Trainer Beef Liver Bites",
+            "id": "584893587920014323",
+            "channel": "Email",
+            "publisher": "Sampl",
+            "clicks": 1351,
+            "dpv": 2109,
+            "atc": 243,
+            "purchases": 100,
+            "sales": 1249.4
+          },
+          {
+            "name": "Venison Chia Jerky",
+            "id": "585705038049585508",
+            "channel": "Email",
+            "publisher": "Sampl",
+            "clicks": 1979,
+            "dpv": 3094,
+            "atc": 439,
+            "purchases": 180,
+            "sales": 2638.23
+          }
+        ],
+        "products": [
+          {
+            "name": "Crumps Naturals Venison Chia Jerky 5.6oz/158 Grams, Dog Treats",
+            "asin": "B0DF916FYH",
+            "dpv": 524,
+            "atc": 136,
+            "purchases": 53,
+            "sales": 853.49,
+            "ntb": 28
+          },
+          {
+            "name": "Crumps' Naturals Mt-Fd-105 Mini Trainers Freeze Dried Beef Liver (1 Pack), 126 G (Packaging may vary)",
+            "asin": "B01M1VAH9F",
+            "dpv": 162,
+            "atc": 34,
+            "purchases": 28,
+            "sales": 481.4,
+            "ntb": 18
+          },
+          {
+            "name": "Crumps' Naturals Mini Trainers Freeze Dried Beef Liver (1 Pack),, 1.9OZ/ 55G",
+            "asin": "B01NCK64KC",
+            "dpv": 263,
+            "atc": 30,
+            "purchases": 22,
+            "sales": 226.14,
+            "ntb": 15
+          },
+          {
+            "name": "Crumps' Naturals, Plaque Busters Advanced - Whole Mouth Care Dental Sticks, 270 g, Dog Treats",
+            "asin": "B0CK8J9LRN",
+            "dpv": 119,
+            "atc": 31,
+            "purchases": 11,
+            "sales": 213.02,
+            "ntb": 5
+          },
+          {
+            "name": "Crumps' Naturals, Mini Trainers Beef (semi-moist), 300 g, Dog Treats",
+            "asin": "B01NAH83UQ",
+            "dpv": 68,
+            "atc": 16,
+            "purchases": 14,
+            "sales": 189.21,
+            "ntb": 8
+          },
+          {
+            "name": "Crumps' Naturals, Plaque Busters Advanced - Double Fresh Dental Sticks, 270 g, Dog Treats",
+            "asin": "B0CK8HD9L6",
+            "dpv": 116,
+            "atc": 39,
+            "purchases": 14,
+            "sales": 170.25,
+            "ntb": 7
+          },
+          {
+            "name": "Crumps’ Naturals Original Plaque Busters, 7”- 10 Pack",
+            "asin": "B01M0MDD9T",
+            "dpv": 118,
+            "atc": 41,
+            "purchases": 16,
+            "sales": 168.27,
+            "ntb": 9
+          },
+          {
+            "name": "Crumps' Naturals, Mini Trainers Lamb (semi-Moist), 132 g, Dog Treats",
+            "asin": "B0CBL6T3YC",
+            "dpv": 54,
+            "atc": 38,
+            "purchases": 16,
+            "sales": 142.48,
+            "ntb": 8
+          },
+          {
+            "name": "Crumps' Naturals, Beef Tendersticks, 250 g, Dog Treats",
+            "asin": "B00B2F4JUO",
+            "dpv": 36,
+            "atc": 14,
+            "purchases": 6,
+            "sales": 99.75,
+            "ntb": 4
+          },
+          {
+            "name": "Crumps' Naturals Fresh Bites, Duck Flavour, 207 g, Dog Treats",
+            "asin": "B0GR6BYK7J",
+            "dpv": 165,
+            "atc": 23,
+            "purchases": 9,
+            "sales": 99.21,
+            "ntb": 0
+          }
+        ],
+        "prodNote": ""
+      },
+      {
+        "id": "578057076953973524",
+        "name": "CN Google Paid Search",
+        "type": "Paid search",
+        "chip": "search",
+        "adGroups": [
+          {
+            "name": "CN Google Paid Search - Single Ingredient",
+            "id": "580861072487321714",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 716,
+            "dpv": 195,
+            "atc": 33,
+            "purchases": 19,
+            "sales": 250.11
+          },
+          {
+            "name": "CN Google Paid Search - Training",
+            "id": "582095656097799123",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 1833,
+            "dpv": 396,
+            "atc": 67,
+            "purchases": 47,
+            "sales": 820.53
+          },
+          {
+            "name": "CN Google Paid Search - Dental",
+            "id": "584794115263722892",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 9287,
+            "dpv": 3022,
+            "atc": 668,
+            "purchases": 340,
+            "sales": 5410.47
+          },
+          {
+            "name": "CN Google Paid Search - Sweet Potato",
+            "id": "587925040104442298",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 891,
+            "dpv": 201,
+            "atc": 47,
+            "purchases": 27,
+            "sales": 525.77
+          },
+          {
+            "name": "CN Google Paid Search",
+            "id": "591851747426346924",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 8944,
+            "dpv": 6832,
+            "atc": 1668,
+            "purchases": 893,
+            "sales": 17049.76
+          }
+        ],
+        "products": [
+          {
+            "name": "Crumps' Naturals Mt-Fd-105 Mini Trainers Freeze Dried Beef Liver (1 Pack), 126 G (Packaging may vary)",
+            "asin": "B01M1VAH9F",
+            "dpv": 240,
+            "atc": 58,
+            "purchases": 48,
+            "sales": 1088.32,
+            "ntb": 29
+          },
+          {
+            "name": "Crumps' Naturals, Plaque Busters Advanced - Whole Mouth Care Dental Sticks, 270 g, Dog Treats",
+            "asin": "B0CK8J9LRN",
+            "dpv": 155,
+            "atc": 31,
+            "purchases": 21,
+            "sales": 398.2,
+            "ntb": 10
+          },
+          {
+            "name": "Crumps' Naturals, Plaque Busters with Bacon, 870 g, Dog Treats",
+            "asin": "B0DPNFCFBM",
+            "dpv": 64,
+            "atc": 19,
+            "purchases": 14,
+            "sales": 388.46,
+            "ntb": 11
+          },
+          {
+            "name": "Crumps' Naturals, Beef Liver Bites, 280 g, Dog Treats",
+            "asin": "B00B2F4RKG",
+            "dpv": 53,
+            "atc": 10,
+            "purchases": 10,
+            "sales": 349.41,
+            "ntb": 5
+          },
+          {
+            "name": "Crumps' Naturals Beef Liver Bites for Pets, 4.7-Ounce",
+            "asin": "B00B2F4R4C",
+            "dpv": 93,
+            "atc": 21,
+            "purchases": 11,
+            "sales": 303.78,
+            "ntb": 7
+          },
+          {
+            "name": "Crumps’ Naturals Original Plaque Busters, 7”- 10 Pack",
+            "asin": "B01M0MDD9T",
+            "dpv": 214,
+            "atc": 22,
+            "purchases": 21,
+            "sales": 296.61,
+            "ntb": 8
+          },
+          {
+            "name": "Crumps' Naturals Sweet Potato Chews, PRODUCT MAY VARY 612g/21.6oz",
+            "asin": "B00B2F4ZMG",
+            "dpv": 59,
+            "atc": 9,
+            "purchases": 9,
+            "sales": 276.58,
+            "ntb": 3
+          },
+          {
+            "name": "Crumps' Naturals, Plaque Busters Advanced - Double Fresh Dental Sticks, 270 g, Dog Treats",
+            "asin": "B0CK8HD9L6",
+            "dpv": 197,
+            "atc": 27,
+            "purchases": 16,
+            "sales": 268.88,
+            "ntb": 9
+          },
+          {
+            "name": "Crumps' Naturals, Beef Tendersticks, 250 g, Dog Treats",
+            "asin": "B00B2F4JUO",
+            "dpv": 47,
+            "atc": 12,
+            "purchases": 7,
+            "sales": 179.58,
+            "ntb": 1
+          },
+          {
+            "name": "Crumps' Naturals, Mini Trainers Beef (semi-moist), 300 g, Dog Treats",
+            "asin": "B01NAH83UQ",
+            "dpv": 94,
+            "atc": 21,
+            "purchases": 13,
+            "sales": 165.32,
+            "ntb": 7
+          }
+        ],
+        "prodNote": ""
+      },
+      {
+        "id": "585045800733128527",
+        "name": "CF Google Search",
+        "type": "Paid search",
+        "chip": "search",
+        "adGroups": [
+          {
+            "name": "CF Google Paid Search",
+            "id": "581650510182147263",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 11394,
+            "dpv": 3956,
+            "atc": 1057,
+            "purchases": 557,
+            "sales": 12312.8
+          },
+          {
+            "name": "CF Google Paid Search - Single Ingredient",
+            "id": "590512738255314533",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 269,
+            "dpv": 41,
+            "atc": 5,
+            "purchases": 3,
+            "sales": 39.94
+          },
+          {
+            "name": "CF Google Paid Search - Sweet Potato",
+            "id": "591254073247197288",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 0,
+            "dpv": 0,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0
+          },
+          {
+            "name": "CF Google Paid Search - Dental",
+            "id": "592400960529582868",
+            "channel": "Search",
+            "publisher": "Google Adwords",
+            "clicks": 576,
+            "dpv": 96,
+            "atc": 14,
+            "purchases": 3,
+            "sales": 46.85
+          }
+        ],
+        "products": [
+          {
+            "name": "Caledon Farms, Value Pack Sweet Potato Chews, 795 g, Dog Treats",
+            "asin": "B09KSV26D7",
+            "dpv": 115,
+            "atc": 51,
+            "purchases": 46,
+            "sales": 1418.38,
+            "ntb": 25
+          },
+          {
+            "name": "Caledon Farms Value Pack Beef Tendersticks 12oz/340G brown",
+            "asin": "B09KT9L6D1",
+            "dpv": 68,
+            "atc": 24,
+            "purchases": 21,
+            "sales": 567.96,
+            "ntb": 10
+          },
+          {
+            "name": "Caledon Farms, Plaque Busters Dental Sticks Triple Action, Beef Recipe, 222 g, Dog Treats",
+            "asin": "B0GL9KWMZQ",
+            "dpv": 122,
+            "atc": 32,
+            "purchases": 24,
+            "sales": 561.23,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms, Value Pack Freeze Dried Beef Liver Bites, 355 g, Dog Treats",
+            "asin": "B0FM9T41F2",
+            "dpv": 86,
+            "atc": 40,
+            "purchases": 25,
+            "sales": 488.25,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Sweet Potato Parmesan Fries Dog Treats, 1.02 kg | Oven-Baked Crunchy Dog Snacks Made with Real Sweet Potato & Parmesan Cheese",
+            "asin": "B0GMY1BHYW",
+            "dpv": 48,
+            "atc": 10,
+            "purchases": 8,
+            "sales": 330.94,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Homestyle Beef Jerky Value Pack 18.3oz, 520g, Dog Treats",
+            "asin": "B0FM9PHCZF",
+            "dpv": 28,
+            "atc": 13,
+            "purchases": 8,
+            "sales": 327.54,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Plaque Busters Bacon Style Dog Treats, 55 Count (1.48 kg) | Dental Chews with Oyster Shell Calcium for Medium & Large Dogs",
+            "asin": "B0GY1P4SW6",
+            "dpv": 37,
+            "atc": 10,
+            "purchases": 5,
+            "sales": 264.01,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms, Plaque Busters Dental Sticks Triple Action Natural Mint Flavour, 234 g, Dog Treats",
+            "asin": "B0GNPF35C1",
+            "dpv": 117,
+            "atc": 24,
+            "purchases": 15,
+            "sales": 239.52,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms, Chewy Duck Sticks Value Pack, 680 g, Dog Treats",
+            "asin": "B0FMB2Q7SN",
+            "dpv": 16,
+            "atc": 16,
+            "purchases": 8,
+            "sales": 231.56,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms, Value Pack Chewy Beef Sticks, 680 g, Dog Treats",
+            "asin": "B09KSV8GD3",
+            "dpv": 42,
+            "atc": 16,
+            "purchases": 10,
+            "sales": 219.78,
+            "ntb": 7
+          }
+        ],
+        "prodNote": ""
+      },
+      {
+        "id": "581787310784842910",
+        "name": "CF - Fuse Create",
+        "type": "Agency",
+        "chip": "agency",
+        "adGroups": [
+          {
+            "name": "Google Search",
+            "id": "585092146787438378",
+            "channel": "Display",
+            "publisher": "Google Display Network",
+            "clicks": 4009,
+            "dpv": 609,
+            "atc": 128,
+            "purchases": 69,
+            "sales": 1233.39
+          },
+          {
+            "name": "Instagram",
+            "id": "589095594256025758",
+            "channel": "Social",
+            "publisher": "Instagram",
+            "clicks": 78081,
+            "dpv": 129,
+            "atc": 23,
+            "purchases": 3,
+            "sales": 52.9
+          },
+          {
+            "name": "Pinterest",
+            "id": "590010365854288036",
+            "channel": "Social",
+            "publisher": "Pinterest",
+            "clicks": 17498,
+            "dpv": 225,
+            "atc": 16,
+            "purchases": 1,
+            "sales": 17.76
+          }
+        ],
+        "products": [],
+        "prodNote": "Amazon reports no ASIN-level rows for this campaign (purchases are campaign-level only)"
+      },
+      {
+        "id": "578031988635796637",
+        "name": "Email - Website - CF",
+        "type": "Email",
+        "chip": "email",
+        "adGroups": [
+          {
+            "name": "CF Email - 4/16/2025 - Sweet Potato Chews",
+            "id": "577948811725574905",
+            "channel": "Email",
+            "publisher": "Caledon Farms",
+            "clicks": 272,
+            "dpv": 331,
+            "atc": 26,
+            "purchases": 7,
+            "sales": 128.8
+          },
+          {
+            "name": "CF Email - 4/16/2025 - Beef Tendersticks",
+            "id": "579374359886193260",
+            "channel": "Email",
+            "publisher": "Caledon Farms",
+            "clicks": 555,
+            "dpv": 655,
+            "atc": 42,
+            "purchases": 21,
+            "sales": 425.76
+          },
+          {
+            "name": "CF Email - 4/16/2025 - Store Home",
+            "id": "580498813144444509",
+            "channel": "Email",
+            "publisher": "Caledon Farms",
+            "clicks": 178,
+            "dpv": 31,
+            "atc": 3,
+            "purchases": 0,
+            "sales": 0
+          },
+          {
+            "name": "CF Email - 4/16/2025 - Beef Liver Bites",
+            "id": "589110358325116173",
+            "channel": "Email",
+            "publisher": "Caledon Farms",
+            "clicks": 289,
+            "dpv": 346,
+            "atc": 14,
+            "purchases": 7,
+            "sales": 147.02
+          }
+        ],
+        "products": [
+          {
+            "name": "Caledon Farms, Sweet Potato Chews, 265 g, Dog Treats",
+            "asin": "B00VGTHAQG",
+            "dpv": 1,
+            "atc": 0,
+            "purchases": 0,
+            "sales": 0,
+            "ntb": 0
+          }
+        ],
+        "prodNote": ""
+      },
+      {
+        "id": "590138709711496013",
+        "name": "CF - Amazon General Brand Store",
+        "type": "Brand Store",
+        "chip": "agency",
+        "adGroups": [
+          {
+            "name": "CF Brand Store",
+            "id": "580495812558899622",
+            "channel": "Social",
+            "publisher": "Caledon Farms",
+            "clicks": 4152,
+            "dpv": 245,
+            "atc": 62,
+            "purchases": 13,
+            "sales": 246.6
+          }
+        ],
+        "products": [
+          {
+            "name": "Caledon Farms, Value Pack Sweet Potato Chews, 795 g, Dog Treats",
+            "asin": "B09KSV26D7",
+            "dpv": 23,
+            "atc": 7,
+            "purchases": 3,
+            "sales": 119.88,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Beef Tendersticks 3.9oz/110G Dog Treats",
+            "asin": "B00VMLPS3U",
+            "dpv": 18,
+            "atc": 8,
+            "purchases": 3,
+            "sales": 31.92,
+            "ntb": 2
+          },
+          {
+            "name": "Caledon Farms, Plaque Busters Dental Sticks Triple Action Chicken and Bacon Flavour, 232 g, Dog Treats",
+            "asin": "B0GNNTZ4YH",
+            "dpv": 22,
+            "atc": 6,
+            "purchases": 3,
+            "sales": 29.94,
+            "ntb": 1
+          },
+          {
+            "name": "Caledon Farms, Plaque Busters Dental Sticks Triple Action, Beef Recipe, 222 g, Dog Treats",
+            "asin": "B0GL9KWMZQ",
+            "dpv": 15,
+            "atc": 2,
+            "purchases": 2,
+            "sales": 29.94,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms Freeze-Dried Coated Lamb Recipe 123oz, 3.5kg, Kibbles, Dog Dry",
+            "asin": "B0D848N4KY",
+            "dpv": 1,
+            "atc": 1,
+            "purchases": 1,
+            "sales": 27.96,
+            "ntb": 1
+          },
+          {
+            "name": "Caledon Farms, Value Pack Chewy Beef Sticks, 680 g, Dog Treats",
+            "asin": "B09KSV8GD3",
+            "dpv": 3,
+            "atc": 1,
+            "purchases": 1,
+            "sales": 19.98,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms, Salmon Bites - Freeze Dried, 90 g, Dog Treats",
+            "asin": "B0BX4HQPJC",
+            "dpv": 10,
+            "atc": 5,
+            "purchases": 1,
+            "sales": 15.96,
+            "ntb": 0
+          },
+          {
+            "name": "Caledon Farms, Plaque Busters Dental Sticks Triple Action Natural Mint Flavour, 234 g, Dog Treats",
+            "asin": "B0GNPF35C1",
+            "dpv": 19,
+            "atc": 5,
+            "purchases": 1,
+            "sales": 9.98,
+            "ntb": 1
+          },
+          {
+            "name": "Caledon Farms, Freeze-Dried Beef Bites + Daily Essentials, 120 g, Dog Treats",
+            "asin": "B0GP2WLP3S",
+            "dpv": 4,
+            "atc": 1,
+            "purchases": 1,
+            "sales": 9.98,
+            "ntb": 1
+          },
+          {
+            "name": "Caledon Farms, Crunchy Biscuits - Chicken with Apple & Blueberry, 553 g, Dog Treats",
+            "asin": "B0F2H8MV5G",
+            "dpv": 4,
+            "atc": 1,
+            "purchases": 1,
+            "sales": 7.98,
+            "ntb": 1
+          }
+        ],
+        "prodNote": ""
+      }
+    ],
+    "raw": {
+      "581787310784842910": [
+        "2025-03-20|6|0|0|0|0",
+        "2025-03-21|1|0|0|0|0",
+        "2025-03-24|2|0|0|0|0",
+        "2025-03-31|2|0|0|0|0",
+        "2025-04-02|587|3|2|0|0",
+        "2025-04-03|1531|52|10|3|41.57",
+        "2025-04-04|1497|30|1|0|0",
+        "2025-04-05|1723|11|3|1|39.52",
+        "2025-04-06|1910|8|1|2|23.98",
+        "2025-04-07|1722|10|1|0|0",
+        "2025-04-08|1790|16|8|3|93.42",
+        "2025-04-09|1755|2|1|1|37.76",
+        "2025-04-10|1724|12|3|2|30.98",
+        "2025-04-11|1703|7|0|0|0",
+        "2025-04-12|1841|8|1|0|0",
+        "2025-04-13|1839|25|3|1|18.98",
+        "2025-04-14|1742|14|4|3|37.35",
+        "2025-04-15|1633|7|3|2|39.49",
+        "2025-04-16|1457|11|0|0|0",
+        "2025-04-17|1190|12|1|1|19.76",
+        "2025-04-18|1829|15|4|1|17.76",
+        "2025-04-19|1786|11|3|1|17.76",
+        "2025-04-20|1966|15|2|2|32.62",
+        "2025-04-21|1877|26|1|0|0",
+        "2025-04-22|1630|13|1|0|0",
+        "2025-04-23|1634|28|5|2|30.94",
+        "2025-04-24|1578|10|3|1|18.88",
+        "2025-04-25|1826|14|0|1|17.76",
+        "2025-04-26|2267|26|6|4|94.5",
+        "2025-04-27|2334|21|5|2|31.05",
+        "2025-04-28|2271|16|3|0|0",
+        "2025-04-29|2129|10|1|0|0",
+        "2025-04-30|2136|30|3|3|58.4",
+        "2025-05-01|2178|16|10|7|112.8",
+        "2025-05-02|2048|25|2|0|0",
+        "2025-05-03|2138|21|4|3|49.92",
+        "2025-05-04|2333|21|2|0|0",
+        "2025-05-05|2141|20|0|0|0",
+        "2025-05-06|1758|11|1|0|0",
+        "2025-05-07|1458|23|1|1|14.48",
+        "2025-05-08|1566|27|6|3|49.84",
+        "2025-05-09|1619|9|3|0|0",
+        "2025-05-10|1688|48|4|3|45.44",
+        "2025-05-11|1771|12|2|0|0",
+        "2025-05-12|1713|11|2|2|33.96",
+        "2025-05-13|1692|14|2|1|12.15",
+        "2025-05-14|1638|12|0|0|0",
+        "2025-05-15|1778|21|5|0|0",
+        "2025-05-16|1153|13|2|3|42.62",
+        "2025-05-17|1006|9|0|0|0",
+        "2025-05-18|1060|23|4|0|0",
+        "2025-05-19|1206|17|9|3|49.77",
+        "2025-05-20|1253|18|2|0|0",
+        "2025-05-21|1881|16|1|1|15.88",
+        "2025-05-22|2214|14|4|2|34.86",
+        "2025-05-23|2228|20|5|2|46.43",
+        "2025-05-24|2369|21|3|1|17.76",
+        "2025-05-25|2318|10|3|1|10.99",
+        "2025-05-26|2332|13|1|1|17.76",
+        "2025-05-27|2087|7|2|0|0",
+        "2025-05-28|14|2|0|0|0",
+        "2025-05-29|3|3|3|1|17.96",
+        "2025-05-30|0|5|2|1|17.96",
+        "2025-05-31|2|0|0|0|0",
+        "2025-06-01|2|5|2|0|0",
+        "2025-06-02|0|8|0|1|10.99",
+        "2025-06-04|1|3|0|0|0",
+        "2025-06-06|1|1|0|0|0",
+        "2025-06-07|0|1|1|0|0",
+        "2025-06-09|2|0|0|0|0",
+        "2025-06-11|2|0|0|0|0",
+        "2025-06-12|2|0|0|0|0",
+        "2025-06-13|1|0|0|0|0",
+        "2025-06-14|1|0|0|0|0",
+        "2025-06-18|1|0|0|0|0",
+        "2025-06-25|1|0|0|0|0",
+        "2025-08-07|2|0|0|0|0",
+        "2025-09-17|2|0|0|0|0",
+        "2026-02-05|1|0|0|0|0",
+        "2026-04-28|4|0|0|0|0",
+        "2026-05-30|2|0|0|0|0"
+      ],
+      "578031988635796637": [
+        "2025-04-16|844|846|41|14|252.74",
+        "2025-04-17|218|226|22|9|192.44",
+        "2025-04-18|57|67|4|0|0",
+        "2025-04-19|10|18|0|0|0",
+        "2025-04-20|16|31|4|1|18.88",
+        "2025-04-21|15|16|2|2|32.66",
+        "2025-04-22|14|20|1|2|36.64",
+        "2025-04-23|12|15|0|1|19.76",
+        "2025-04-24|4|9|0|0|0",
+        "2025-04-25|3|10|0|0|0",
+        "2025-04-26|16|20|3|3|85.46",
+        "2025-04-27|8|10|1|0|0",
+        "2025-04-28|2|3|0|0|0",
+        "2025-04-29|2|9|3|2|37.86",
+        "2025-04-30|0|2|0|0|0",
+        "2025-05-01|3|7|0|0|0",
+        "2025-05-02|3|3|0|0|0",
+        "2025-05-03|3|2|2|0|0",
+        "2025-05-04|1|0|0|0|0",
+        "2025-05-05|3|2|0|0|0",
+        "2025-05-06|6|0|0|0|0",
+        "2025-05-07|1|1|0|0|0",
+        "2025-05-08|2|2|0|0|0",
+        "2025-05-09|5|5|0|0|0",
+        "2025-05-11|0|0|0|0|0",
+        "2025-05-12|4|4|0|0|0",
+        "2025-05-14|2|2|0|0|0",
+        "2025-05-16|1|1|0|0|0",
+        "2025-05-17|2|0|0|0|0",
+        "2025-05-18|2|3|0|0|0",
+        "2025-05-19|2|1|0|0|0",
+        "2025-05-20|1|0|0|0|0",
+        "2025-05-21|1|1|0|0|0",
+        "2025-05-22|4|1|0|0|0",
+        "2025-05-23|2|2|0|0|0",
+        "2025-05-24|1|1|0|0|0",
+        "2025-05-25|1|1|0|0|0",
+        "2025-05-28|3|3|0|0|0",
+        "2025-06-03|1|1|0|0|0",
+        "2025-06-06|1|1|0|0|0",
+        "2025-06-17|1|1|0|0|0",
+        "2025-06-23|2|2|0|0|0",
+        "2025-06-28|1|1|0|0|0",
+        "2025-07-06|2|5|2|1|25.14",
+        "2025-07-07|1|0|0|0|0",
+        "2025-07-17|1|1|0|0|0",
+        "2025-07-25|1|0|0|0|0",
+        "2025-09-11|2|1|0|0|0",
+        "2025-09-13|1|1|0|0|0",
+        "2025-10-29|1|0|0|0|0",
+        "2025-11-05|1|1|0|0|0",
+        "2025-11-07|0|0|0|0|0",
+        "2025-11-10|0|2|0|0|0",
+        "2025-11-17|2|0|0|0|0",
+        "2025-12-11|1|1|0|0|0",
+        "2026-06-17|1|1|0|0|0"
+      ],
+      "590138709711496013": [
+        "2026-08-11|126|19|2|0|0",
+        "2026-08-12|239|25|11|5|58.86",
+        "2026-08-13|254|28|5|1|9.98",
+        "2026-08-14|195|9|2|0|0",
+        "2026-08-15|254|16|7|1|9.98",
+        "2026-08-16|263|14|3|1|9.98",
+        "2026-08-17|264|12|0|0|0",
+        "2026-08-18|317|7|1|1|19.98",
+        "2026-08-19|266|19|5|0|0",
+        "2026-08-20|244|13|10|0|0",
+        "2026-08-21|232|7|1|0|0",
+        "2026-08-22|261|4|0|0|0",
+        "2026-08-23|276|16|5|1|79.92",
+        "2026-08-24|263|8|0|0|0",
+        "2026-08-25|239|17|1|0|0",
+        "2026-08-26|239|24|8|1|27.96",
+        "2026-08-27|220|16|4|2|29.94",
+        "2026-08-28|216|12|1|0|0",
+        "2026-08-29|292|17|5|2|15.96",
+        "2026-08-30|245|7|4|1|19.98",
+        "2026-08-31|99|4|0|1|7.98",
+        "2026-09-01|9|5|1|0|0",
+        "2026-09-02|189|5|1|1|19.98"
+      ],
+      "585045800733128527": [
+        "2025-06-09|11|1|0|0|0",
+        "2025-06-10|338|48|4|0|0",
+        "2025-06-11|505|122|12|6|81.62",
+        "2025-06-12|607|100|12|4|54.87",
+        "2025-06-13|338|66|10|4|80.44",
+        "2025-06-14|640|69|13|2|35.84",
+        "2025-06-15|709|86|17|6|107.7",
+        "2025-06-16|646|112|23|13|243.57",
+        "2025-06-17|582|97|18|3|63.58",
+        "2025-06-18|436|64|10|6|103.34",
+        "2025-06-19|33|5|2|2|33.38",
+        "2025-06-20|480|56|11|4|119.33",
+        "2025-06-21|555|97|24|9|259.25",
+        "2025-06-22|870|98|20|6|146.19",
+        "2025-06-23|47|31|8|9|253.98",
+        "2025-06-24|9|10|6|2|33.92",
+        "2025-06-25|6|16|6|2|34.92",
+        "2025-06-26|5|13|2|2|18.47",
+        "2025-06-27|3|10|5|2|33.53",
+        "2025-06-28|0|2|0|1|18.98",
+        "2025-06-29|1|7|2|1|14.32",
+        "2025-06-30|2|1|0|2|30.97",
+        "2025-07-02|0|0|0|2|43.23",
+        "2025-07-03|0|4|2|1|19.98",
+        "2025-07-04|1|0|0|0|0",
+        "2025-07-05|0|3|1|0|0",
+        "2025-07-13|1|0|0|0|0",
+        "2025-07-14|1|0|0|0|0",
+        "2025-07-17|1|0|0|0|0",
+        "2025-07-25|13|2|2|0|0",
+        "2025-07-26|31|9|0|1|13.88",
+        "2025-07-27|34|16|3|2|33.86",
+        "2025-07-28|31|14|1|0|0",
+        "2025-07-29|20|6|0|0|0",
+        "2025-07-30|48|23|5|0|0",
+        "2025-07-31|43|28|5|1|18.88",
+        "2025-08-01|21|24|3|2|34.97",
+        "2025-08-02|32|5|0|0|0",
+        "2025-08-03|38|9|1|1|19.98",
+        "2025-08-04|27|4|2|1|139.96",
+        "2025-08-05|32|15|1|1|19.98",
+        "2025-08-06|40|13|5|2|40.65",
+        "2025-08-07|21|8|5|1|13.76",
+        "2025-08-08|37|18|1|0|0",
+        "2025-08-09|30|15|2|1|27.52",
+        "2025-08-10|31|19|6|1|13.74",
+        "2025-08-11|15|10|3|3|62.51",
+        "2025-08-12|6|1|0|0|0",
+        "2025-08-13|3|1|0|0|0",
+        "2025-08-14|0|1|0|0|0",
+        "2025-08-15|0|2|1|1|104.97",
+        "2025-08-16|2|0|0|0|0",
+        "2025-08-18|1|1|0|0|0",
+        "2025-08-19|0|1|0|0|0",
+        "2025-08-20|2|0|0|0|0",
+        "2025-08-24|1|0|0|0|0",
+        "2025-09-12|5|0|0|0|0",
+        "2025-09-16|1|0|0|1|131.8",
+        "2025-09-17|3|3|0|0|0",
+        "2025-09-23|30|19|0|0|0",
+        "2025-09-24|20|14|6|3|65.57",
+        "2025-09-25|11|11|3|2|51.83",
+        "2025-09-26|30|17|1|2|37.76",
+        "2025-09-27|38|17|5|3|87.6",
+        "2025-09-28|33|10|3|1|12.81",
+        "2025-09-29|31|11|4|0|0",
+        "2025-09-30|28|12|5|0|0",
+        "2025-10-01|13|7|0|0|0",
+        "2025-10-02|18|14|2|1|24.26",
+        "2025-10-03|20|27|6|4|67.59",
+        "2025-10-04|28|18|12|4|75.75",
+        "2025-10-05|28|7|3|3|86.61",
+        "2025-10-06|22|3|3|3|45.84",
+        "2025-10-07|21|13|8|2|75.5",
+        "2025-10-08|24|12|0|0|0",
+        "2025-10-09|28|13|6|4|74.4",
+        "2025-10-10|31|17|3|1|26.97",
+        "2025-10-11|5|1|0|0|0",
+        "2025-10-12|0|1|0|0|0",
+        "2025-10-14|0|2|0|0|0",
+        "2025-10-18|0|0|2|1|18.88",
+        "2025-10-24|1|0|0|0|0",
+        "2025-11-24|1|0|0|0|0",
+        "2025-11-25|1|0|0|0|0",
+        "2025-11-26|2|0|0|0|0",
+        "2025-12-03|1|0|0|0|0",
+        "2025-12-10|2|7|1|0|0",
+        "2025-12-16|1|0|0|0|0",
+        "2025-12-20|1|0|0|0|0",
+        "2026-01-14|2|0|0|0|0",
+        "2026-02-01|2|0|0|0|0",
+        "2026-03-26|2|0|0|0|0",
+        "2026-03-27|34|12|2|1|11.8",
+        "2026-03-28|22|7|2|1|17.82",
+        "2026-03-29|42|25|6|3|94.22",
+        "2026-03-30|32|13|3|3|131.19",
+        "2026-03-31|28|30|6|4|93.4",
+        "2026-04-01|21|3|0|0|0",
+        "2026-04-02|15|8|4|0|0",
+        "2026-04-03|24|6|9|6|99.83",
+        "2026-04-04|24|10|2|1|19.98",
+        "2026-04-05|25|5|0|0|0",
+        "2026-04-06|19|4|4|1|19.98",
+        "2026-04-07|20|3|1|1|19.98",
+        "2026-04-08|36|29|4|1|19.98",
+        "2026-04-09|25|11|6|0|0",
+        "2026-04-10|27|7|3|4|54.61",
+        "2026-04-11|27|11|6|4|83.12",
+        "2026-04-12|30|14|8|3|47.52",
+        "2026-04-13|30|22|4|1|15.88",
+        "2026-04-14|25|25|9|0|0",
+        "2026-04-15|28|6|1|0|0",
+        "2026-04-16|30|12|3|3|65.62",
+        "2026-04-17|34|18|6|3|44.78",
+        "2026-04-18|36|19|5|2|46.66",
+        "2026-04-19|38|27|6|3|87.68",
+        "2026-04-20|18|4|3|2|51.72",
+        "2026-04-21|18|12|5|2|38.88",
+        "2026-04-22|24|18|2|2|29.94",
+        "2026-04-23|37|22|18|10|166.45",
+        "2026-04-24|29|14|9|3|72.71",
+        "2026-04-25|33|12|3|1|20.99",
+        "2026-04-26|23|6|1|1|31.76",
+        "2026-04-27|20|9|6|2|47.64",
+        "2026-04-28|20|11|6|3|47.64",
+        "2026-04-29|25|15|5|6|98.68",
+        "2026-04-30|22|8|1|0|0",
+        "2026-05-01|25|25|6|3|67.6",
+        "2026-05-02|21|12|1|0|0",
+        "2026-05-03|26|14|2|2|47.64",
+        "2026-05-04|25|19|7|2|27.78",
+        "2026-05-05|29|20|14|7|94.44",
+        "2026-05-06|27|19|5|2|35.84",
+        "2026-05-07|37|13|0|0|0",
+        "2026-05-08|24|13|2|2|31.76",
+        "2026-05-09|16|15|2|3|101.24",
+        "2026-05-10|21|5|4|4|58.6",
+        "2026-05-11|26|11|3|2|39.92",
+        "2026-05-12|24|21|2|0|0",
+        "2026-05-13|26|17|8|2|31.76",
+        "2026-05-14|24|3|0|0|0",
+        "2026-05-15|21|11|2|3|46.88",
+        "2026-05-16|40|9|6|3|63.47",
+        "2026-05-17|32|27|5|2|66.98",
+        "2026-05-18|28|8|4|5|111.42",
+        "2026-05-19|16|19|3|3|47.64",
+        "2026-05-20|24|13|3|2|47.64",
+        "2026-05-21|31|16|7|1|15.88",
+        "2026-05-22|17|13|1|2|35.84",
+        "2026-05-23|22|25|9|7|176.8",
+        "2026-05-24|21|9|4|2|38.01",
+        "2026-05-25|17|26|4|2|71.68",
+        "2026-05-26|14|25|4|3|46.62",
+        "2026-05-27|31|10|5|3|49.27",
+        "2026-05-28|17|13|4|2|35.84",
+        "2026-05-29|30|35|6|3|76.91",
+        "2026-05-30|14|6|1|3|88.65",
+        "2026-05-31|13|12|4|2|63.52",
+        "2026-06-01|32|24|3|3|103.44",
+        "2026-06-02|20|13|4|3|63.52",
+        "2026-06-03|30|16|4|5|152.84",
+        "2026-06-04|37|20|5|3|134.37",
+        "2026-06-05|29|35|9|5|130.55",
+        "2026-06-06|36|14|3|1|17.98",
+        "2026-06-07|22|19|4|2|24.96",
+        "2026-06-08|34|22|8|4|125.75",
+        "2026-06-09|24|8|2|7|140",
+        "2026-06-10|24|15|6|4|92.62",
+        "2026-06-11|23|6|1|2|36.63",
+        "2026-06-12|21|9|2|1|31.17",
+        "2026-06-13|24|11|1|0|0",
+        "2026-06-14|22|9|3|3|71.3",
+        "2026-06-15|18|23|3|2|39.94",
+        "2026-06-16|27|12|4|2|34.17",
+        "2026-06-17|30|22|3|1|19.98",
+        "2026-06-18|19|36|6|6|145.3",
+        "2026-06-19|38|23|2|2|32.54",
+        "2026-06-20|25|10|2|0|0",
+        "2026-06-21|28|11|8|2|32.13",
+        "2026-06-22|28|35|3|1|12.16",
+        "2026-06-23|23|15|8|7|126.17",
+        "2026-06-24|19|20|12|10|226.98",
+        "2026-06-25|20|6|8|6|90.06",
+        "2026-06-26|10|11|5|4|139.36",
+        "2026-06-27|27|8|4|3|63.8",
+        "2026-06-28|37|51|2|0|0",
+        "2026-06-29|22|5|1|3|73.42",
+        "2026-06-30|17|11|7|5|205.82",
+        "2026-07-01|18|5|6|3|40.92",
+        "2026-07-02|30|17|5|1|13.5",
+        "2026-07-03|29|12|8|5|99.27",
+        "2026-07-04|24|33|8|4|60.6",
+        "2026-07-05|28|18|4|3|113.98",
+        "2026-07-06|20|15|2|2|21.35",
+        "2026-07-07|11|8|3|3|80.08",
+        "2026-07-08|42|10|7|1|9.98",
+        "2026-07-09|21|15|2|0|0",
+        "2026-07-10|18|14|4|4|99.94",
+        "2026-07-11|19|13|1|0|0",
+        "2026-07-12|26|12|13|3|66.22",
+        "2026-07-13|20|21|4|2|52.14",
+        "2026-07-14|29|27|11|9|160.58",
+        "2026-07-15|17|8|2|1|16.2",
+        "2026-07-16|29|11|1|3|69.86",
+        "2026-07-17|26|35|1|2|39.96",
+        "2026-07-18|42|15|3|1|19.98",
+        "2026-07-19|24|14|2|3|59.92",
+        "2026-07-20|24|7|1|0|0",
+        "2026-07-21|37|17|2|3|49.92",
+        "2026-07-22|31|32|8|0|0",
+        "2026-07-23|29|10|3|3|60.93",
+        "2026-07-24|21|21|10|2|45.94",
+        "2026-07-25|22|29|12|8|103.86",
+        "2026-07-26|19|10|3|3|61.9",
+        "2026-07-27|32|16|4|3|143.45",
+        "2026-07-28|28|10|2|3|69.88",
+        "2026-07-29|20|11|3|0|0",
+        "2026-07-30|23|19|4|4|68.94",
+        "2026-07-31|19|13|4|4|59.88",
+        "2026-08-01|23|8|12|6|116.89",
+        "2026-08-02|26|15|9|3|56.35",
+        "2026-08-03|38|14|5|2|18.41",
+        "2026-08-04|18|14|4|2|45.62",
+        "2026-08-05|22|23|6|2|18.97",
+        "2026-08-06|18|5|7|4|45.92",
+        "2026-08-07|42|20|4|3|69.92",
+        "2026-08-08|33|33|14|6|93.97",
+        "2026-08-09|15|17|10|6|156.99",
+        "2026-08-10|26|26|11|9|150.78",
+        "2026-08-11|28|28|12|4|89.9",
+        "2026-08-12|27|24|6|2|137.88",
+        "2026-08-13|27|21|11|6|188.7",
+        "2026-08-14|23|16|8|2|47.94",
+        "2026-08-15|29|20|7|1|19.98",
+        "2026-08-16|35|15|6|2|99.84",
+        "2026-08-17|19|13|9|2|15.51",
+        "2026-08-18|49|25|6|2|49.94",
+        "2026-08-19|20|20|5|3|23.94",
+        "2026-08-20|31|10|0|0|0",
+        "2026-08-21|30|18|2|1|19.98",
+        "2026-08-22|32|13|2|1|49.54",
+        "2026-08-23|27|27|2|2|35.94",
+        "2026-08-24|27|25|1|1|19.96",
+        "2026-08-25|32|34|7|6|114.78",
+        "2026-08-26|34|25|19|9|196.47",
+        "2026-08-27|417|206|68|23|475.08",
+        "2026-08-28|71|48|20|11|171.23",
+        "2026-08-29|53|40|20|10|117.78",
+        "2026-08-30|42|37|13|8|199.25",
+        "2026-08-31|30|34|18|8|176.45",
+        "2026-09-01|40|39|13|6|100.84",
+        "2026-09-02|27|5|3|1|39.92"
+      ],
+      "578057076953973524": [
+        "2025-04-05|11|3|0|0|0",
+        "2025-04-06|155|41|3|1|16.99",
+        "2025-04-07|199|35|16|6|156",
+        "2025-04-08|157|77|6|3|97.93",
+        "2025-04-09|174|66|14|11|164.23",
+        "2025-04-10|219|72|11|7|155.89",
+        "2025-04-11|200|41|6|2|67.48",
+        "2025-04-12|210|99|9|3|45.65",
+        "2025-04-13|201|57|19|8|136.51",
+        "2025-04-14|218|69|11|5|132.35",
+        "2025-04-15|239|128|19|11|218.72",
+        "2025-04-16|255|87|16|9|138.97",
+        "2025-04-17|225|47|9|10|164.38",
+        "2025-04-18|212|68|16|8|128.67",
+        "2025-04-19|218|63|11|4|104.87",
+        "2025-04-20|272|112|26|18|343.73",
+        "2025-04-21|258|104|13|3|57.15",
+        "2025-04-22|231|103|15|4|51.96",
+        "2025-04-23|212|86|25|11|181.03",
+        "2025-04-24|238|93|25|14|258.97",
+        "2025-04-25|206|107|15|8|176.88",
+        "2025-04-26|209|65|23|10|283.36",
+        "2025-04-27|217|82|18|8|155.74",
+        "2025-04-28|181|44|10|8|145.4",
+        "2025-04-29|225|110|16|6|185.89",
+        "2025-04-30|198|108|22|14|213.82",
+        "2025-05-01|165|89|27|13|247.27",
+        "2025-05-02|177|58|16|10|188.01",
+        "2025-05-03|356|92|21|8|181.87",
+        "2025-05-04|254|103|22|8|215.8",
+        "2025-05-05|214|55|14|10|191.85",
+        "2025-05-06|200|67|8|3|106.61",
+        "2025-05-07|271|85|24|17|297.73",
+        "2025-05-08|252|89|24|6|64.94",
+        "2025-05-09|262|101|19|13|246.57",
+        "2025-05-10|300|98|18|8|174.61",
+        "2025-05-11|244|81|18|10|213.32",
+        "2025-05-12|246|53|9|6|97.92",
+        "2025-05-13|209|37|12|5|123.51",
+        "2025-05-14|138|61|17|10|230.2",
+        "2025-05-15|154|60|18|11|119.06",
+        "2025-05-16|139|83|29|13|125.86",
+        "2025-05-17|164|43|9|2|20.97",
+        "2025-05-18|171|39|20|13|173.47",
+        "2025-05-19|138|79|27|9|156.6",
+        "2025-05-20|151|67|18|8|112.22",
+        "2025-05-21|144|39|4|5|55.95",
+        "2025-05-22|162|28|6|4|264.13",
+        "2025-05-23|153|70|21|10|177.06",
+        "2025-05-24|154|46|11|4|55.55",
+        "2025-05-25|158|71|16|8|198.99",
+        "2025-05-26|138|38|11|6|84.92",
+        "2025-05-27|146|42|20|8|107.92",
+        "2025-05-28|144|55|14|8|144.15",
+        "2025-05-29|181|62|14|5|55.55",
+        "2025-05-30|137|49|9|5|83.68",
+        "2025-05-31|155|61|15|8|123.89",
+        "2025-06-01|180|48|10|4|52.66",
+        "2025-06-02|147|26|6|7|115",
+        "2025-06-03|155|61|10|6|84.02",
+        "2025-06-04|164|92|27|16|235.16",
+        "2025-06-05|139|46|9|8|168.24",
+        "2025-06-06|179|25|4|1|11.99",
+        "2025-06-07|163|69|25|8|131.17",
+        "2025-06-08|139|64|20|8|151.89",
+        "2025-06-09|137|85|13|10|134.49",
+        "2025-06-10|137|47|16|6|100.58",
+        "2025-06-11|102|70|10|7|155.22",
+        "2025-06-12|132|69|12|11|162.88",
+        "2025-06-13|107|55|9|7|125.3",
+        "2025-06-14|118|45|5|3|46.85",
+        "2025-06-15|131|30|17|4|90.31",
+        "2025-06-16|109|27|7|5|106.81",
+        "2025-06-17|130|62|7|3|35.6",
+        "2025-06-18|124|54|11|4|47.22",
+        "2025-06-19|156|70|24|13|144.49",
+        "2025-06-20|107|41|5|3|45.19",
+        "2025-06-21|130|49|13|7|118.39",
+        "2025-06-22|119|32|8|3|55.76",
+        "2025-06-23|152|57|13|3|40.6",
+        "2025-06-24|119|40|11|7|146.09",
+        "2025-06-25|136|71|17|13|165.85",
+        "2025-06-26|148|54|18|7|89.4",
+        "2025-06-27|138|27|4|7|100.72",
+        "2025-06-28|157|43|10|4|80.04",
+        "2025-06-29|128|52|17|5|89.02",
+        "2025-06-30|170|55|11|5|85.58",
+        "2025-07-01|133|42|8|7|135.95",
+        "2025-07-02|129|39|5|0|0",
+        "2025-07-03|10|11|4|4|30.56",
+        "2025-07-04|1|46|13|5|49.25",
+        "2025-07-05|1|4|0|1|23.24",
+        "2025-07-06|0|0|0|2|38.57",
+        "2025-07-07|0|4|1|1|30.57",
+        "2025-07-08|0|34|6|3|27.18",
+        "2025-07-09|0|37|8|3|55.2",
+        "2025-07-10|0|11|5|2|22.57",
+        "2025-07-11|1|8|1|1|19.65",
+        "2025-07-12|0|1|0|0|0",
+        "2025-07-14|0|0|0|1|8.99",
+        "2025-07-23|2|0|0|0|0",
+        "2025-07-25|14|10|4|0|0",
+        "2025-07-26|24|20|3|1|33.98",
+        "2025-07-27|29|34|13|4|78.16",
+        "2025-07-28|26|15|10|7|141.62",
+        "2025-07-29|27|20|6|3|69.3",
+        "2025-07-30|27|23|7|7|138.22",
+        "2025-07-31|25|16|10|2|101.94",
+        "2025-08-01|23|16|2|1|11.73",
+        "2025-08-02|25|14|9|6|91.53",
+        "2025-08-03|22|30|15|4|86.95",
+        "2025-08-04|21|55|6|4|83.95",
+        "2025-08-05|25|15|2|2|28.87",
+        "2025-08-06|30|32|20|7|108.43",
+        "2025-08-07|30|11|1|0|0",
+        "2025-08-08|21|33|11|5|225.61",
+        "2025-08-09|23|16|18|12|275.88",
+        "2025-08-10|34|41|16|6|102.88",
+        "2025-08-11|4|16|5|0|0",
+        "2025-08-12|1|7|2|2|51.72",
+        "2025-08-13|1|3|3|1|19.98",
+        "2025-08-14|0|0|0|2|50.69",
+        "2025-08-15|12|7|4|1|14.99",
+        "2025-08-16|0|2|1|0|0",
+        "2025-08-17|0|0|0|1|25.48",
+        "2025-08-19|0|1|1|1|25.48",
+        "2025-08-20|0|8|4|1|11.23",
+        "2025-08-21|6|1|1|0|0",
+        "2025-08-25|0|4|1|1|8.09",
+        "2025-08-27|6|0|0|0|0",
+        "2025-09-22|1|0|0|0|0",
+        "2025-09-23|6|6|2|2|35.98",
+        "2025-09-24|18|16|6|3|79.47",
+        "2025-09-25|14|15|4|2|33.38",
+        "2025-09-26|26|33|14|7|90.47",
+        "2025-09-27|25|29|13|7|108.09",
+        "2025-09-28|27|26|4|2|47.97",
+        "2025-09-29|25|30|17|5|81.07",
+        "2025-09-30|27|23|8|4|67.48",
+        "2025-10-01|18|9|10|1|16.87",
+        "2025-10-02|27|27|13|4|52.85",
+        "2025-10-03|20|19|2|1|18.99",
+        "2025-10-04|22|40|12|7|111.16",
+        "2025-10-05|16|11|5|2|31.5",
+        "2025-10-06|22|29|2|1|21",
+        "2025-10-07|6|22|6|5|50.81",
+        "2025-10-08|32|22|13|7|131.66",
+        "2025-10-09|22|37|10|7|109.97",
+        "2025-10-10|18|26|12|13|215.34",
+        "2025-10-11|6|12|1|1|16.98",
+        "2025-10-12|1|17|1|1|21",
+        "2025-10-13|0|18|5|2|26",
+        "2025-10-14|0|12|0|1|8.5",
+        "2025-10-15|0|20|3|3|48",
+        "2025-10-16|0|1|0|0|0",
+        "2025-10-17|0|7|3|2|66.97",
+        "2025-10-18|0|17|5|1|10.19",
+        "2025-10-19|0|0|8|2|36.85",
+        "2025-10-21|5|0|0|0|0",
+        "2025-10-26|1|0|0|0|0",
+        "2025-10-27|1|0|0|0|0",
+        "2025-10-28|5|0|0|0|0",
+        "2025-11-08|1|0|0|0|0",
+        "2025-11-18|1|0|0|0|0",
+        "2025-11-20|1|0|0|0|0",
+        "2025-11-26|1|0|0|0|0",
+        "2025-12-05|2|0|0|0|0",
+        "2025-12-15|2|0|0|0|0",
+        "2025-12-16|1|0|0|0|0",
+        "2025-12-25|1|0|0|0|0",
+        "2025-12-27|4|0|0|0|0",
+        "2025-12-31|1|0|0|0|0",
+        "2026-02-10|3|0|0|0|0",
+        "2026-02-11|2|0|0|0|0",
+        "2026-03-26|3|0|0|0|0",
+        "2026-03-27|31|33|16|13|215.35",
+        "2026-03-28|32|21|4|5|89.8",
+        "2026-03-29|27|25|7|4|43.41",
+        "2026-03-30|22|17|9|1|6.99",
+        "2026-03-31|36|17|7|8|141.2",
+        "2026-04-01|26|21|5|1|21.4",
+        "2026-04-02|31|44|12|7|95.22",
+        "2026-04-03|28|19|9|4|50.71",
+        "2026-04-04|19|19|7|4|86.65",
+        "2026-04-05|25|34|15|6|79.04",
+        "2026-04-06|9|13|5|1|12.74",
+        "2026-04-07|25|25|2|1|46.38",
+        "2026-04-08|22|28|8|4|73.34",
+        "2026-04-09|22|17|3|1|19.18",
+        "2026-04-10|30|13|2|4|70.35",
+        "2026-04-11|45|7|2|0|0",
+        "2026-04-12|38|22|5|3|41.75",
+        "2026-04-13|54|25|4|1|17.99",
+        "2026-04-14|45|27|5|4|57.58",
+        "2026-04-15|36|15|2|7|181.12",
+        "2026-04-16|55|15|3|1|19.83",
+        "2026-04-17|54|6|0|0|0",
+        "2026-04-18|44|2|0|0|0",
+        "2026-04-19|46|21|2|1|13.59",
+        "2026-04-20|54|19|2|3|81.21",
+        "2026-04-21|59|27|12|3|137.58",
+        "2026-04-22|47|13|3|1|13.59",
+        "2026-04-23|44|18|6|2|49",
+        "2026-04-24|42|14|7|3|41.99",
+        "2026-04-25|51|22|4|4|53.16",
+        "2026-04-26|32|7|1|2|29",
+        "2026-04-27|61|23|10|7|91.98",
+        "2026-04-28|50|16|5|3|34",
+        "2026-04-29|46|13|3|3|71",
+        "2026-04-30|44|26|3|3|47",
+        "2026-05-01|60|24|14|2|13",
+        "2026-05-02|47|21|5|4|63.1",
+        "2026-05-03|61|10|11|8|119.46",
+        "2026-05-04|36|17|4|2|14.5",
+        "2026-05-05|52|35|9|2|14.5",
+        "2026-05-06|45|20|6|1|15.6",
+        "2026-05-07|68|18|7|5|250.38",
+        "2026-05-08|72|6|2|2|24.71",
+        "2026-05-09|46|26|3|1|9.73",
+        "2026-05-10|55|2|2|0|0",
+        "2026-05-11|62|9|1|0|0",
+        "2026-05-12|60|47|18|14|175.69",
+        "2026-05-13|52|13|0|0|0",
+        "2026-05-14|50|7|1|2|31.47",
+        "2026-05-15|60|24|4|2|40.48",
+        "2026-05-16|51|5|0|2|29.42",
+        "2026-05-17|48|6|1|1|4.5",
+        "2026-05-18|63|5|0|0|0",
+        "2026-05-19|55|14|1|0|0",
+        "2026-05-20|49|20|2|0|0",
+        "2026-05-21|55|6|2|2|14.79",
+        "2026-05-22|47|19|3|1|50.36",
+        "2026-05-23|69|19|2|1|10.23",
+        "2026-05-24|68|13|4|2|21.48",
+        "2026-05-25|47|20|3|2|45.45",
+        "2026-05-26|46|9|4|3|19.28",
+        "2026-05-27|48|20|11|5|60.44",
+        "2026-05-28|59|33|8|3|33.97",
+        "2026-05-29|59|52|7|6|115.26",
+        "2026-05-30|50|12|1|0|0",
+        "2026-05-31|42|7|5|4|42.93",
+        "2026-06-01|11|13|4|0|0",
+        "2026-06-02|22|16|6|2|67.57",
+        "2026-06-03|28|20|3|1|33.98",
+        "2026-06-04|43|39|4|3|125.65",
+        "2026-06-05|40|38|4|1|20.58",
+        "2026-06-06|32|13|3|2|67.96",
+        "2026-06-07|25|14|2|1|28.49",
+        "2026-06-08|20|27|3|2|42.13",
+        "2026-06-09|20|9|0|1|24.69",
+        "2026-06-10|24|34|4|4|110.5",
+        "2026-06-11|29|32|7|6|129.42",
+        "2026-06-12|26|34|3|2|97.78",
+        "2026-06-13|36|31|2|3|148",
+        "2026-06-14|31|36|2|2|60.67",
+        "2026-06-15|23|22|4|1|9.59",
+        "2026-06-16|21|20|7|3|50.3",
+        "2026-06-17|40|72|8|4|76.7",
+        "2026-06-18|27|43|9|6|131.02",
+        "2026-06-19|16|47|2|2|38.44",
+        "2026-06-20|26|39|10|8|139.37",
+        "2026-06-21|27|14|7|6|85.41",
+        "2026-06-22|33|30|5|6|66.53",
+        "2026-06-23|26|39|5|3|64.44",
+        "2026-06-24|24|34|7|2|24.21",
+        "2026-06-25|27|95|17|12|130.25",
+        "2026-06-26|22|52|2|2|64.98",
+        "2026-06-27|24|30|2|1|17",
+        "2026-06-28|26|10|1|0|0",
+        "2026-06-29|30|62|7|6|111.84",
+        "2026-06-30|17|45|6|3|68.38",
+        "2026-07-01|14|18|9|5|61.57",
+        "2026-07-02|24|30|8|2|26.06",
+        "2026-07-03|23|30|4|0|0",
+        "2026-07-04|22|45|16|10|191.98",
+        "2026-07-05|25|28|5|5|70.08",
+        "2026-07-06|24|24|5|3|20.36",
+        "2026-07-07|30|89|15|2|12.34",
+        "2026-07-08|20|28|8|7|137.42",
+        "2026-07-09|23|17|1|2|48.57",
+        "2026-07-10|28|27|7|4|82.7",
+        "2026-07-11|24|22|6|2|34.17",
+        "2026-07-12|33|21|2|1|10.16",
+        "2026-07-13|24|33|4|3|33.05",
+        "2026-07-14|22|25|3|2|36.61",
+        "2026-07-15|33|22|10|5|88.48",
+        "2026-07-16|24|30|3|2|19.27",
+        "2026-07-17|39|49|12|11|141.37",
+        "2026-07-18|16|25|13|7|109.84",
+        "2026-07-19|15|8|4|2|33.95",
+        "2026-07-20|20|14|2|2|34.92",
+        "2026-07-21|31|20|4|6|80.17",
+        "2026-07-22|40|52|8|5|110.34",
+        "2026-07-23|18|20|2|2|42.15",
+        "2026-07-24|17|30|5|4|130.33",
+        "2026-07-25|28|42|6|6|113.22",
+        "2026-07-26|28|33|3|2|23.41",
+        "2026-07-27|22|27|2|3|41.4",
+        "2026-07-28|26|37|5|3|83.58",
+        "2026-07-29|14|15|0|0|0",
+        "2026-07-30|25|16|4|2|59.17",
+        "2026-07-31|15|13|6|2|35.43",
+        "2026-08-01|16|25|3|3|69.67",
+        "2026-08-02|25|57|4|4|43.15",
+        "2026-08-03|21|38|15|4|55.21",
+        "2026-08-04|29|36|2|1|28.99",
+        "2026-08-05|23|15|2|2|38.98",
+        "2026-08-06|20|28|5|3|47.18",
+        "2026-08-07|24|27|9|7|113.94",
+        "2026-08-08|12|22|5|0|0",
+        "2026-08-09|33|19|4|3|42.2",
+        "2026-08-10|17|36|5|0|0",
+        "2026-08-11|20|32|8|4|78.69",
+        "2026-08-12|16|19|8|1|14.38",
+        "2026-08-13|21|23|4|3|35.16",
+        "2026-08-14|22|19|10|6|84.49",
+        "2026-08-15|17|29|8|5|93.3",
+        "2026-08-16|23|29|4|2|38.17",
+        "2026-08-17|21|8|2|0|0",
+        "2026-08-18|25|35|2|1|7.19",
+        "2026-08-19|20|51|7|4|48.81",
+        "2026-08-20|25|38|5|4|76.88",
+        "2026-08-21|27|31|7|5|80.26",
+        "2026-08-22|25|52|11|1|22.98",
+        "2026-08-23|19|16|4|4|43.38",
+        "2026-08-24|18|14|4|2|30.96",
+        "2026-08-25|27|26|10|5|306.8",
+        "2026-08-26|20|39|15|8|147.77",
+        "2026-08-27|31|45|16|8|102.96",
+        "2026-08-28|22|25|5|5|78.17",
+        "2026-08-29|24|30|6|2|29.95",
+        "2026-08-30|15|24|2|2|36.95",
+        "2026-08-31|14|25|0|0|0",
+        "2026-09-01|16|56|15|6|144.72",
+        "2026-09-02|17|1|5|3|109.55"
+      ],
+      "580317128981094467": [
+        "2025-05-12|9|13|0|0|0",
+        "2025-05-13|3|0|0|0|0",
+        "2025-05-14|3|1|0|0|0",
+        "2025-06-10|2|0|0|0|0",
+        "2025-06-14|1|0|0|0|0",
+        "2025-06-16|3|0|0|0|0",
+        "2025-06-22|1|0|0|0|0",
+        "2025-06-25|2|0|1|0|0",
+        "2025-06-27|2|0|0|0|0",
+        "2025-06-30|187|4|1|0|0",
+        "2025-07-01|215|15|0|0|0",
+        "2025-07-02|82|14|0|0|0",
+        "2025-07-03|117|7|5|0|0",
+        "2025-07-04|117|24|1|2|46.45",
+        "2025-07-05|122|7|0|0|0",
+        "2025-07-06|67|2|1|0|0",
+        "2025-07-07|291|21|3|1|8.6",
+        "2025-07-08|287|100|21|3|24.29",
+        "2025-07-09|236|58|20|7|108.14",
+        "2025-07-10|258|68|17|7|67.62",
+        "2025-07-11|214|36|10|6|59.22",
+        "2025-07-12|228|32|13|1|6.55",
+        "2025-07-13|220|28|5|0|0",
+        "2025-07-14|218|21|4|0|0",
+        "2025-07-15|192|25|5|0|0",
+        "2025-07-16|199|24|8|2|30.14",
+        "2025-07-17|177|28|11|1|13.1",
+        "2025-07-18|165|11|4|0|0",
+        "2025-07-19|166|18|2|3|59.26",
+        "2025-07-20|189|14|5|4|28.64",
+        "2025-07-21|191|28|8|0|0",
+        "2025-07-22|188|25|3|1|17.98",
+        "2025-07-23|172|33|16|3|55.52",
+        "2025-07-24|184|35|14|0|0",
+        "2025-07-25|144|22|3|1|11.34",
+        "2025-07-26|182|25|7|2|28.33",
+        "2025-07-27|173|11|0|0|0",
+        "2025-07-28|338|76|18|5|64.53",
+        "2025-07-29|215|40|21|2|20.54",
+        "2025-07-30|515|89|27|5|58.17",
+        "2025-07-31|282|33|8|0|0",
+        "2025-08-01|231|39|10|3|37.23",
+        "2025-08-02|236|61|7|3|53.59",
+        "2025-08-03|292|27|14|0|0",
+        "2025-08-04|211|36|6|3|38.31",
+        "2025-08-05|214|32|5|4|77.41",
+        "2025-08-06|213|45|20|0|0",
+        "2025-08-07|245|91|29|8|132.13",
+        "2025-08-08|373|66|47|6|125.39",
+        "2025-08-09|404|81|37|10|97.63",
+        "2025-08-10|372|94|16|8|153.69",
+        "2025-08-11|354|59|45|4|44.62",
+        "2025-08-12|573|469|78|23|359.71",
+        "2025-08-13|345|150|37|11|143.71",
+        "2025-08-14|582|177|56|10|163.78",
+        "2025-08-15|390|126|51|11|126.61",
+        "2025-08-16|324|144|47|12|178.88",
+        "2025-08-17|482|202|137|19|274.22",
+        "2025-08-18|335|142|52|20|280.41",
+        "2025-08-19|272|93|28|9|107.89",
+        "2025-08-20|372|137|55|12|165.65",
+        "2025-08-21|310|89|50|12|155.91",
+        "2025-08-22|312|89|44|16|208.44",
+        "2025-08-23|253|121|45|20|418.16",
+        "2025-08-24|307|88|44|19|313.6",
+        "2025-08-25|270|144|58|22|393.79",
+        "2025-08-26|259|139|75|23|305.28",
+        "2025-08-27|285|114|64|25|344.44",
+        "2025-08-28|230|122|57|6|136.37",
+        "2025-08-29|412|420|69|16|227.84",
+        "2025-08-30|264|127|44|19|259.68",
+        "2025-08-31|256|100|45|8|99.58",
+        "2025-09-01|195|79|27|7|115.78",
+        "2025-09-02|219|95|34|7|96.41",
+        "2025-09-03|392|141|82|21|314.98",
+        "2025-09-04|547|157|50|24|443.73",
+        "2025-09-05|301|125|45|6|66.67",
+        "2025-09-06|299|155|112|21|417.85",
+        "2025-09-07|250|79|32|12|158.92",
+        "2025-09-08|243|60|32|5|54.29",
+        "2025-09-09|192|100|45|7|119.8",
+        "2025-09-10|220|86|36|9|94.02",
+        "2025-09-11|208|83|34|11|123.61",
+        "2025-09-12|215|68|48|17|271.65",
+        "2025-09-13|228|49|32|19|221.11",
+        "2025-09-14|256|69|37|22|308.84",
+        "2025-09-15|214|75|51|11|164.96",
+        "2025-09-16|194|58|36|9|107.55",
+        "2025-09-17|164|70|27|9|121.78",
+        "2025-09-18|180|61|37|13|197.24",
+        "2025-09-19|385|376|86|38|584.43",
+        "2025-09-20|261|180|64|31|496.28",
+        "2025-09-21|239|190|41|23|272.42",
+        "2025-09-22|226|146|71|33|394.08",
+        "2025-09-23|216|118|58|27|253.78",
+        "2025-09-24|388|184|150|29|436.99",
+        "2025-09-25|339|192|91|28|359.66",
+        "2025-09-26|170|89|45|20|283.87",
+        "2025-09-27|229|140|88|22|285.53",
+        "2025-09-28|181|79|54|15|220.73",
+        "2025-09-29|155|92|62|20|220.48",
+        "2025-09-30|168|118|68|33|393.22",
+        "2025-10-01|111|46|16|6|96.6",
+        "2025-10-02|137|71|25|11|127.09",
+        "2025-10-03|103|51|15|5|51.5",
+        "2025-10-04|92|90|28|16|190.95",
+        "2025-10-05|99|36|29|17|175.66",
+        "2025-10-06|89|18|11|6|46.9",
+        "2025-10-07|98|73|34|15|129.45",
+        "2025-10-08|76|89|28|19|224.98",
+        "2025-10-09|106|67|17|9|98.98",
+        "2025-10-10|68|37|11|9|102.6",
+        "2025-10-11|88|60|20|7|89.32",
+        "2025-10-12|92|28|11|7|75.49",
+        "2025-10-13|84|26|15|3|22",
+        "2025-10-14|73|34|8|1|33.98",
+        "2025-10-15|325|96|8|0|0",
+        "2025-10-16|150|50|3|0|0",
+        "2025-10-17|97|53|15|7|120.16",
+        "2025-10-18|122|36|14|7|60.39",
+        "2025-10-19|96|7|3|0|0",
+        "2025-10-20|99|33|10|5|123.59",
+        "2025-10-21|101|34|9|2|25.49",
+        "2025-10-22|92|16|1|2|20.98",
+        "2025-10-23|104|27|11|0|0",
+        "2025-10-24|100|41|13|2|27.18",
+        "2025-10-25|99|25|10|5|74.01",
+        "2025-10-26|95|13|3|5|60.91",
+        "2025-10-27|121|54|14|4|33.71",
+        "2025-10-28|112|44|11|2|26.98",
+        "2025-10-29|148|51|32|10|127.87",
+        "2025-10-30|188|256|73|17|238.38",
+        "2025-10-31|72|89|33|7|95.68",
+        "2025-11-01|38|45|16|8|125.42",
+        "2025-11-02|41|51|18|6|66.88",
+        "2025-11-03|40|108|24|4|54.96",
+        "2025-11-04|517|192|112|11|170.54",
+        "2025-11-05|130|76|35|13|220.56",
+        "2025-11-06|70|46|21|5|72.94",
+        "2025-11-07|125|89|48|6|62.38",
+        "2025-11-08|73|101|51|31|393.7",
+        "2025-11-09|62|111|34|20|238.34",
+        "2025-11-10|34|68|40|10|163.47",
+        "2025-11-11|70|62|49|8|132.13",
+        "2025-11-12|52|118|45|17|155.12",
+        "2025-11-13|47|44|59|9|88.15",
+        "2025-11-14|68|74|20|7|64.37",
+        "2025-11-15|53|60|39|2|12.89",
+        "2025-11-16|151|265|55|13|193.14",
+        "2025-11-17|80|123|46|14|183.92",
+        "2025-11-18|59|87|34|16|216.28",
+        "2025-11-19|52|68|31|11|191.7",
+        "2025-11-20|27|31|17|16|180.07",
+        "2025-11-21|186|135|130|33|405.03",
+        "2025-11-22|48|41|31|11|188.03",
+        "2025-11-23|50|31|35|19|200.61",
+        "2025-11-24|91|60|56|15|164.3",
+        "2025-11-25|65|41|33|10|140.82",
+        "2025-11-26|20|23|19|7|78.34",
+        "2025-11-27|68|108|45|27|370.21",
+        "2025-11-28|38|92|51|37|581.23",
+        "2025-11-29|15|58|21|15|297.66",
+        "2025-11-30|14|32|37|12|90.25",
+        "2025-12-01|4|24|25|10|118.5",
+        "2025-12-02|12|27|13|6|61.97",
+        "2025-12-03|18|11|5|1|9.73",
+        "2025-12-04|8|7|1|2|36.73",
+        "2025-12-05|21|13|12|0|0",
+        "2025-12-06|3|8|3|1|6.74",
+        "2025-12-07|13|21|21|3|28.52",
+        "2025-12-08|13|13|5|2|12.38",
+        "2025-12-09|1|21|10|6|84.32",
+        "2025-12-10|3|6|6|4|32.96",
+        "2025-12-11|6|11|0|0|0",
+        "2025-12-12|12|5|4|4|85.62",
+        "2025-12-13|9|13|8|3|40.97",
+        "2025-12-14|2|4|1|1|13.99",
+        "2025-12-15|6|4|3|2|18.59",
+        "2025-12-16|3|3|0|2|24.49",
+        "2025-12-17|10|19|8|4|37.18",
+        "2025-12-19|0|1|0|1|9.99",
+        "2025-12-20|6|0|1|2|23.97",
+        "2025-12-21|4|0|2|0|0",
+        "2025-12-22|1|9|6|4|63.43",
+        "2025-12-23|2|0|0|0|0",
+        "2025-12-27|5|1|1|0|0",
+        "2025-12-28|2|1|1|0|0",
+        "2025-12-29|0|3|1|1|30",
+        "2025-12-30|2|4|0|0|0",
+        "2025-12-31|4|4|4|2|18.49",
+        "2026-01-01|1|0|0|0|0",
+        "2026-01-04|4|18|11|3|30.81",
+        "2026-01-05|2|10|7|0|0",
+        "2026-01-06|7|6|0|0|0",
+        "2026-01-07|1|0|0|0|0",
+        "2026-01-08|3|1|2|0|0",
+        "2026-01-09|2|4|5|0|0",
+        "2026-01-10|1|5|0|0|0",
+        "2026-01-11|1|0|0|0|0",
+        "2026-01-13|2|6|5|3|55.52",
+        "2026-01-14|2|0|0|0|0",
+        "2026-01-17|0|1|0|1|14.5",
+        "2026-01-18|3|5|0|0|0",
+        "2026-01-19|5|4|0|0|0",
+        "2026-01-20|1|0|0|0|0",
+        "2026-01-21|3|0|3|0|0",
+        "2026-01-22|2|0|0|0|0",
+        "2026-01-23|7|5|2|1|17",
+        "2026-01-24|7|2|3|1|8.99",
+        "2026-01-25|0|1|0|0|0",
+        "2026-01-26|3|1|5|4|28",
+        "2026-01-28|3|12|4|0|0",
+        "2026-01-29|2|0|0|0|0",
+        "2026-01-30|1|1|0|0|0",
+        "2026-01-31|6|5|4|1|67.47",
+        "2026-02-01|0|0|0|1|8.99",
+        "2026-02-02|5|2|0|0|0",
+        "2026-02-03|11|1|0|0|0",
+        "2026-02-04|1|0|0|0|0",
+        "2026-02-06|1|0|0|0|0",
+        "2026-02-07|5|5|0|0|0",
+        "2026-02-11|1|1|1|0|0",
+        "2026-02-14|5|3|0|0|0",
+        "2026-02-17|1|1|3|0|0",
+        "2026-02-19|0|0|0|1|12.58",
+        "2026-02-21|2|0|0|0|0",
+        "2026-02-23|1|5|4|0|0",
+        "2026-02-24|0|4|1|2|27.18",
+        "2026-02-27|1|0|0|0|0",
+        "2026-03-02|1|0|0|0|0",
+        "2026-03-04|1|1|0|0|0",
+        "2026-03-07|1|5|3|1|10.29",
+        "2026-03-10|1|3|1|0|0",
+        "2026-03-14|2|1|0|0|0",
+        "2026-03-15|5|6|0|0|0",
+        "2026-03-17|1|0|0|0|0",
+        "2026-03-18|1|0|0|0|0",
+        "2026-03-24|1|1|0|0|0",
+        "2026-03-25|2|0|0|0|0",
+        "2026-03-26|453|41|14|2|17.3",
+        "2026-03-27|140|34|13|2|13.2",
+        "2026-03-28|6|4|0|0|0",
+        "2026-03-29|1|1|1|0|0",
+        "2026-03-30|1|5|2|0|0",
+        "2026-03-31|0|1|0|2|29.54",
+        "2026-04-01|2|3|0|0|0",
+        "2026-04-02|2|1|0|0|0",
+        "2026-04-04|0|2|2|0|0",
+        "2026-04-05|0|5|0|0|0",
+        "2026-04-06|0|1|0|0|0",
+        "2026-04-07|1|3|2|2|25.05",
+        "2026-04-08|3|3|0|0|0",
+        "2026-04-09|1|1|0|0|0",
+        "2026-04-11|1|0|0|0|0",
+        "2026-04-14|6|5|1|0|0",
+        "2026-04-18|2|0|0|0|0",
+        "2026-04-20|1|2|1|1|13.59",
+        "2026-04-21|100|13|1|1|8.99",
+        "2026-04-22|138|17|0|0|0",
+        "2026-04-23|166|19|4|0|0",
+        "2026-04-24|182|34|9|0|0",
+        "2026-04-25|167|44|7|3|38",
+        "2026-04-26|178|31|10|0|0",
+        "2026-04-27|105|13|6|1|13.98",
+        "2026-04-28|126|19|0|0|0",
+        "2026-04-29|125|38|12|6|55.48",
+        "2026-04-30|106|18|0|0|0",
+        "2026-05-01|121|20|7|0|0",
+        "2026-05-02|105|13|2|1|8.5",
+        "2026-05-03|112|20|9|0|0",
+        "2026-05-04|126|17|6|1|8.5",
+        "2026-05-05|110|35|21|13|295.29",
+        "2026-05-06|119|15|3|3|32.5",
+        "2026-05-07|132|41|2|4|36.5",
+        "2026-05-08|92|23|2|0|0",
+        "2026-05-09|76|18|12|0|0",
+        "2026-05-10|100|14|1|0|0",
+        "2026-05-11|115|37|7|4|51.84",
+        "2026-05-12|111|54|9|2|15.2",
+        "2026-05-13|10|7|2|0|0",
+        "2026-05-14|4|4|1|1|4.5",
+        "2026-05-15|201|61|6|1|40.48",
+        "2026-05-16|39|19|3|0|0",
+        "2026-05-17|13|7|2|0|0",
+        "2026-05-18|17|5|1|0|0",
+        "2026-05-19|22|9|0|0|0",
+        "2026-05-20|23|18|1|1|11.99",
+        "2026-05-21|150|7|5|1|11.23",
+        "2026-05-22|182|22|2|0|0",
+        "2026-05-23|159|42|6|3|47.45",
+        "2026-05-24|159|24|24|1|10.11",
+        "2026-05-25|144|49|8|0|0",
+        "2026-05-26|145|50|15|10|93.36",
+        "2026-05-27|136|38|13|1|17.98",
+        "2026-05-28|152|44|16|1|33.98",
+        "2026-05-29|136|40|16|3|45.01",
+        "2026-05-30|327|263|48|7|90.15",
+        "2026-05-31|155|97|26|6|173.14",
+        "2026-06-01|167|66|31|2|20.96",
+        "2026-06-02|192|82|18|7|95.52",
+        "2026-06-03|140|49|19|2|20.69",
+        "2026-06-04|306|201|79|5|87.6",
+        "2026-06-05|135|69|22|4|68.11",
+        "2026-06-06|72|75|17|6|105.66",
+        "2026-06-07|148|118|41|11|161.14",
+        "2026-06-08|65|64|25|12|160.74",
+        "2026-06-09|128|58|20|1|16.99",
+        "2026-06-10|33|20|8|6|87.73",
+        "2026-06-11|109|45|15|3|41.76",
+        "2026-06-12|26|13|8|3|44.51",
+        "2026-06-13|34|27|10|5|75.94",
+        "2026-06-14|11|8|1|0|0",
+        "2026-06-15|10|6|4|3|44.96",
+        "2026-06-16|240|65|10|4|70.33",
+        "2026-06-17|68|42|6|1|42.7",
+        "2026-06-18|37|23|6|0|0",
+        "2026-06-19|23|18|3|6|91.45",
+        "2026-06-20|7|5|2|3|28",
+        "2026-06-21|5|4|5|4|66.91",
+        "2026-06-22|15|14|3|1|8.54",
+        "2026-06-23|26|84|22|13|163.86",
+        "2026-06-24|25|73|21|15|203.74",
+        "2026-06-25|71|123|28|16|198.67",
+        "2026-06-26|56|86|34|17|169.7",
+        "2026-06-27|28|38|8|9|181.21",
+        "2026-06-28|28|29|9|1|8.5",
+        "2026-06-29|10|25|8|0|0",
+        "2026-06-30|31|23|7|2|39.09",
+        "2026-07-01|149|227|46|29|303.68",
+        "2026-07-02|38|41|6|6|83.98",
+        "2026-07-03|22|60|25|12|137.49",
+        "2026-07-04|13|17|9|3|40.07",
+        "2026-07-05|15|35|9|3|29.13",
+        "2026-07-06|149|114|42|9|97.77",
+        "2026-07-07|44|35|8|3|44.25",
+        "2026-07-08|25|15|3|6|57.15",
+        "2026-07-09|86|89|39|15|149.84",
+        "2026-07-10|30|49|13|5|65.48",
+        "2026-07-11|25|31|12|6|51.87",
+        "2026-07-12|18|43|14|8|113.07",
+        "2026-07-13|19|24|7|3|15.1",
+        "2026-07-14|13|12|1|0|0",
+        "2026-07-15|12|11|2|0|0",
+        "2026-07-16|8|15|4|0|0",
+        "2026-07-17|19|32|6|6|74.92",
+        "2026-07-18|26|20|5|0|0",
+        "2026-07-19|11|23|6|2|54.36",
+        "2026-07-20|4|10|0|0|0",
+        "2026-07-21|13|16|4|0|0",
+        "2026-07-22|1|6|0|0|0",
+        "2026-07-23|2|6|2|1|13.59",
+        "2026-07-24|5|5|2|3|37.43",
+        "2026-07-26|3|12|2|1|7.19",
+        "2026-07-27|6|10|3|0|0",
+        "2026-07-28|2|0|0|0|0",
+        "2026-07-29|2|15|5|5|63.68",
+        "2026-07-30|8|15|6|2|27.97",
+        "2026-07-31|1|0|0|1|7.19",
+        "2026-08-01|4|10|2|0|0",
+        "2026-08-02|8|13|6|0|0",
+        "2026-08-03|6|1|1|0|0",
+        "2026-08-04|5|11|4|4|46.79",
+        "2026-08-05|1|2|1|0|0",
+        "2026-08-06|1|12|3|2|32.23",
+        "2026-08-07|7|9|4|0|0",
+        "2026-08-08|2|6|4|0|0",
+        "2026-08-09|4|3|1|1|25.19",
+        "2026-08-10|7|15|8|5|53.95",
+        "2026-08-11|1|1|1|0|0",
+        "2026-08-12|0|1|2|2|16.92",
+        "2026-08-13|1|2|1|0|0",
+        "2026-08-14|3|20|5|0|0",
+        "2026-08-15|1|6|4|2|26.6",
+        "2026-08-16|8|1|1|2|52.15",
+        "2026-08-17|5|7|1|1|14.97",
+        "2026-08-18|1|11|4|0|0",
+        "2026-08-19|2|1|2|1|16.99",
+        "2026-08-20|3|7|2|1|14.38",
+        "2026-08-23|5|4|2|2|21.22",
+        "2026-08-24|1|16|0|3|57.92",
+        "2026-08-26|1|5|1|0|0",
+        "2026-08-27|3|13|0|0|0",
+        "2026-08-28|1|1|1|0|0",
+        "2026-08-29|1|1|0|0|0",
+        "2026-08-31|4|0|0|0|0",
+        "2026-09-02|5|0|0|0|0"
+      ]
+    }
+  }
+}
+;
+
+// ===== KPI config & state =====
+const KPIS = [
+  { key: "clicks",    label: "Click-throughs",    color: "#6c5ce7", axis: "big",   money: false, on: true },
+  { key: "dpv",       label: "Detail page views", color: "#0ea5e9", axis: "small", money: false, on: true },
+  { key: "atc",       label: "Add to cart",       color: "#ec4899", axis: "small", money: false, on: true },
+  { key: "purchases", label: "Purchases",         color: "#22c55e", axis: "small", money: false, on: true },
+  { key: "sales",     label: "Product sales",     color: "#f59e0b", axis: "sales", money: true,  on: true }
+];
+const KKEYS = ["clicks","dpv","atc","purchases","sales"];
+let MARKET = "US", UNIT = "D", MODE = "val", R0 = 0, R1 = 0, currentDetail = null;
+let M, DATES_ISO, DATES_LBL, N, SERIES, TOTAL;
+
+// ===== Derive per-market structures =====
+function loadMarket(code) {
+  MARKET = code; M = MARKETS[code];
+  DATES_ISO = []; DATES_LBL = [];
+  const MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const d0 = new Date(M.start + "T00:00:00Z"), d1 = new Date(M.end + "T00:00:00Z");
+  for (let d = new Date(d0); d <= d1; d.setUTCDate(d.getUTCDate() + 1)) {
+    DATES_ISO.push(d.toISOString().slice(0, 10));
+    DATES_LBL.push(MN[d.getUTCMonth()] + " " + d.getUTCDate() + " '" + String(d.getUTCFullYear()).slice(2));
+  }
+  N = DATES_ISO.length;
+  const idx = {}; DATES_ISO.forEach((iso, i) => idx[iso] = i);
+  SERIES = {};
+  for (const c of M.campaigns) {
+    const s = {}; for (const k of KKEYS) s[k] = new Array(N).fill(0);
+    for (const row of (M.raw[c.id] || [])) {
+      const p = row.split("|"); const i = idx[p[0]];
+      if (i === undefined) continue;
+      s.clicks[i] += +p[1]; s.dpv[i] += +p[2]; s.atc[i] += +p[3]; s.purchases[i] += +p[4]; s.sales[i] += +p[5];
+    }
+    SERIES[c.id] = s;
+  }
+  TOTAL = {}; for (const k of KKEYS) TOTAL[k] = new Array(N).fill(0);
+  for (const c of M.campaigns) for (const k of KKEYS) for (let i = 0; i < N; i++) TOTAL[k][i] += SERIES[c.id][k][i];
+  R1 = N - 1; R0 = Math.max(0, N - 30); // default last 30 days
+  const pv = document.getElementById("preset").value;
+  if (pv !== "custom" && pv !== "all") { R0 = Math.max(0, N - (+pv || 30)); }
+  if (pv === "all") R0 = 0;
+  syncDateInputs();
+}
+
+const fmt = (v, money) => v === null || v === undefined ? "—" : (money ? "$" + (+v).toFixed(2) : (+v).toLocaleString());
+const fmtBig = (v, money) => money ? (v >= 10000 ? "$" + (v/1000).toFixed(1) + "K" : "$" + v.toFixed(2)) : v.toLocaleString();
+const rangeSum = (arr, money) => { const s = arr.slice(R0, R1 + 1).reduce((a, b) => a + b, 0); return money ? Math.round(s * 100) / 100 : s; };
+const rangeLabel = () => DATES_LBL[R0] + " – " + DATES_LBL[R1];
+
+function deltaHtml(series, k) {
+  const len = R1 - R0 + 1;
+  const f = v => k.money ? "$" + v.toFixed(2) : v.toLocaleString();
+  const p0 = R0 - len;
+  if (p0 < 0) return `<div class="prev">no prior ${len}-day period in history</div><div class="delta flat">—</div>`;
+  const a = series[k.key].slice(R0, R1 + 1).reduce((x, y) => x + y, 0);
+  const b = series[k.key].slice(p0, R0).reduce((x, y) => x + y, 0);
+  let d;
+  if (b === 0 && a === 0) d = `<div class="delta flat">— none in either period</div>`;
+  else if (b === 0) d = `<div class="delta up">+${f(a)} from zero &#8593;</div>`;
+  else { const pct = (a - b) / b * 100; d = `<div class="delta ${pct >= 0 ? "up" : "down"}">${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% ${pct >= 0 ? "&#8593;" : "&#8595;"}</div>`; }
+  return `<div class="prev">prior ${len}d: ${f(b)}</div>${d}`;
+}
+
+function cardsHtml(series) {
+  return KPIS.map((k, i) => `
+    <div class="card toggle ${k.on ? "" : "off"}" onclick="toggleKpi(${i})" title="Toggle this line on the trend chart">
+      <div class="strip" style="background:${k.color}"></div>
+      <div class="body">
+        <div class="label">${k.label} <span class="state">${k.on ? "ON" : "OFF"}</span></div>
+        <div class="value">${fmtBig(rangeSum(series[k.key], k.money), k.money)}</div>
+        ${deltaHtml(series, k)}
+      </div>
+    </div>`).join("");
+}
+
+// ===== Bucketing (D/W/M) =====
+function buckets() {
+  const out = []; // [{i0, i1, label}]
+  if (UNIT === "D") { for (let i = R0; i <= R1; i++) out.push({ i0: i, i1: i, label: DATES_LBL[i] }); return out; }
+  if (UNIT === "W") {
+    for (let i = R0; i <= R1; i += 7) out.push({ i0: i, i1: Math.min(i + 6, R1), label: "Wk " + DATES_LBL[i] });
+    return out;
+  }
+  // M: calendar months
+  let cur = null;
+  for (let i = R0; i <= R1; i++) {
+    const m = DATES_ISO[i].slice(0, 7);
+    if (!cur || cur.m !== m) { cur = { m, i0: i, i1: i }; out.push(cur); } else cur.i1 = i;
+  }
+  const MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  for (const b of out) b.label = MN[+b.m.slice(5, 7) - 1] + " '" + b.m.slice(2, 4);
+  return out;
+}
+function bucketSeries(series) {
+  const bs = buckets();
+  const data = {}; for (const k of KKEYS) data[k] = bs.map(b => { let s = 0; for (let i = b.i0; i <= b.i1; i++) s += series[k][i]; return Math.round(s * 100) / 100; });
+  return { labels: bs.map(b => b.label), data };
+}
+
+// ===== SVG chart =====
+function niceMax(v) {
+  if (v <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const s of [1, 2, 2.5, 5, 10]) if (v <= s * p) return s * p;
+  return 10 * p;
+}
+function smoothPath(pts, yMin, yMax) {
+  if (pts.length < 2) return "";
+  const cl = y => Math.max(yMin, Math.min(yMax, y));
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = cl(p1[1] + (p2[1] - p0[1]) / 6);
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = cl(p2[1] - (p3[1] - p1[1]) / 6);
+    d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+function renderTrend(wrapId, rawSeries) {
+  const wrap = document.getElementById(wrapId);
+  const { labels: lbls, data } = bucketSeries(rawSeries);
+  if (MODE === "pct") return renderTrendPct(wrap, wrapId, lbls, data);
+  const W = 960, H = 258, padL = 58, padR = 62, padT = 14, padB = 30;
+  const iw = W - padL - padR, ih = H - padT - padB, n = lbls.length;
+  const X = i => padL + (n === 1 ? iw / 2 : i * (iw / (n - 1)));
+  const vis = KPIS.filter(k => k.on);
+  // Each axis is scaled from the VISIBLE series on that axis only, so toggling a KPI
+  // off rescales the chart instead of leaving the survivors squashed against a hidden
+  // series' maximum (e.g. purchases flattened by DPV's peak).
+  const axisMax = axis => {
+    const keys = vis.filter(k => k.axis === axis).map(k => k.key);
+    if (!keys.length) return 1;
+    let m = 0; for (const key of keys) for (const v of data[key]) if (v > m) m = v;
+    return niceMax(Math.max(m, 1));
+  };
+  const maxBig = axisMax("big"), maxSmall = axisMax("small"), maxSales = axisMax("sales");
+  const axMax = { big: maxBig, small: maxSmall, sales: maxSales };
+  const Y = (axis, v) => padT + ih - (v / axMax[axis]) * ih;
+  let defs = "", seriesSvg = "";
+  for (const k of vis) {
+    const pts = data[k.key].map((v, i) => [X(i), Y(k.axis, v)]);
+    const line = smoothPath(pts, padT, padT + ih);
+    defs += `<linearGradient id="${wrapId}-g-${k.key}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${k.color}" stop-opacity="0.22"/><stop offset="100%" stop-color="${k.color}" stop-opacity="0.02"/></linearGradient>`;
+    seriesSvg += `<path d="${line} L${X(n - 1).toFixed(1)},${(padT + ih).toFixed(1)} L${X(0).toFixed(1)},${(padT + ih).toFixed(1)} Z" fill="url(#${wrapId}-g-${k.key})" stroke="none"></path>`;
+    seriesSvg += `<path d="${line}" fill="none" stroke="${k.color}" stroke-width="2"></path>`;
+    if (n <= 45) seriesSvg += data[k.key].map((v, i) => v > 0 ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(k.axis, v).toFixed(1)}" r="2.4" fill="#fff" stroke="${k.color}" stroke-width="1.6"></circle>` : "").join("");
+  }
+  let grid = "", leftLabels = "", rightLabels = "";
+  const showBig = vis.some(k => k.axis === "big"), showSales = vis.some(k => k.axis === "sales");
+  const showSmall = vis.some(k => k.axis === "small");
+  // Gutter assignment: clicks own the left gutter when visible, otherwise the count
+  // axis moves into it; sales own the right gutter, otherwise counts can use it.
+  const leftAxis  = showBig ? "big" : (showSmall ? "small" : null);
+  const rightAxis = showSales ? "sales" : ((showBig && showSmall) ? "small" : null);
+  const AXCOL = { big: "#6c5ce7", small: "#6b7a99", sales: "#f59e0b" };
+  const axLabel = (axis, g) => axis === "sales"
+    ? "$" + (axMax.sales * g / 4).toLocaleString()
+    : Math.round(axMax[axis] * g / 4).toLocaleString();
+  for (let g = 0; g <= 4; g++) {
+    const y = padT + ih - (g / 4) * ih;
+    grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" stroke="#eef1f7" stroke-width="1"></line>`;
+    if (leftAxis) leftLabels += `<text x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="${AXCOL[leftAxis]}">${axLabel(leftAxis, g)}</text>`;
+    if (rightAxis) rightLabels += `<text x="${W - padR + 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="start" font-size="10" fill="${AXCOL[rightAxis]}">${axLabel(rightAxis, g)}</text>`;
+  }
+  const step = Math.ceil(n / 9);
+  let xLabels = "";
+  for (let i = 0; i < n; i += step) xLabels += `<text x="${X(i).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#9aa7c2">${lbls[i]}</text>`;
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Trend chart">
+    <defs>${defs}</defs>${grid}
+    <line x1="${padL}" y1="${padT + ih}" x2="${W - padR}" y2="${padT + ih}" stroke="#dfe5ef" stroke-width="1"></line>
+    ${leftLabels}${rightLabels}${xLabels}${seriesSvg}
+    <line class="guide" x1="0" y1="${padT}" x2="0" y2="${padT + ih}" stroke="#b6c1d8" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"></line>
+    <rect x="${padL}" y="${padT}" width="${iw}" height="${ih}" fill="transparent"></rect>
+  </svg><div class="tt"></div>`;
+  const svg = wrap.querySelector("svg"), guide = wrap.querySelector(".guide"), tt = wrap.querySelector(".tt");
+  svg.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect();
+    const fx = (e.clientX - r.left) / r.width * W;
+    if (fx < padL - 6 || fx > W - padR + 6) { guide.setAttribute("visibility", "hidden"); tt.style.display = "none"; return; }
+    const i = Math.max(0, Math.min(n - 1, Math.round((fx - padL) / (iw / Math.max(1, n - 1)))));
+    guide.setAttribute("x1", X(i)); guide.setAttribute("x2", X(i)); guide.setAttribute("visibility", "visible");
+    tt.innerHTML = `<div class="d">${lbls[i]}</div>` + vis.map(k =>
+      `<div class="r"><span class="k"><span class="dot" style="background:${k.color}"></span>${k.label}</span><b>${k.money ? "$" + data[k.key][i].toFixed(2) : data[k.key][i].toLocaleString()}</b></div>`).join("");
+    tt.style.display = "block";
+    const px = (X(i) / W) * r.width;
+    tt.style.left = Math.min(px + 14, r.width - tt.offsetWidth - 6) + "px";
+    tt.style.top = "18px";
+  });
+  svg.addEventListener("mouseleave", () => { guide.setAttribute("visibility", "hidden"); tt.style.display = "none"; });
+}
+
+// ===== Period-over-period % change chart =====
+function renderTrendPct(wrap, wrapId, lbls, data) {
+  const pdata = pctSeries(data);
+  const W = 960, H = 258, padL = 62, padR = 20, padT = 14, padB = 30;
+  const iw = W - padL - padR, ih = H - padT - padB, n = lbls.length;
+  const X = i => padL + (n === 1 ? iw / 2 : i * (iw / (n - 1)));
+  const vis = KPIS.filter(k => k.on);
+  const CAP = 300; // plot cap: % spikes off tiny bases would flatten the axis; tooltip shows true value
+  let hi = 5, lo = 0, clamped = false;
+  for (const k of vis) for (const v of pdata[k.key]) if (v !== null) { if (v > hi) hi = v; if (v < lo) lo = v; }
+  if (hi > CAP) { hi = CAP; clamped = true; }
+  const top = niceMax(hi), bottom = lo < 0 ? -niceMax(-lo) : 0;
+  const Y = v => padT + ih - ((Math.min(v, top) - bottom) / (top - bottom)) * ih;
+  const zeroY = Y(0);
+  let defs = "", seriesSvg = "";
+  for (const k of vis) {
+    const pts = pdata[k.key].map((v, i) => [X(i), v === null ? null : Y(v)]);
+    defs += `<linearGradient id="${wrapId}-pg-${k.key}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${k.color}" stop-opacity="0.16"/><stop offset="100%" stop-color="${k.color}" stop-opacity="0.03"/></linearGradient>`;
+    for (const seg of segments(pts)) {
+      if (seg.length === 1) { seriesSvg += `<circle cx="${seg[0][0].toFixed(1)}" cy="${seg[0][1].toFixed(1)}" r="2.6" fill="#fff" stroke="${k.color}" stroke-width="1.8"></circle>`; continue; }
+      const line = smoothPath(seg, padT, padT + ih);
+      seriesSvg += `<path d="${line} L${seg[seg.length-1][0].toFixed(1)},${zeroY.toFixed(1)} L${seg[0][0].toFixed(1)},${zeroY.toFixed(1)} Z" fill="url(#${wrapId}-pg-${k.key})" stroke="none"></path>`;
+      seriesSvg += `<path d="${line}" fill="none" stroke="${k.color}" stroke-width="2"></path>`;
+      if (n <= 45) seriesSvg += seg.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.4" fill="#fff" stroke="${k.color}" stroke-width="1.6"></circle>`).join("");
+    }
+  }
+  let grid = "", leftLabels = "";
+  for (let g = 0; g <= 4; g++) {
+    const v = bottom + (top - bottom) * g / 4, y = Y(v);
+    grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" stroke="#eef1f7" stroke-width="1"></line>`;
+    leftLabels += `<text x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#6b7a99">${v > 0 ? "+" : ""}${Math.round(v)}%</text>`;
+  }
+  const step = Math.ceil(n / 9);
+  let xLabels = "";
+  for (let i = 0; i < n; i += step) xLabels += `<text x="${X(i).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#9aa7c2">${lbls[i]}</text>`;
+  const capNote = clamped ? `<text x="${W - padR}" y="${padT + 9}" text-anchor="end" font-size="9" fill="#b6c1d8">chart capped at +${top}% — hover for exact values</text>` : "";
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${UNIT === "W" ? "Week-over-week" : "Month-over-month"} % change chart">
+    <defs>${defs}</defs>${grid}${capNote}
+    <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W - padR}" y2="${zeroY.toFixed(1)}" stroke="#b6c1d8" stroke-width="1.2"></line>
+    ${leftLabels}${xLabels}${seriesSvg}
+    <line class="guide" x1="0" y1="${padT}" x2="0" y2="${padT + ih}" stroke="#b6c1d8" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"></line>
+    <rect x="${padL}" y="${padT}" width="${iw}" height="${ih}" fill="transparent"></rect>
+  </svg><div class="tt"></div>`;
+  const svg = wrap.querySelector("svg"), guide = wrap.querySelector(".guide"), tt = wrap.querySelector(".tt");
+  const per = UNIT === "W" ? "wk" : "mo";
+  svg.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect();
+    const fx = (e.clientX - r.left) / r.width * W;
+    if (fx < padL - 6 || fx > W - padR + 6) { guide.setAttribute("visibility", "hidden"); tt.style.display = "none"; return; }
+    const i = Math.max(0, Math.min(n - 1, Math.round((fx - padL) / (iw / Math.max(1, n - 1)))));
+    guide.setAttribute("x1", X(i)); guide.setAttribute("x2", X(i)); guide.setAttribute("visibility", "visible");
+    tt.innerHTML = `<div class="d">${lbls[i]} vs prior ${per}</div>` + vis.map(k => {
+      const p = pdata[k.key][i];
+      const val = k.money ? "$" + data[k.key][i].toFixed(2) : data[k.key][i].toLocaleString();
+      return `<div class="r"><span class="k"><span class="dot" style="background:${k.color}"></span>${k.label}</span><b>${p === null ? "—" : (p > 0 ? "+" : "") + p.toFixed(1) + "%"} <span style="color:#9aa7c2;font-weight:500">(${val})</span></b></div>`;
+    }).join("");
+    tt.style.display = "block";
+    const px = (X(i) / W) * r.width;
+    tt.style.left = Math.min(px + 14, r.width - tt.offsetWidth - 6) + "px";
+    tt.style.top = "18px";
+  });
+  svg.addEventListener("mouseleave", () => { guide.setAttribute("visibility", "hidden"); tt.style.display = "none"; });
+}
+
+// ===== Selectors =====
+function renderMarkets() {
+  document.getElementById("mktSel").innerHTML = Object.entries(MARKETS).map(([code, m]) => `
+    <button class="${code === MARKET ? "sel" : ""}" onclick="pickMarket('${code}')" title="${m.label}">
+      <span class="flag">${m.flag}</span>${code}
+    </button>`).join("");
+}
+function pickMarket(code) {
+  if (code === MARKET) return;
+  loadMarket(code); renderMarkets(); showList(); renderAll();
+}
+function renderUnits() {
+  const opts = [["D","Daily values"],["W","Weekly totals"],["M","Monthly totals"],["WoW","Week-over-week % change"],["MoM","Month-over-month % change"]];
+  const cur = MODE === "pct" ? (UNIT === "W" ? "WoW" : "MoM") : UNIT;
+  document.getElementById("unitSel").innerHTML = opts.map(([u, tip]) =>
+    `<button class="${u === cur ? "sel" : ""}" onclick="pickUnit('${u}')" title="${tip}">${u}</button>`).join("");
+}
+function pickUnit(u) {
+  if (u === "WoW") { UNIT = "W"; MODE = "pct"; }
+  else if (u === "MoM") { UNIT = "M"; MODE = "pct"; }
+  else { UNIT = u; MODE = "val"; }
+  renderUnits(); renderAll();
+}
+// Period-over-period % change per bucket; null = no prior period or zero base
+function pctSeries(data) {
+  const out = {};
+  for (const k of KKEYS) out[k] = data[k].map((v, i, a) => {
+    if (i === 0) return null;
+    const prev = a[i - 1];
+    if (prev === 0) return null;
+    return Math.round((v - prev) / prev * 1000) / 10;
+  });
+  return out;
+}
+function segments(pts) { // split point list at null y (gaps where no prior-period base)
+  const segs = []; let cur = [];
+  for (const p of pts) { if (p[1] === null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(p); }
+  if (cur.length) segs.push(cur);
+  return segs;
+}
+
+function presetChange() {
+  const v = document.getElementById("preset").value;
+  if (v === "custom") return;
+  R1 = N - 1;
+  R0 = v === "all" ? 0 : Math.max(0, N - +v);
+  syncDateInputs(); renderAll();
+}
+function customChange() {
+  const f = document.getElementById("dFrom").value, t = document.getElementById("dTo").value;
+  if (!f || !t) return;
+  let i0 = DATES_ISO.indexOf(f), i1 = DATES_ISO.indexOf(t);
+  if (i0 === -1) i0 = 0;
+  if (i1 === -1) i1 = N - 1;
+  if (i0 > i1) [i0, i1] = [i1, i0];
+  R0 = i0; R1 = i1;
+  document.getElementById("preset").value = "custom";
+  renderAll();
+}
+function syncDateInputs() {
+  const f = document.getElementById("dFrom"), t = document.getElementById("dTo");
+  f.min = t.min = DATES_ISO[0]; f.max = t.max = DATES_ISO[N - 1];
+  f.value = DATES_ISO[R0]; t.value = DATES_ISO[R1];
+}
+
+// ===== Views =====
+function renderList() {
+  document.getElementById("metaSub").innerHTML = `${M.entity} · Range: <b>${rangeLabel()}</b> · Data pulled: <b>${PULLED}</b> · History: Mar 20 '25 – Sep 2 '26`;
+  document.getElementById("summaryCards").innerHTML = cardsHtml(TOTAL);
+  document.getElementById("trendNote").textContent = M.label + " · " + rangeLabel();
+  document.getElementById("campaignRows").innerHTML = M.campaigns.map((c, i) => {
+    const s = SERIES[c.id];
+    const clicks = rangeSum(s.clicks);
+    return `
+    <tr class="clickable" onclick="showDetail(${i})">
+      <td><div class="cname">${c.name}</div><div class="cid">${c.id}</div></td>
+      <td><span class="typechip ${c.chip}">${c.type}</span> ${clicks > 0 ? '<span class="pill active">active</span>' : '<span class="pill idle">no traffic</span>'}</td>
+      <td class="num">${fmt(clicks)}</td><td class="num">${fmt(rangeSum(s.dpv))}</td><td class="num">${fmt(rangeSum(s.atc))}</td>
+      <td class="num">${fmt(rangeSum(s.purchases))}</td><td class="num">${fmt(rangeSum(s.sales, true), true)}</td>
+    </tr>`;
+  }).join("");
+  try { renderTrend("trendWrap", TOTAL); } catch (e) { console.error(e); }
+}
+
+function renderDetail() {
+  const c = M.campaigns[currentDetail];
+  const s = SERIES[c.id];
+  document.getElementById("dTitle").textContent = c.name;
+  document.getElementById("dSub").innerHTML = `Campaign ID ${c.id} · ${c.type} · Range: <b>${rangeLabel()}</b> · ${M.entity}`;
+  document.getElementById("dCards").innerHTML = cardsHtml(s);
+
+  const fp = document.getElementById("dFunnelPanel");
+  const rc = rangeSum(s.clicks);
+  if (rc > 0) {
+    fp.style.display = "";
+    const rd = rangeSum(s.dpv), ra = rangeSum(s.atc), rp = rangeSum(s.purchases), rs = rangeSum(s.sales, true);
+    const steps = [
+      ["Click-throughs", rc, null, "#6c5ce7"],
+      ["DPV", rd, rd / rc, "#0ea5e9"],
+      ["ATC", ra, rd ? ra / rd : null, "#ec4899"],
+      ["Purchases", rp, ra ? rp / ra : null, "#22c55e"],
+      ["Sales", "$" + rs.toFixed(2), null, "#f59e0b"]
+    ];
+    document.getElementById("dFunnel").innerHTML = steps.map(([l, v, r, col]) => `
+      <div class="fstep">
+        <div class="fv" style="color:${col}">${typeof v === "number" ? v.toLocaleString() : v}</div>
+        <div class="fl">${l}</div>
+        ${r !== null && isFinite(r) ? `<div class="fr" style="color:${col}">${(r * 100).toFixed(r < 0.05 ? 1 : 0)}% of prev.</div>` : ""}
+      </div>`).join("");
+  } else fp.style.display = "none";
+
+  const tp = document.getElementById("dTrendPanel");
+  if ((M.raw[c.id] || []).length) {
+    tp.style.display = "";
+    try { renderTrend("dTrendWrap", s); } catch (e) { console.error(e); }
+  } else tp.style.display = "none";
+
+  document.getElementById("dAdGroupNote").textContent = c.adGroups.length ? "full history" : "";
+  document.getElementById("dAdGroups").innerHTML = c.adGroups.length
+    ? c.adGroups.map(g => `<tr><td><div class="cname">${g.name}</div><div class="cid">${g.id}</div></td><td>${g.channel}</td><td>${g.publisher}</td><td class="num">${fmt(g.clicks)}</td><td class="num">${fmt(g.dpv)}</td><td class="num">${fmt(g.atc)}</td><td class="num">${fmt(g.purchases)}</td><td class="num">${fmt(g.sales, true)}</td></tr>`).join("")
+    : `<tr><td colspan="8" class="nodata" style="padding:14px 18px">Ad-group breakdown not available via the reporting API for this campaign — see the Ads console.</td></tr>`;
+
+  document.getElementById("dProdNote").textContent = c.prodNote || "";
+  document.getElementById("dProducts").innerHTML = c.products.length
+    ? c.products.map(p => `
+      <div class="prod">
+        <img src="${IMG(p.asin)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;imgfallback&quot;>${p.name.charAt(0)}</div>'">
+        <div>
+          <div class="pname">${p.name}</div>
+          <div class="asin">${p.asin} ${p.ntb > 0 ? `<span class="pill ntb">${p.ntb} new-to-brand</span>` : ''}</div>
+          <div class="stats">
+            <span>DPV <b>${p.dpv.toLocaleString()}</b></span><span>ATC <b>${p.atc.toLocaleString()}</b></span>
+            <span>Purchases <b>${p.purchases.toLocaleString()}</b></span><span>Sales <b>$${p.sales.toFixed(2)}</b></span>
+          </div>
+        </div>
+      </div>`).join("")
+    : `<div class="nodata">${c.prodNote || "No attributed product activity reported."}</div>`;
+}
+
+function renderAll() {
+  renderList();
+  if (currentDetail !== null && document.getElementById("detail").style.display === "block") renderDetail();
+}
+function toggleKpi(i) { KPIS[i].on = !KPIS[i].on; renderAll(); }
+function showDetail(i) {
+  currentDetail = i;
+  document.getElementById("list").style.display = "none";
+  document.getElementById("detail").style.display = "block";
+  renderDetail();
+  window.scrollTo(0, 0);
+}
+function showList() {
+  currentDetail = null;
+  document.getElementById("detail").style.display = "none";
+  document.getElementById("list").style.display = "block";
+}
+
+// ===== Boot (guarded steps; tables before charts) =====
+try { loadMarket("US"); } catch (e) { console.error(e); }
+try { renderMarkets(); } catch (e) { console.error(e); }
+try { renderUnits(); } catch (e) { console.error(e); }
+try { renderList(); } catch (e) { console.error(e); }
+</script>
+</body>
+</html>
