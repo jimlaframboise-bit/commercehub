@@ -4,6 +4,7 @@ import Layout from './components/Layout.jsx'
 import Overview from './pages/Overview.jsx'
 import Tracker from './pages/Tracker.jsx'
 import Rolling12 from './pages/Rolling12.jsx'
+import Attribution from './pages/Attribution.jsx'
 import { Campaigns, AdGroups, Targeting, SearchTerms, ShareOfVoice, Dayparting, BulkOperations, Tagging, ProfileGrid, PortfolioGrid, PlacementGrid, AsinGrid, AdsGrid } from './pages/Ads.jsx'
 import { Dsp, Audiences, Amc } from './pages/Dsp.jsx'
 import { DigitalShelf, BuyBox, Products } from './pages/Commerce.jsx'
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/" element={<Overview />} />
           <Route path="/tracker" element={<Tracker />} />
           <Route path="/rolling12" element={<Rolling12 />} />
+          <Route path="/attribution" element={<Attribution />} />
           <Route path="/ads/profile" element={<ProfileGrid />} />
           <Route path="/ads/campaigns" element={<Campaigns />} />
           <Route path="/ads/tagging" element={<Tagging />} />
