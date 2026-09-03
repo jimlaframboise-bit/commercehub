@@ -2222,6 +2222,7 @@ const NAV = [
     { to: '/', label: 'Overview', icon: 'dashboard', end: true },
     { to: '/tracker', label: 'Amazon Tracker', icon: 'bars' },
     { to: '/rolling12', label: 'Rolling 12 Tracker', icon: 'clock' },
+    { to: '/attribution', label: 'Amazon Attribution', icon: 'target' },
   ] },
   {
     section: 'Sponsored Ads', module: true,
@@ -2308,7 +2309,7 @@ function Sidebar() {
 }
 
 const CRUMBS = {
-  '/': 'Overview', '/tracker': 'Amazon Tracker', '/rolling12': 'Rolling 12 Tracker', '/ads/profile': 'Sponsored Ads · Profile', '/ads/campaigns': 'Sponsored Ads · Campaigns',
+  '/': 'Overview', '/tracker': 'Amazon Tracker', '/rolling12': 'Rolling 12 Tracker', '/attribution': 'Amazon Attribution', '/ads/profile': 'Sponsored Ads · Profile', '/ads/campaigns': 'Sponsored Ads · Campaigns',
   '/ads/tagging': 'Sponsored Ads · Tagging', '/ads/portfolio': 'Sponsored Ads · Portfolio',
   '/ads/placement': 'Sponsored Ads · Placement', '/ads/ads': 'Sponsored Ads · Ads',
   '/ads/asin': 'Sponsored Ads · ASIN',
@@ -2725,6 +2726,33 @@ function Rolling12() {
 }
 
 Rolling12
+
+/* ===================== src/pages/Attribution.jsx ===================== */
+
+/* Amazon Attribution dashboard (both markets). Unlike /tracker and /rolling12 the document is
+ * NOT baked into this bundle: it is served as a static file from /attribution/index.html
+ * (public/attribution/index.html in the repo) and refreshed daily by the scheduled Cowork task,
+ * so a data refresh never touches this bundle. Same origin, so the frame height is read
+ * directly from the child document - no postMessage handshake needed. */
+function Attribution() {
+  const [height, setHeight] = useState(1800)
+  const frameRef = useRef(null)
+  useEffect(() => {
+    const id = setInterval(() => {
+      try {
+        const d = frameRef.current && frameRef.current.contentDocument
+        const h = d && d.documentElement ? Math.max(d.documentElement.scrollHeight, d.body ? d.body.scrollHeight : 0) : 0
+        if (h && isFinite(h)) setHeight((cur) => (Math.abs(cur - h) > 2 ? Math.max(600, Math.ceil(h) + 8) : cur))
+      } catch (e) { /* cross-origin or not loaded yet */ }
+    }, 800)
+    return () => clearInterval(id)
+  }, [])
+  return (
+    <div className="tracker-embed" data-attribution-embed>
+      <iframe ref={frameRef} title="Amazon Attribution" src="/attribution/index.html" loading="eager" style={{ height }} />
+    </div>
+  )
+}
 
 
 /* ===================== src/pages/Ads.jsx ===================== */
@@ -6869,6 +6897,7 @@ function App() {
           <Route path="/" element={<Overview />} />
           <Route path="/tracker" element={<Tracker />} />
           <Route path="/rolling12" element={<Rolling12 />} />
+          <Route path="/attribution" element={<Attribution />} />
           <Route path="/ads/profile" element={<ProfileGrid />} />
           <Route path="/ads/campaigns" element={<Campaigns />} />
           <Route path="/ads/tagging" element={<Tagging />} />
