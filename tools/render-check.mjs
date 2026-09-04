@@ -6,7 +6,7 @@ const ROUTES = [
   '/ads/adgroups', '/ads/ads', '/ads/asin', '/ads/targeting', '/ads/search-terms', '/ads/sov',
   '/ads/dayparting', '/ads/bulk', '/dsp', '/dsp/audiences', '/dsp/amc', '/commerce/shelf',
   '/commerce/buybox', '/commerce/products', '/rules', '/budgets', '/ai/campaign', '/ai/product',
-  '/reports', '/alerts', '/settings', '/tracker', '/rolling12',
+  '/reports', '/alerts', '/settings', '/tracker',
 ]
 
 const url = 'file://' + path.resolve('render-check.html')
@@ -14,7 +14,7 @@ const errors = []
 const blockedAssets = []
 let cur = 'boot'
 
-/* The /rolling12 tracker ships the artifact's product photos, which live on Shopify's public
+/* The embedded tracker ships the artifact's product photos, which live on Shopify's public
    CDN. This sandbox has no route to that CDN, so those image requests fail here and would
    not fail in a real browser. They are excluded from the error count but NOT ignored: every
    failed request is checked below to be an image from that CDN and nothing else. Both the
@@ -47,7 +47,7 @@ const rowCounts = {}
 for (const route of ROUTES) {
   cur = route
   await page.evaluate((h) => { window.location.hash = h }, route)
-  const EMBEDS = ['/tracker', '/rolling12']
+  const EMBEDS = ['/tracker']
   await page.waitForTimeout(EMBEDS.includes(route) ? 2500 : 450)
   // sanity: content rendered under .content
   const ok = await page.evaluate(() => {
@@ -57,10 +57,10 @@ for (const route of ROUTES) {
   // /tracker is an embedded document - the host .content holds no text of its own, so the
   // generic assertion does not apply. It gets a stronger, frame-aware check instead.
   if (!ok && !EMBEDS.includes(route)) errors.push(`[${route}] EMPTY content region`)
-  // Both tracker routes are embedded documents - the host .content holds no text of its own,
-  // so the generic assertion does not apply. They get a stronger, frame-aware check instead.
+  // /tracker is an embedded document - the host .content holds no text of its own, so the
+  // generic assertion does not apply. It gets a stronger, frame-aware check instead.
   if (EMBEDS.includes(route)) {
-    const sel = route === '/tracker' ? '.tracker-embed iframe' : '[data-rolling12-embed] iframe'
+    const sel = '.tracker-embed iframe'
     const fr = await page.evaluate((sel) => {
       const f = document.querySelector(sel)
       if (!f) return { ok: false, why: 'no iframe' }
@@ -94,15 +94,10 @@ for (const route of ROUTES) {
     if (fr.height < 1200) errors.push(`[${route}] frame did not size to content (${Math.round(fr.height)}px)`)
     if (fr.lastBottom > Math.round(fr.height)) errors.push(`[${route}] frame CLIPS content (page ends at ${fr.lastBottom}px, frame is ${Math.round(fr.height)}px)`)
     if (!/snapshot/i.test(fr.body)) errors.push(`[${route}] frame never says it is a snapshot`)
-    // The two routes carry DIFFERENT artifacts. The single-file build concatenates every page
-    // into one scope, so a name collision could silently serve one page's payload from both.
-    // Assert each frame is the one it is supposed to be.
+    // /rolling12 was retired 2026-09-03, so /tracker is now the only embedded artifact and the
+    // cross-payload collision it used to guard against cannot happen. Keep the positive check.
     if (route === '/tracker' && !/market/i.test(fr.body))
       errors.push('[/tracker] does not look like the R3 redesign (no filter strip) - payload collision?')
-    if (route === '/rolling12' && !/Crump Group - Amazon History/i.test(fr.title))
-      errors.push(`[/rolling12] wrong document in the frame - title was "${fr.title.trim()}"`)
-    if (route === '/rolling12' && /FILTER\s*MARKET/i.test(fr.body))
-      errors.push('[/rolling12] shows the redesign filter strip - payload collision?')
     rowCounts[route] = `frame ${Math.round(fr.height)}px · ${fr.canvases} charts${fr.pill.trim() ? ' · ' + fr.pill.trim() : ''}`
   }
   // capture grid entry count if present

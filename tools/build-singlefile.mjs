@@ -149,7 +149,7 @@ function BarChart(p) { return _Chart(p, 'bar'); }
 const order = [
   'src/lib/format.js', 'src/data/mock.js', 'src/components/Icon.jsx', 'src/components/ui.jsx',
   'src/state.jsx', 'src/components/Layout.jsx', 'src/pages/Overview.jsx', 'src/pages/Tracker.jsx',
-  'src/pages/Rolling12.jsx', 'src/pages/Attribution.jsx', 'src/pages/Ads.jsx',
+  'src/pages/Attribution.jsx', 'src/pages/Ads.jsx',
   'src/pages/Dsp.jsx', 'src/pages/Commerce.jsx', 'src/pages/Automation.jsx', 'src/pages/Insights.jsx', 'src/App.jsx',
 ]
 let body = preamble + '\n'
@@ -168,7 +168,6 @@ const b64Payload = (file, name) => {
   return m[1]
 }
 const trackerB64 = b64Payload('src/data/trackerSnapshot.js', 'TRACKER_HTML_B64')
-const rolling12B64 = b64Payload('src/data/rolling12Snapshot.js', 'ROLLING12_HTML_B64')
 
 const html = `<!doctype html>
 <html lang="en">
@@ -188,7 +187,6 @@ ${css}
 <body>
 <div id="root"><div id="boot">Loading CommerceHub…</div></div>
 <script>window.__TRACKER_HTML_B64="${trackerB64}";</script>
-<script>window.__ROLLING12_HTML_B64="${rolling12B64}";</script>
 <script type="text/babel" data-presets="react">
 ${body}
 </script>

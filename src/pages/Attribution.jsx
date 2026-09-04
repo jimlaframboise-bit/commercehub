@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 
-/* Amazon Attribution dashboard (both markets). Unlike Tracker.jsx and Rolling12.jsx the document
+/* Amazon Attribution dashboard (both markets). Unlike Tracker.jsx the document
  * is NOT baked into the bundle: it is served as a static file from /attribution/index.html
  * (public/attribution/index.html in this repo, copied to the site root by Vite's public dir) and
  * refreshed daily by the scheduled Cowork task "refresh-amazon-attribution-dashboard". A data

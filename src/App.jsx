@@ -1,9 +1,8 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider } from './state.jsx'
 import Layout from './components/Layout.jsx'
 import Overview from './pages/Overview.jsx'
 import Tracker from './pages/Tracker.jsx'
-import Rolling12 from './pages/Rolling12.jsx'
 import Attribution from './pages/Attribution.jsx'
 import { Campaigns, AdGroups, Targeting, SearchTerms, ShareOfVoice, Dayparting, BulkOperations, Tagging, ProfileGrid, PortfolioGrid, PlacementGrid, AsinGrid, AdsGrid } from './pages/Ads.jsx'
 import { Dsp, Audiences, Amc } from './pages/Dsp.jsx'
@@ -18,7 +17,9 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/tracker" element={<Tracker />} />
-          <Route path="/rolling12" element={<Rolling12 />} />
+          {/* /rolling12 retired 2026-09-03 (the R3 tracker at /tracker supersedes it,
+              matching the 2026-08-17 retirement on crump-amazon-tracker). Old links redirect. */}
+          <Route path="/rolling12" element={<Navigate to="/" replace />} />
           <Route path="/attribution" element={<Attribution />} />
           <Route path="/ads/profile" element={<ProfileGrid />} />
           <Route path="/ads/campaigns" element={<Campaigns />} />
