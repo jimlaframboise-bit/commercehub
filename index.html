@@ -569,6 +569,20 @@ function Routes({ children }) {
   return match || fallback;
 }
 function Route() { return null; }
+/* react-router's <Navigate> for the shim. Needed since 2026-09-03: /rolling12 was retired and
+   redirects to /. The import line is stripped by this build, so anything App.jsx references
+   must exist HERE too - otherwise it throws at render and the whole page goes blank. */
+function Navigate({ to, replace }) {
+  useEffect(() => {
+    if (replace && window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', '#' + to);
+      window.dispatchEvent(new window.HashChangeEvent('hashchange'));
+    } else {
+      window.location.hash = to;
+    }
+  }, [to, replace]);
+  return null;
+}
 
 /* ---------------- minimal SVG chart shim (replaces recharts) ---------------- */
 function _useW() {
