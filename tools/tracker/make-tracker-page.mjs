@@ -7,7 +7,11 @@
      - the page reports its height so the host iframe can size to content            */
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const SRC = '/mnt/user-data/uploads/Crump Group FY27 Ads Plan/tracker_versions/redesign_2026-07-28_R3_market-brand-filters.html';
+// The R3 source lives in the project folder, whose mount path differs per session. Pass it as
+// TRACKER_SRC; the default below is the sandbox mount used 2026-09-06. (The previous literal
+// pointed at a dead /mnt/user-data/uploads path and would have failed every refresh.)
+const SRC = process.env.TRACKER_SRC ||
+  '/sessions/modest-exciting-brahmagupta/mnt/Crump Group FY27 Ads Plan/tracker_versions/redesign_2026-07-28_R3_market-brand-filters.html';
 const snapshot = JSON.parse(readFileSync(new URL('./snapshot.json', import.meta.url)));
 const titles = JSON.parse(readFileSync(new URL('./titles.json', import.meta.url)));
 snapshot.titles = titles;
@@ -31,7 +35,9 @@ patch('strip artifact meta',
   '');
 
 /* 2 — inline Chart.js in place of the CDN tag */
-const chartjs = readFileSync(new URL('./node_modules/chart.js/dist/chart.umd.js', import.meta.url), 'utf8');
+// `npm install chart.js@4.5.0` from anywhere in the repo lands in the ROOT node_modules (there is
+// no package.json in tools/tracker), so resolve from the repo root; CHARTJS overrides.
+const chartjs = readFileSync(process.env.CHARTJS || new URL('../../node_modules/chart.js/dist/chart.umd.js', import.meta.url), 'utf8');
 patch('inline chart.js',
   '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>',
   '<script>' + chartjs + '</script>');
@@ -172,6 +178,16 @@ patch('watchdog finished flag',
   `  el('loading').style.display = 'none';
   el('content').style.display = 'block';
   try { window.__trk.finished = true } catch (e) {}`);
+
+/* 8b — one FX path. The connector converted the ad-spend rows to CAD at a rate measured on the
+   same pull (snapshot.fx). The artifact converts vendor COGS at its own literal 1.42071. Left
+   alone, spend and COGS would sit on two different rates inside one page and every TACoS would
+   be off by the ratio. So COGS is converted at the measured rate too - exactly what the R10c
+   tracker on Vercel does. The on-page "US at <rate>" label reads the same constant, so it stays
+   truthful. Added 2026-09-06. */
+patch('one FX path',
+  'const FX = 1.42071; // Pacvue connector rate — the Crump reporting standard (Jim, 2026-07-28)',
+  'const FX = ' + snapshot.fx + '; // measured on the ' + snapshot.asOf + ' pull as US ads in USD / US ads in CAD; the connector used it for the spend rows, so COGS uses it too (one path)');
 
 /* 9 — don't assert a clock time the snapshot doesn't have (pinned "now" is midday UTC) */
 patch('date not time', "'. Refreshed ' + now.toLocaleString() + '. ' +",

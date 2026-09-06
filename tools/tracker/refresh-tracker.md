@@ -15,26 +15,42 @@ would otherwise collide with CommerceHub's.
 The tracker artifact remains the separate live original. This page is a mirror, not a
 replacement, and the artifact must never be edited to match this one.
 
-## Refresh procedure
+## Refresh procedure (rewritten 2026-09-06 — fed from the daily pipeline, no hand pull)
 
-1. **Pull** the nine queries through the Pacvue MCP connector, exactly as listed in
-   `tools/tracker/raw.js` (7 base + 2 movers), plus product titles for movers. Window is
-   rolling 12 months + the live month; FX is the connector standard **1.42071**; US COGS
-   arrives in native USD and is converted, ad spend is requested with `toCurrency: CAD`.
-   Ads carry no brand dimension — brand-level spend is attributed by advertised ASIN from
-   the product-ad fact, pulled as three brand-scoped queries so the totals stay exact.
-2. **Rewrite** `tools/tracker/raw.js` with the new rows and set `AS_OF` / `CUT_DAY` in
-   `tools/tracker/build-snapshot.mjs`.
-3. `node tools/tracker/build-snapshot.mjs` — rebuilds `snapshot.json` and **fails loudly**
-   if any reconciliation check breaks. Do not proceed past a FAIL.
-4. `node tools/tracker/make-tracker-page.mjs` — re-applies the 12 plumbing patches to the
-   tracker source. It aborts if any patch does not match exactly once, which is the guard
-   against silently building against a changed artifact.
-5. `node tools/tracker/emit-module.mjs` — writes `src/data/trackerSnapshot.js`.
-6. `node tools/build-singlefile.mjs` then copy `CommerceHub.html` to `index.html`.
-7. `node tools/tracker/check-tracker.mjs` — headless render across all six filter states.
-   Zero console errors and 23/23 required.
-8. Commit and deploy.
+The R3 page and the R10c tracker on `crump-amazon-tracker.vercel.app` issue the same seven base
+queries plus movers. The R10c pipeline (project `tracker_build/REFRESH_RUNBOOK.md`, scheduled task
+`refresh-amazon-tracker`, weekdays 14:00) already pulls, ties out and stores them as
+`tracker_build/r10c_snapshot_<DATE>.json`. This page is built from that file — one pull, two
+pages, one set of figures. Do not re-pull by hand; a second copy of the same numbers is a second
+thing to tie out.
+
+1. `node tools/tracker/gen-raw-from-r10c.mjs <project>/tracker_build/r10c_snapshot_<DATE>.json`
+   — writes `raw.js` (with `AS_OF` and the measured `FX` exported) and `titles.json`.
+2. `EXPECT_CUT=<dCommon from pull_<DATE>/_derived.json> node tools/tracker/build-snapshot.mjs`
+   — rebuilds `snapshot.json`; **fails loudly** on any reconciliation break. Month, prior month and
+   days-in-month all derive from `AS_OF`; nothing about the month is a literal any more.
+3. `node tools/tracker/make-tracker-page.mjs` — re-applies the plumbing patches to the R3 source
+   (`TRACKER_SRC` overrides the path; `npm install chart.js@4.5.0` once at the repo root). Aborts
+   if any patch does not match exactly once. Includes the one-FX-path patch (below).
+4. `node tools/tracker/emit-module.mjs` — writes `src/data/trackerSnapshot.js`.
+5. `JSDOM_DIR=<dir with node_modules/jsdom> node tools/tracker/check-tracker-jsdom.mjs` — the
+   Playwright check ported to jsdom (this sandbox has no Chromium). 26 assertions across six filter
+   states, expectations computed from `snapshot.json` independently of the page. All must pass.
+6. `node tools/build-singlefile.mjs`, copy `CommerceHub.html` to `index.html`, confirm
+   `dup top-level decls: []`, then boot the bundle under jsdom for `/`, `/tracker` (one iframe,
+   snapshot date inside it) — see memory `commercehub-singlefile-router-shim` for why this step is
+   not optional.
+7. Commit and push (`attribution_push/github_token.txt` PAT from the sandbox). Verify the live page.
+
+### FX — one path (2026-09-06)
+
+The connector converts the ad-spend rows to CAD itself; the rate it used is measured on the same
+pull as US-ads-in-USD ÷ US-ads-in-CAD (`fx.json`, 1.39041 on 2026-09-04). The R3 artifact converts
+vendor COGS at its own literal 1.42071. Left alone, spend and COGS would sit on two rates inside one
+page and every TACoS would be off by the ratio (~2.2%). `make-tracker-page.mjs` therefore patches
+the page's `FX` to the measured rate, which is exactly what the R10c tracker does. The on-page
+"US at <rate>" label reads the same constant. The 1.42071 pin remains the *plan* convention
+(`registry.json fx.connector`); this page reports what the connector actually delivered.
 
 ## Reconciliation checks (step 3)
 

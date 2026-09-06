@@ -4,9 +4,20 @@
 import * as R from './raw.js';
 import { writeFileSync } from 'node:fs';
 
-const FX = 1.42071;                       // Pacvue connector rate — Crump reporting standard
-const AS_OF = '2026-07-29';
-const CUT_DAY = 27;                       // settled common window, computed below and asserted
+/* AS_OF and FX come from raw.js (written by gen-raw-from-r10c.mjs from the daily pipeline's
+   verified snapshot). Nothing about the month is hardcoded here any more: until 2026-09-06 this
+   file carried '2026-07-', '2026-07-01' and pk '2026-06' as literals, so every refresh after
+   July would have reconciled against the wrong month and still said PASS. */
+const FX = R.FX;                          // measured on the same pull as the CAD ad-spend rows
+const AS_OF = R.AS_OF;
+const CUR = AS_OF.slice(0, 7);            // '2026-09'
+const CUR_FIRST = CUR + '-01';
+const PK = (() => { const [y, m] = CUR.split('-').map(Number); const d = new Date(Date.UTC(y, m - 2, 1));
+  return d.toISOString().slice(0, 7); })();          // prior month, e.g. '2026-08'
+const PREV_DAYS = (() => { const [y, m] = PK.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); })();
+// Expected settled cut. Pass EXPECT_CUT=<day> to assert a known value (the daily pipeline writes
+// it to pull_<DATE>/_derived.json as dCommon); otherwise the computed value is accepted and printed.
+const CUT_DAY = process.env.EXPECT_CUT ? +process.env.EXPECT_CUT : null;
 
 // representative real ASIN per brand — lets brand-attributed spend flow through the
 // tracker's ASIN->brand map with no code change
@@ -51,13 +62,16 @@ const vUS = lastDay(vDaily.filter(r => r.country_code === 'US' && r.shipped_cogs
 const SETTLE = 2;
 const asOfDay = +AS_OF.slice(8, 10);
 const dCommon = Math.min(adsLast, vCA, vUS, asOfDay - SETTLE);
-checks.push({ label: 'settled window day', a: dCommon, b: CUT_DAY, diff: dCommon - CUT_DAY, ok: dCommon === CUT_DAY });
-const cut = '2026-07-' + String(dCommon).padStart(2, '0');
+if (CUT_DAY !== null)
+  checks.push({ label: 'settled window day', a: dCommon, b: CUT_DAY, diff: dCommon - CUT_DAY, ok: dCommon === CUT_DAY });
+else
+  checks.push({ label: 'settled window day (computed, not asserted)', a: dCommon, b: dCommon, diff: 0, ok: dCommon >= 0 });
+const cut = CUR + '-' + String(dCommon).padStart(2, '0');
 
 // 2. daily COGS (to cut) must roll up under the July monthly figure
 for (const m of ['CA', 'US']) {
   const d = vDaily.filter(r => r.country_code === m && r.date <= cut).reduce((s, r) => s + r.shipped_cogs, 0);
-  const mo = vMonthly.filter(r => r.country_code === m && r.date === '2026-07-01').reduce((s, r) => s + r.shipped_cogs, 0);
+  const mo = vMonthly.filter(r => r.country_code === m && r.date === CUR_FIRST).reduce((s, r) => s + r.shipped_cogs, 0);
   checks.push({ label: `daily<=cut <= monthly COGS ${m}`, a: +d.toFixed(2), b: +mo.toFixed(2), diff: +(d - mo).toFixed(2), ok: d <= mo + 0.01 });
 }
 
@@ -83,10 +97,10 @@ checks.push({ label: 'movers ASINs unmapped', a: missing.length, b: 0, diff: mis
 const snapshot = {
   asOf: AS_OF, fx: FX, cut, dCommon,
   coverage: +coverage.toFixed(4),
-  source: 'Pacvue connector (execute_query) — pulled ' + AS_OF,
+  source: 'Pacvue connector (execute_query) — pulled ' + AS_OF + ' by the daily tracker pipeline; FX measured on that pull = ' + FX.toFixed(5),
   moversCap: 'top 80 ASINs by shipped COGS in each window',
   vMonthly, aMonthly, vDaily, aDaily, aMonthlyAsin, aDailyAsin, brandMapRows,
-  movers: { cur: moversCur, base: moversBase, pk: '2026-06', prevDays: 30 }
+  movers: { cur: moversCur, base: moversBase, pk: PK, prevDays: PREV_DAYS }
 };
 
 writeFileSync(new URL('./snapshot.json', import.meta.url), JSON.stringify(snapshot));
