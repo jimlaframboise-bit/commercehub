@@ -8,7 +8,7 @@ import { writeFileSync } from 'node:fs';
    verified snapshot). Nothing about the month is hardcoded here any more: until 2026-09-06 this
    file carried '2026-07-', '2026-07-01' and pk '2026-06' as literals, so every refresh after
    July would have reconciled against the wrong month and still said PASS. */
-const FX = R.FX;                          // measured on the same pull as the CAD ad-spend rows
+const FX = +(+R.FX).toFixed(5);           // measured on the same pull as the CAD ad-spend rows; 5 dp so the page label reads 1.39041, not 15 digits
 const AS_OF = R.AS_OF;
 const CUR = AS_OF.slice(0, 7);            // '2026-09'
 const CUR_FIRST = CUR + '-01';
